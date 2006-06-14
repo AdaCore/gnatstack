@@ -142,11 +142,13 @@ package body Display is
          Options.Output_File := new String'("graph.vcg");
       end if;
 
-      GNAT.OS_Lib.Delete_File (Options.Output_File.all, Success);
+      if GNAT.OS_Lib.Is_Regular_File (Options.Output_File.all) then
+         GNAT.OS_Lib.Delete_File (Options.Output_File.all, Success);
+         pragma Assert (Success);
+      end if;
 
       Ada.Text_IO.Create
         (VCG_Descriptor, Ada.Text_IO.Out_File, Options.Output_File.all);
-      pragma Assert (Success);
 
       Ada.Text_IO.Set_Output (VCG_Descriptor);
 
