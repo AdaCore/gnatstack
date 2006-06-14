@@ -115,9 +115,9 @@ package body Parser is
 
    Label_Regexp : constant String :=
      "^([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
-     " \((static|dynamic|dynamic,bounded)\))??$";
+     "( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??$";
    --  Pattern: (([^\\:]+)??(\\n)??(([^\\]+)??(\\n)??([0-9]+ bytes
-   --           \((static|dynamic|dynamic,bounded)\))??$
+   --           ( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??$
 
    No_Location_Regexp : constant String := "^<no location>$";
    --  Pattern : ^<no location>$
@@ -127,8 +127,8 @@ package body Parser is
    --  Pattern: ^([^:,]+):([0-9]+):*([0-9]+)*,*(.+)*$
 
    Stack_Regexp : constant String :=
-     "^([0-9]+)+ bytes \((static|dynamic|dynamic,bounded)+\)$";
-   --  Pattern: ^([0-9]+)+ bytes \((static|dynamic|dynamic,bounded)+\)$
+     "^([0-9]+)+ bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))??$";
+   --  Pattern: ^([0-9]+)+ bytes( \(static| \(dynamic| \(dynamic,bounded\))??$
 
    Entry_Regexp : constant String :=
      "^([^:,]+),*(.+)*$";
@@ -166,7 +166,7 @@ package body Parser is
    --  locations in source files, and stack requirements extracted by the
    --  compiler.
    --  The format of the input String is:
-   --  [demangled_name\n][LOC[,LOC]\n][N bytes (static|dynamic[,bounded]])
+   --  [demangled_name\n][LOC[,LOC]\n][N bytes[ (static|dynamic[,bounded])]]
 
    procedure Parse_Locations
      (Input     : in String;
@@ -178,7 +178,7 @@ package body Parser is
    procedure Parse_Stack_Usage
      (Input : in String; Stack : out Static_Stack_Analysis.Stack_Usage_Info);
    --  Extract stack requirements.
-   --  Format: N bytes (static|dynamic[,bounded])
+   --  Format: N bytes[ (static|dynamic[,bounded])]
 
    procedure Parse_Shape (Input : in String; Local : out Boolean);
    --  Local is set to True if the subprogram is defined in the compilation
@@ -686,19 +686,23 @@ package body Parser is
            Static_Stack_Analysis.Frame_Size'Value
              (Input (Matches (1).First .. Matches (1).Last));
 
-         if Input (Matches (2).First .. Matches (2).Last) = "static" then
+         if Matches (2) = GNAT.Regpat.No_Match
+           or else Input (Matches (2).First .. Matches (2).Last) = " (static)"
+         then
             Stack.Frame_Type := Static_Stack_Analysis.Static;
             Stack.Dynamic_Usage := 0;
             Stack.Unknown_Usage := 0;
 
-         elsif Input (Matches (2).First .. Matches (2).Last) = "dynamic" then
+         elsif Input (Matches (2).First .. Matches (2).Last) =
+               " (dynamic)"
+         then
             Stack.Frame_Type := Static_Stack_Analysis.Unbounded;
             Stack.Dynamic_Usage :=
               Static_Stack_Analysis.Frame_Size (Options.Default_Unbounded);
             Stack.Unknown_Usage := 0;
 
          elsif Input (Matches (2).First .. Matches (2).Last) =
-               "dynamic,bounded"
+               " (dynamic,bounded)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Bounded;
             Stack.Dynamic_Usage := 0;
