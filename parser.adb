@@ -328,7 +328,7 @@ package body Parser is
          else
             --  The entry point does not exist
 
-            raise Parser_Error;
+            raise Parser_Error with "The entry point does not exist";
          end if;
 
          --  Get next entry point
