@@ -51,7 +51,7 @@ with GNAT.Strings;
 
 package body Display is
 
-   use type Static_Stack_Analysis.List_Of_Locations.Vector;
+   use type Static_Stack_Analysis.List_Of_Locations.Set;
    use type Static_Stack_Analysis.Subprogram_Name;
    use type Static_Stack_Analysis.Frame_Size;
 
@@ -230,7 +230,7 @@ package body Display is
       Ada.Text_IO.Put (" label: """);
 
       declare
-         Locations : constant Static_Stack_Analysis.List_Of_Locations.Vector :=
+         Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
            Static_Stack_Analysis.Get_Location_List (Node.all);
 
       begin

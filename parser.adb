@@ -160,7 +160,7 @@ package body Parser is
    procedure Parse_Label
      (Input     : in String;
       Demangled : out Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Vector;
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set;
       Stack     : out Static_Stack_Analysis.Stack_Usage_Info);
    --  The label contain information about the demangled symbol name,
    --  locations in source files, and stack requirements extracted by the
@@ -171,7 +171,7 @@ package body Parser is
    procedure Parse_Locations
      (Input     : in String;
       Demangled : in Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Vector);
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of locations in source files.
    --  Format: [filename:line:[column][,filename:line:[column]]
 
@@ -381,8 +381,8 @@ package body Parser is
 
       Matches         : GNAT.Regpat.Match_Array (0 .. 3);
 
-      Locations_Set   : List_Of_Locations.Vector :=
-        List_Of_Locations.Empty_Vector;
+      Locations_Set   : List_Of_Locations.Set :=
+        List_Of_Locations.Empty_Set;
 
    begin
       --  The pattern of the input line is:
@@ -503,12 +503,10 @@ package body Parser is
                   --  analyzing a node: Target_Calls and
                   --  Accumulated_Stack_Usage.
 
-                  --  Check the location list
+                  --  Merge the location list
 
-                  if not Locations_Set.Is_Empty then
-                     Explicit_Node (Found_Node.all).Location_List.Append
-                       (Locations_Set);
-                  end if;
+                  Explicit_Node (Found_Node.all).Location_List.Union
+                    (Locations_Set);
 
                   --  Check information about stack usage and update if
                   --  necessary.
@@ -516,9 +514,9 @@ package body Parser is
                   Explicit_Node (Found_Node.all).Update_Stack_Usage
                     (Stack_Info);
 
-               elsif Found_Node.all in Unresolved_Node'Class then
-                  --  The node was known as an unresolved node. We now need to
-                  --  change it to an explicit node.
+               else
+                  --  The node needs to be changed to an explicit node. We
+                  --  will include the information that we already had.
 
                   Node_Ptr := new Explicit_Node'
                     (Target_Calls            => Found_Node.Target_Calls,
@@ -528,51 +526,13 @@ package body Parser is
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False);
 
-                  --  Check the location list
+                  --  Merge the location list
 
-                  if
-                    not Unresolved_Node (Found_Node.all).Location_List.Is_Empty
-                  then
-                     Explicit_Node (Node_Ptr.all).Location_List.Append
-                       (Unresolved_Node (Found_Node.all).Location_List);
-                  end if;
+                  Explicit_Node (Node_Ptr.all).Location_List.Union
+                    (Get_Location_List (Found_Node.all));
 
                   List_Of_Nodes.Replace_Element
                        (List_Of_Subprograms, Found_Id, Node_Ptr);
-
-                  --  Free the old node ???
-
-               elsif Found_Node.all in Indirect_Node'Class then
-                  --  The node was known as an indirect node. We now need to
-                  --  update with the information we have just found.
-
-                  Node_Ptr := new Explicit_Node'
-                    (Target_Calls            => Found_Node.Target_Calls,
-                     Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                     Location_List           => Locations_Set,
-                     Subprogram              => Symbol_Name,
-                     Stack_Info              => Stack_Info,
-                     Under_Analysis          => False);
-
-                  List_Of_Nodes.Replace_Element
-                    (List_Of_Subprograms, Found_Id, Node_Ptr);
-
-                  --  Free the old node ???
-
-               elsif Found_Node.all in Dispatching_Node'Class then
-                  --  The node was known as a dispatching node. We now need to
-                  --  update with the information we have just found.
-
-                  Node_Ptr := new Explicit_Node'
-                    (Target_Calls            => Found_Node.Target_Calls,
-                     Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                     Location_List           => Locations_Set,
-                     Subprogram              => Symbol_Name,
-                     Stack_Info              => Stack_Info,
-                     Under_Analysis          => False);
-
-                  List_Of_Nodes.Replace_Element
-                    (List_Of_Subprograms, Found_Id, Node_Ptr);
 
                   --  Free the old node ???
 
@@ -605,7 +565,7 @@ package body Parser is
    procedure Parse_Label
      (Input     : in String;
       Demangled : out Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Vector;
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set;
       Stack     : out Static_Stack_Analysis.Stack_Usage_Info)
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 6);
@@ -632,7 +592,7 @@ package body Parser is
                Demangled,
                Locations);
          else
-            Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Vector;
+            Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
          end if;
 
          if Matches (5) /= GNAT.Regpat.No_Match then
@@ -653,7 +613,7 @@ package body Parser is
    procedure Parse_Locations
      (Input     : in String;
       Demangled : in Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Vector)
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 4);
 
@@ -665,7 +625,7 @@ package body Parser is
       GNAT.Regpat.Match (No_Location_Regexp, Input, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Vector;
+         Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
 
       else
          GNAT.Regpat.Match (Location_Regexp, Input, Matches);
@@ -698,9 +658,10 @@ package body Parser is
                   Locations);
             end if;
 
-            Locations :=
-              Static_Stack_Analysis.List_Of_Locations."&"
-                (Tmp_Location, Locations);
+            --  Include the parsed location if it is not already in the list
+
+            Locations.Include (Tmp_Location);
+
          else
             raise Parser_Error;
          end if;
@@ -802,7 +763,7 @@ package body Parser is
             Source_Ptr := new Unresolved_Node'
               (Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Location_List           => List_Of_Locations.Empty_Vector,
+               Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              => Name,
                Under_Analysis          => False);
 
@@ -827,7 +788,7 @@ package body Parser is
             Target_Ptr := new Unresolved_Node'
               (Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Location_List           => List_Of_Locations.Empty_Vector,
+               Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              => Name,
                Under_Analysis          => False);
 

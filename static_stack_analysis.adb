@@ -43,6 +43,20 @@ package body Static_Stack_Analysis is
         Get_Subprogram_Name (Right.all).all;
    end "<";
 
+   function "<" (Left, Right : Location) return Boolean is
+   begin
+      return Left.File.all < Right.File.all
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all < Right.Demangled.all)
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all = Right.Demangled.all
+                   and then Left.Line_Number < Right.Line_Number)
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all = Right.Demangled.all
+                   and then Left.Line_Number = Right.Line_Number
+                   and then Left.Column_Number < Right.Column_Number);
+   end "<";
+
    ---------
    -- "=" --
    ---------
@@ -96,16 +110,16 @@ package body Static_Stack_Analysis is
    -----------------------
 
    function Get_Location_List
-     (Target : Real_Node) return List_Of_Locations.Vector is
+     (Target : Real_Node) return List_Of_Locations.Set is
    begin
       return Target.Location_List;
    end Get_Location_List;
 
    function Get_Location_List
-     (Target : Fake_Node) return List_Of_Locations.Vector is
+     (Target : Fake_Node) return List_Of_Locations.Set is
       pragma Unreferenced (Target);
    begin
-      return List_Of_Locations.Empty_Vector;
+      return List_Of_Locations.Empty_Set;
    end Get_Location_List;
 
    --------------

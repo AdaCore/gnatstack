@@ -31,12 +31,14 @@ package Static_Stack_Analysis is
 
    function "=" (Left, Right : Location) return Boolean;
 
+   function "<" (Left, Right : Location) return Boolean;
+
    Null_Location : constant Location;
    --  Identifier to be used when the location is not specified
 
    package List_Of_Locations is new
-     Ada.Containers.Vectors (Positive, Location, "=");
-   --  Package used for storing a singly-linked list of locations
+     Ada.Containers.Ordered_Sets (Location, "<", "=");
+   --  Package used for storing lists of locations
 
    -----------------
    -- Stack usage --
@@ -221,7 +223,7 @@ package Static_Stack_Analysis is
    --  specified node.
 
    function Get_Location_List
-     (Target : Node) return List_Of_Locations.Vector is abstract;
+     (Target : Node) return List_Of_Locations.Set is abstract;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where the associated subprogram is defined.
 
@@ -237,7 +239,7 @@ package Static_Stack_Analysis is
 
    type Real_Node is abstract new Node with
       record
-         Location_List : List_Of_Locations.Vector;
+         Location_List : List_Of_Locations.Set;
          --  List of places where the subprogram appears. This list of
          --  locations will typically contain just one entry, and it will
          --  contain a list of more than one location in the case of
@@ -256,7 +258,7 @@ package Static_Stack_Analysis is
    --  real (explicit or unresolved) node.
 
    overriding function Get_Location_List
-     (Target : Real_Node) return List_Of_Locations.Vector;
+     (Target : Real_Node) return List_Of_Locations.Set;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where the associated subprogram is defined for a real
    --  (explicit or unresolved) node.
@@ -315,7 +317,7 @@ package Static_Stack_Analysis is
    --  node.
 
    overriding function Get_Location_List
-     (Target : Fake_Node) return List_Of_Locations.Vector;
+     (Target : Fake_Node) return List_Of_Locations.Set;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where the associated subprogram is defined for a fake node.
 
