@@ -31,13 +31,13 @@ package Static_Stack_Analysis is
 
    function "=" (Left, Right : Location) return Boolean;
 
-   function "<" (Left, Right : Location) return Boolean;
+   function Alphabetical_Order (Left, Right : Location) return Boolean;
 
    Null_Location : constant Location;
    --  Identifier to be used when the location is not specified
 
    package List_Of_Locations is new
-     Ada.Containers.Ordered_Sets (Location, "<", "=");
+     Ada.Containers.Ordered_Sets (Location, Alphabetical_Order, "=");
    --  Package used for storing lists of locations
 
    -----------------
@@ -92,18 +92,33 @@ package Static_Stack_Analysis is
    type Node_Class_Access is access all Node'Class;
    --  Classwide access type
 
-   function "<" (Left, Right : Node_Class_Access) return Boolean;
+   function Alphabetical_Order
+     (Left, Right : Node_Class_Access) return Boolean;
+   --  Returns True if Left is alphabetically before Right, False otherwise.
+   --  It is used for ordering sets of nodes alphabetically.
+
+   function Stack_Usage_Order
+     (Left, Right : Node_Class_Access) return Boolean;
+   --  Returns True if Left has a total accumulated stack usage greater than
+   --  Right, False otherwise. It is used for ordering sets of nodes according
+   --  to their total accumulated stack usage (in decreasing order).
 
    function Equal (Left, Right : Node_Class_Access) return Boolean;
 
    package List_Of_Nodes is
-     new Ada.Containers.Ordered_Sets (Node_Class_Access, "<", Equal);
+     new Ada.Containers.Ordered_Sets
+       (Node_Class_Access, Alphabetical_Order, Equal);
    --  Package used for storing an ordered list of pointers to nodes
    --  representing subprograms. The nodes are ordered alphabetically
    --  (according to the program they represent).
 
    subtype Node_Id is List_Of_Nodes.Cursor;
    --  Unique identifier for subprograms
+
+   function Stack_Usage_Order (Left, Right : Node_Id) return Boolean;
+   --  Returns True if Left has a total accumulated stack usage greater than
+   --  Right, False otherwise. It is used for ordering sets of nodes according
+   --  to their total accumulated stack usage (in decreasing order).
 
    function Get_Node (Subprogram : String) return Node_Id;
    --  This function returns the identifier for the name of the symbol
@@ -131,6 +146,10 @@ package Static_Stack_Analysis is
    end record;
    --  Edge joins the caller to the callee. This information is stored in the
    --  caller.
+
+   function Stack_Usage_Order (Left, Right : Edge) return Boolean;
+   --  We will order the different calls according to the accumulated stack
+   --  usage (in decreasing order) that we get going through this path.
 
    package List_Of_Edges is new Ada.Containers.Vectors (Natural, Edge);
    --  Package used for storing a singly-linked list of edges for a given

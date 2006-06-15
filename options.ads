@@ -27,6 +27,13 @@ package Options is
    Verbose : Boolean := False;
    --  Verbose output
 
+   type Order_Type is (Alphabetical, Stack_Usage);
+
+   Order : Order_Type := Stack_Usage;
+   --  Determines the order in which the results are displayed. It can be
+   --  either in alphabetical order (according to the symbol name), or in
+   --  decreasing order of stack usage.
+
    Explore_All : Boolean := False;
    --  Compute worst case stack usage for every node in the partition
 

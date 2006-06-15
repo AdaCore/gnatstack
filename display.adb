@@ -23,6 +23,7 @@ with Options;
 --  Used for Output_File
 --           Explore_All
 --           Verbose
+--           Order
 
 with Static_Stack_Analysis;
 --  Used for List_Of_Locations
@@ -56,6 +57,14 @@ package body Display is
    use type Static_Stack_Analysis.Subprogram_Name;
    use type Static_Stack_Analysis.Frame_Size;
 
+   --------------------------
+   -- Ordered entry points --
+   --------------------------
+
+   package Ordered_Entries is
+     new Static_Stack_Analysis.List_Of_Entry_Points.Generic_Sorting
+       (Static_Stack_Analysis.Stack_Usage_Order);
+
    ----------------
    -- Local data --
    ----------------
@@ -88,6 +97,7 @@ package body Display is
    ------------------------
 
    procedure Print_Longest_Paths is
+
       procedure Print_Longest_Path
         (Position : in Static_Stack_Analysis.Node_Id);
       --  Print the longest path for the specified subprogram
@@ -98,16 +108,8 @@ package body Display is
 
       procedure Print_Longest_Path
         (Position : in Static_Stack_Analysis.Node_Id) is
-         Node : constant Static_Stack_Analysis.Node_Class_Access :=
-           Static_Stack_Analysis.List_Of_Nodes.Element (Position);
-
       begin
-         --  Print the paths only for the subprograms defined within the
-         --  application
-
-         if Node.all in Static_Stack_Analysis.Explicit_Node'Class then
-            Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
-         end if;
+         Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
       end Print_Longest_Path;
 
       procedure Print_Longest_Path
@@ -117,23 +119,22 @@ package body Display is
            (Static_Stack_Analysis.List_Of_Entry_Points.Element (Position));
       end Print_Longest_Path;
 
+      use type Options.Order_Type;
+
    begin
-      if Options.Explore_All then
-         --  Generate the worst case graph for every subprogram
+      --  Reorder if necessary
 
-         Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms,
-            Print_Longest_Path'Access);
+      if Options.Order = Options.Stack_Usage then
+         --  Order entry points according to their stack consumption
 
-      elsif not Static_Stack_Analysis.List_Of_Entry_Points.Is_Empty
-           (Static_Stack_Analysis.Entry_Points)
-      then
-         --  Generate the worst case graph for every entry point
-
-         Static_Stack_Analysis.List_Of_Entry_Points.Iterate
-           (Static_Stack_Analysis.Entry_Points,
-            Print_Longest_Path'Access);
+         Ordered_Entries.Sort (Static_Stack_Analysis.Entry_Points);
       end if;
+
+      --  Generate the worst case graph for every entry point
+
+      Static_Stack_Analysis.List_Of_Entry_Points.Iterate
+        (Static_Stack_Analysis.Entry_Points,
+         Print_Longest_Path'Access);
    end Print_Longest_Paths;
 
    ---------------------

@@ -34,23 +34,9 @@ package body Worst_Case_Analyzer is
    -- Ordered edges --
    -------------------
 
-   function "<" (Left, Right : Static_Stack_Analysis.Edge) return Boolean;
-   --  We will order the different calls according to the accumulated stack
-   --  usage that we get going through this path.
-
    package Ordered_Edges is
-     new Static_Stack_Analysis.List_Of_Edges.Generic_Sorting ("<");
-
-   --------------------------
-   -- Ordered entry points --
-   --------------------------
-
-   function "<" (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean;
-   --  We will order the different entry points according to the accumulated
-   --  stack usage.
-
-   package Ordered_Entries is
-     new Static_Stack_Analysis.List_Of_Entry_Points.Generic_Sorting ("<");
+     new Static_Stack_Analysis.List_Of_Edges.Generic_Sorting
+       (Static_Stack_Analysis.Stack_Usage_Order);
 
    ----------------------
    -- Local procedures --
@@ -68,25 +54,23 @@ package body Worst_Case_Analyzer is
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
 
-   ---------
-   -- "<" --
-   ---------
+   procedure Add_Entry_Point (Position : in Static_Stack_Analysis.Node_Id);
+   --  Add the node to the list of entry points to analyze if it contains a
+   --  subprogram that is part of the application code.
 
-   function "<" (Left, Right : Static_Stack_Analysis.Edge) return Boolean is
+   ---------------------
+   -- Add_Entry_Point --
+   ---------------------
+
+   procedure Add_Entry_Point (Position : in Static_Stack_Analysis.Node_Id) is
+      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
    begin
-      --  Compare the weigth of the subprograms to wich we are pointing to
-
-      return Left.Target < Right.Target;
-   end "<";
-
-   function "<" (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean is
-   begin
-      return Static_Stack_Analysis."<"
-        (Static_Stack_Analysis.List_Of_Nodes.Element
-           (Left).Accumulated_Stack_Usage,
-        Static_Stack_Analysis.List_Of_Nodes.Element
-          (Right).Accumulated_Stack_Usage);
-   end "<";
+      if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
+         Static_Stack_Analysis.Entry_Points.Append (Position);
+      end if;
+   end Add_Entry_Point;
 
    ------------------------
    -- Compute_Worst_Case --
@@ -169,7 +153,7 @@ package body Worst_Case_Analyzer is
                 (Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all),
                  Static_Stack_Analysis.Get_Accumulated_Stack_Usage
                    (Static_Stack_Analysis.List_Of_Nodes.Element
-                      (Static_Stack_Analysis.List_Of_Edges.Last_Element
+                      (Static_Stack_Analysis.List_Of_Edges.First_Element
                          (Explored_Node.Target_Calls).Target).all));
          end if;
       end if;
@@ -207,7 +191,7 @@ package body Worst_Case_Analyzer is
               (Target,
                Static_Stack_Analysis.List_Of_Edges.Last (Node.Target_Calls)),
             Get_Longest_Path
-              (Static_Stack_Analysis.List_Of_Edges.Last_Element
+              (Static_Stack_Analysis.List_Of_Edges.First_Element
                  (Node.Target_Calls).Target));
       end if;
    end Get_Longest_Path;
@@ -219,22 +203,17 @@ package body Worst_Case_Analyzer is
    procedure Worst_Case_Analysis is
    begin
       if Options.Explore_All then
-         --  Explore every node
+         --  Explore every node that contains subprograms defined within the
+         --  application
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms,
-            Compute_Worst_Case'Access);
-
-      else
-         --  Explore every entry point
-
-         Static_Stack_Analysis.List_Of_Entry_Points.Iterate
-           (Static_Stack_Analysis.Entry_Points, Compute_Worst_Case'Access);
-
-         --  Order entry points according to their stack consumption
-
-         Ordered_Entries.Sort (Static_Stack_Analysis.Entry_Points);
+           (Static_Stack_Analysis.List_Of_Subprograms, Add_Entry_Point'Access);
       end if;
+
+      --  Explore every entry point
+
+      Static_Stack_Analysis.List_Of_Entry_Points.Iterate
+        (Static_Stack_Analysis.Entry_Points, Compute_Worst_Case'Access);
    end Worst_Case_Analysis;
 
 end Worst_Case_Analyzer;

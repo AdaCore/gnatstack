@@ -35,28 +35,6 @@ package body Static_Stack_Analysis is
              Right.Static_Usage + Right.Dynamic_Usage + Right.Unknown_Usage;
    end "<";
 
-   function "<" (Left, Right : Node_Class_Access) return Boolean is
-   begin
-      --  Compare the associated symbol names
-
-      return Get_Subprogram_Name (Left.all).all <
-        Get_Subprogram_Name (Right.all).all;
-   end "<";
-
-   function "<" (Left, Right : Location) return Boolean is
-   begin
-      return Left.File.all < Right.File.all
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all < Right.Demangled.all)
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all = Right.Demangled.all
-                   and then Left.Line_Number < Right.Line_Number)
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all = Right.Demangled.all
-                   and then Left.Line_Number = Right.Line_Number
-                   and then Left.Column_Number < Right.Column_Number);
-   end "<";
-
    ---------
    -- "=" --
    ---------
@@ -82,6 +60,33 @@ package body Static_Stack_Analysis is
         and then Static_Stack_Analysis.List_Of_Nodes.Element (Left) =
                  Static_Stack_Analysis.List_Of_Nodes.Element (Right);
    end "=";
+
+   ------------------------
+   -- Alphabetical_Order --
+   ------------------------
+
+   function Alphabetical_Order (Left, Right : Location) return Boolean is
+   begin
+      return Left.File.all < Right.File.all
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all < Right.Demangled.all)
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all = Right.Demangled.all
+                   and then Left.Line_Number < Right.Line_Number)
+        or else (Left.File.all = Right.File.all
+                   and then Left.Demangled.all = Right.Demangled.all
+                   and then Left.Line_Number = Right.Line_Number
+                   and then Left.Column_Number < Right.Column_Number);
+   end Alphabetical_Order;
+
+   function Alphabetical_Order
+     (Left, Right : Node_Class_Access) return Boolean is
+   begin
+      --  Compare the associated symbol names
+
+      return Get_Subprogram_Name (Left.all).all <
+        Get_Subprogram_Name (Right.all).all;
+   end Alphabetical_Order;
 
    -----------
    -- Equal --
@@ -184,8 +189,32 @@ package body Static_Stack_Analysis is
 
    function Key (Element : Node_Class_Access) return String is
    begin
-         return Get_Subprogram_Name (Element.all).all;
+      return Get_Subprogram_Name (Element.all).all;
    end Key;
+
+   -----------------------
+   -- Stack_Usage_Order --
+   -----------------------
+
+   function Stack_Usage_Order
+     (Left, Right : Node_Class_Access) return Boolean is
+   begin
+      return Get_Accumulated_Stack_Usage (Right.all) <
+             Get_Accumulated_Stack_Usage (Left.all);
+   end Stack_Usage_Order;
+
+   function Stack_Usage_Order (Left, Right : Node_Id) return Boolean is
+   begin
+      return Stack_Usage_Order
+        (List_Of_Nodes.Element (Left), List_Of_Nodes.Element (Right));
+   end Stack_Usage_Order;
+
+   function Stack_Usage_Order (Left, Right : Edge) return Boolean is
+   begin
+      --  Compare the weigth of the subprograms to wich we are pointing to
+
+      return Stack_Usage_Order (Left.Target, Right.Target);
+   end Stack_Usage_Order;
 
    ------------------------
    -- Update_Stack_Usage --

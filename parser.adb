@@ -34,6 +34,7 @@ with Options;
 --           Default_Unbounded
 --           List_Of_Entry_Points
 --           Output_File
+--           Order
 
 with Ada.Containers.Vectors;
 
@@ -217,12 +218,27 @@ package body Parser is
       --  Get options
 
       loop
-         case GNAT.Command_Line.Getopt ("h v a u: d: e: o:") is
+         case GNAT.Command_Line.Getopt ("h v o= a u: d: e: g:") is
             when ASCII.NUL =>
                exit;
 
             when 'v' =>
                Options.Verbose := True;
+
+            when 'o' =>
+               declare
+                  Parameter : constant String := GNAT.Command_Line.Parameter;
+               begin
+                  if Parameter = "a" then
+                        Options.Order := Options.Alphabetical;
+                  elsif Parameter = "s" then
+                        Options.Order := Options.Stack_Usage;
+                  else
+                        Ada.Text_IO.Put_Line ("Bad order (-o) option");
+                        Usage;
+                        GNAT.OS_Lib.OS_Exit (1);
+                  end if;
+               end;
 
             when 'a' =>
                Options.Explore_All := True;
@@ -239,7 +255,7 @@ package body Parser is
                Options.List_Of_Entry_Points :=
                  new String'(GNAT.Command_Line.Parameter);
 
-            when 'o' =>
+            when 'g' =>
                Options.Output_File :=
                  new String'(GNAT.Command_Line.Parameter);
 
@@ -848,6 +864,10 @@ package body Parser is
       New_Line;
       Put_Line ("  -v          verbose");
       New_Line;
+      Put_Line ("  -o={a,s}    order for displaying call graphs");
+      Put_Line ("  -o=a        alphabetical");
+      Put_Line ("  -o=s        stack usage (default)");
+      New_Line;
       Put_Line ("  -u size     default for unknown (external) calls");
       New_Line;
       Put_Line ("  -d size     default for unbounded (dynamic) calls");
@@ -856,7 +876,7 @@ package body Parser is
       New_Line;
       Put_Line ("  -e <list>   list of entry points (e1,e2,...)");
       New_Line;
-      Put_Line ("  -o file     output file");
+      Put_Line ("  -g file     output graph file");
       New_Line;
       Put_Line ("  <files>     list of .ci files (c1.ci c2.ci ...)");
       New_Line;
