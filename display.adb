@@ -22,6 +22,7 @@
 with Options;
 --  Used for Output_File
 --           Explore_All
+--           Verbose
 
 with Static_Stack_Analysis;
 --  Used for List_Of_Locations
@@ -97,8 +98,16 @@ package body Display is
 
       procedure Print_Longest_Path
         (Position : in Static_Stack_Analysis.Node_Id) is
+         Node : constant Static_Stack_Analysis.Node_Class_Access :=
+           Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
       begin
-         Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
+         --  Print the paths only for the subprograms defined within the
+         --  application
+
+         if Node.all in Static_Stack_Analysis.Explicit_Node'Class then
+            Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
+         end if;
       end Print_Longest_Path;
 
       procedure Print_Longest_Path
@@ -341,6 +350,10 @@ package body Display is
 
    procedure Print_Path (Path : in Static_Stack_Analysis.Paths.Vector) is
 
+      Top_Subprogram : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element
+          (Static_Stack_Analysis.Paths.First_Element (Path).Source_Node);
+
       procedure Print_Node (Position : in Static_Stack_Analysis.Paths.Cursor);
       --  Print the information about this concrete node (name, location,
       --  stack usage, and subprogram called).
@@ -363,6 +376,10 @@ package body Display is
             Explored_Node := Static_Stack_Analysis.List_Of_Nodes.Element
               (Explored_Item.Source_Node);
 
+            --  Indentation
+
+            Ada.Text_IO.Put (" +-> ");
+
             --  Print subprogram name
 
             Ada.Text_IO.Put
@@ -371,33 +388,52 @@ package body Display is
 
             --  Print location list
 
-            Ada.Text_IO.Put (" at ");
+            if Options.Verbose then
+               Ada.Text_IO.Put (" at ");
 
-            Static_Stack_Analysis.List_Of_Locations.Iterate
-              (Static_Stack_Analysis.Get_Location_List (Explored_Node.all),
-               Expand_Location'Access);
-
-            Ada.Text_IO.New_Line;
+               Static_Stack_Analysis.List_Of_Locations.Iterate
+                 (Static_Stack_Analysis.Get_Location_List (Explored_Node.all),
+                  Expand_Location'Access);
+            end if;
 
             --  Print local and accumulated stack usage
 
-            Ada.Text_IO.Put ("  Local stack usage: ");
+            Ada.Text_IO.Put (" : ");
 
             Expand_Stack_Usage
               (Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all));
 
-            Ada.Text_IO.New_Line;
+            --  Print local and accumulated stack usage
 
-            Ada.Text_IO.Put ("  Accumulated stack usage: ");
+            if Options.Verbose then
+               Ada.Text_IO.Put (" Accumulated : ");
 
-            Expand_Stack_Usage (Explored_Node.Accumulated_Stack_Usage);
+               Expand_Stack_Usage (Explored_Node.Accumulated_Stack_Usage);
+            end if;
 
             Ada.Text_IO.New_Line;
          end if;
       end Print_Node;
 
    begin
+      --  Print the global information
+
+      Ada.Text_IO.Put
+        (Static_Stack_Analysis.Get_Subprogram_Name (Top_Subprogram.all).all);
+
+      Ada.Text_IO.Put (" : total ");
+
+      Expand_Stack_Usage
+        (Static_Stack_Analysis.Get_Accumulated_Stack_Usage
+           (Top_Subprogram.all));
+
+      Ada.Text_IO.New_Line;
+
+      --  Print the call chain
+
       Static_Stack_Analysis.Paths.Iterate (Path, Print_Node'Access);
+
+      Ada.Text_IO.New_Line;
    end Print_Path;
 
 end Display;

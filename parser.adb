@@ -183,7 +183,7 @@ package body Parser is
    procedure Parse_Shape (Input : in String; Local : out Boolean);
    --  Local is set to True if the subprogram is defined in the compilation
    --  unit. For unresolved subprograms it returns False.
-   --  Format : ellipse
+   --  Format :  shape : ellipse
 
    procedure Parse_Edge (Input : String);
    --  Get caller and callee in a subprogram call.
@@ -457,19 +457,23 @@ package body Parser is
             null;
 
          --  Unresolved
-         elsif not Locally_Defined
-           and then not List_Of_Nodes.Has_Element (Found_Id)
-         then
-            --  Insert new unresolved node
+         elsif not Locally_Defined then
+            --  If the subprogram is not yet in the list then we insert it.
+            --  Otherwise, we do nothing because there is no information to
+            --  add.
 
-            Node_Ptr := new Unresolved_Node'
-              (Target_Calls            => List_Of_Edges.Empty_Vector,
-               Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Location_List           => Locations_Set,
-               Subprogram              => Symbol_Name,
-               Under_Analysis          => False);
+            if not List_Of_Nodes.Has_Element (Found_Id) then
+               --  Insert new unresolved node
 
-            List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
+               Node_Ptr := new Unresolved_Node'
+                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Location_List           => Locations_Set,
+                  Subprogram              => Symbol_Name,
+                  Under_Analysis          => False);
+
+               List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
+            end if;
 
          --  Explicit node
          else
@@ -724,7 +728,7 @@ package body Parser is
 
    procedure Parse_Shape (Input : in String; Local : out Boolean) is
    begin
-      Local := Input = "ellipse";
+      Local := Input /= " shape : ellipse";
    end Parse_Shape;
 
    ----------------
