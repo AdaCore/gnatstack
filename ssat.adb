@@ -42,5 +42,5 @@ begin
 
    Display.Generate_VCG_Graph;
 
-   Display.Print_Longest_Path;
+   Display.Print_Longest_Paths;
 end SSAT;

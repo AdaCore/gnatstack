@@ -83,30 +83,49 @@ package body Display is
    --  accumulated stack consumption.
 
    ------------------------
-   -- Print_Longest_Path --
+   -- Print_Longest_Paths --
    ------------------------
 
-   procedure Print_Longest_Path is
+   procedure Print_Longest_Paths is
+      procedure Print_Longest_Path
+        (Position : in Static_Stack_Analysis.Node_Id);
+      --  Print the longest path for the specified subprogram
+
+      procedure Print_Longest_Path
+        (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor);
+      --  Print the longest path for the specified entry point
+
+      procedure Print_Longest_Path
+        (Position : in Static_Stack_Analysis.Node_Id) is
+      begin
+         Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
+      end Print_Longest_Path;
+
+      procedure Print_Longest_Path
+        (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor) is
+      begin
+         Print_Longest_Path
+           (Static_Stack_Analysis.List_Of_Entry_Points.Element (Position));
+      end Print_Longest_Path;
+
    begin
       if Options.Explore_All then
-         null;
+         --  Generate the worst case graph for every subprogram
 
-      else
+         Static_Stack_Analysis.List_Of_Nodes.Iterate
+           (Static_Stack_Analysis.List_Of_Subprograms,
+            Print_Longest_Path'Access);
 
-         --  Select the entry point with the potentially bigest stack
-         --  consumption.
-
-         if not Static_Stack_Analysis.List_Of_Entry_Points.Is_Empty
+      elsif not Static_Stack_Analysis.List_Of_Entry_Points.Is_Empty
            (Static_Stack_Analysis.Entry_Points)
-         then
-            Ada.Text_IO.Put_Line ("Longest path:");
+      then
+         --  Generate the worst case graph for every entry point
 
-            Print_Path
-              (Worst_Case_Analyzer.Get_Longest_Path
-                 (Static_Stack_Analysis.Entry_Points.Last_Element));
-         end if;
+         Static_Stack_Analysis.List_Of_Entry_Points.Iterate
+           (Static_Stack_Analysis.Entry_Points,
+            Print_Longest_Path'Access);
       end if;
-   end Print_Longest_Path;
+   end Print_Longest_Paths;
 
    ---------------------
    -- Expand_Location --
