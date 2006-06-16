@@ -81,6 +81,14 @@ package body Parser is
    procedure Usage;
    --  Print how to use the tool
 
+   procedure Add_Local_Entry (Position : in Static_Stack_Analysis.Node_Id);
+   --  Add the node to the list of entry points to analyze if it contains a
+   --  subprogram that is part of the application code.
+
+   procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id);
+   --  Add the node to the list of entry points to analyze if its symbol name
+   --  contains the pattern specified in Options.Entry_Point_Pattern.
+
    ------------------------
    -- Handle input files --
    ------------------------
@@ -190,6 +198,41 @@ package body Parser is
    --  Get caller and callee in a subprogram call.
    --  Format : ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
 
+   ---------------------
+   -- Add_Local_Entry --
+   ---------------------
+
+   procedure Add_Local_Entry (Position : in Static_Stack_Analysis.Node_Id) is
+      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+   begin
+      if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
+         Static_Stack_Analysis.Entry_Points.Append (Position);
+      end if;
+   end Add_Local_Entry;
+
+   -----------------------
+   -- Add_Pattern_Entry --
+   -----------------------
+
+   procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id) is
+      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+      Matches : GNAT.Regpat.Match_Array (0 .. 1);
+
+   begin
+      GNAT.Regpat.Match
+        (Options.Entry_Point_Pattern.all,
+         Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all,
+         Matches);
+
+      if Matches (0) /= GNAT.Regpat.No_Match then
+         Static_Stack_Analysis.Entry_Points.Append (Position);
+      end if;
+   end Add_Pattern_Entry;
+
    -----------
    -- Equal --
    -----------
@@ -218,7 +261,7 @@ package body Parser is
       --  Get options
 
       loop
-         case GNAT.Command_Line.Getopt ("h v o= a u: d: e: g:") is
+         case GNAT.Command_Line.Getopt ("h v o= a u: d: e: r: g:") is
             when ASCII.NUL =>
                exit;
 
@@ -253,6 +296,10 @@ package body Parser is
 
             when 'e' =>
                Options.List_Of_Entry_Points :=
+                 new String'(GNAT.Command_Line.Parameter);
+
+            when 'r' =>
+               Options.Entry_Point_Pattern :=
                  new String'(GNAT.Command_Line.Parameter);
 
             when 'g' =>
@@ -299,7 +346,23 @@ package body Parser is
       --  Get the list of subprograms to be considered as entry points
 
       if Options.List_Of_Entry_Points /= null then
+         --  Add the entry points that have been specified in the command line
+
          Parse_Entry_Points (Options.List_Of_Entry_Points.all);
+
+      elsif Options.Entry_Point_Pattern /= null then
+         --  Add the entry points matching the pattern
+
+         Static_Stack_Analysis.List_Of_Nodes.Iterate
+           (Static_Stack_Analysis.List_Of_Subprograms,
+            Add_Pattern_Entry'Access);
+
+      elsif Options.Explore_All then
+         --  Explore every node that contains subprograms defined within the
+         --  application.
+
+         Static_Stack_Analysis.List_Of_Nodes.Iterate
+           (Static_Stack_Analysis.List_Of_Subprograms, Add_Local_Entry'Access);
       end if;
 
    exception
@@ -860,25 +923,25 @@ package body Parser is
       New_Line;
       Put_Line ("where possible arguments are:");
       New_Line;
-      Put_Line ("  -h          display help message");
+      Put_Line ("  -h           display help message");
       New_Line;
-      Put_Line ("  -v          verbose");
+      Put_Line ("  -v           verbose");
       New_Line;
-      Put_Line ("  -o={a,s}    order for displaying call graphs");
-      Put_Line ("  -o=a        alphabetical");
-      Put_Line ("  -o=s        stack usage (default)");
+      Put_Line ("  -o={a,s}     order for displaying call graphs");
+      Put_Line ("  -o=a         alphabetical");
+      Put_Line ("  -o=s         stack usage (default)");
       New_Line;
-      Put_Line ("  -u size     default for unknown (external) calls");
+      Put_Line ("  -u size      default for unknown (external) calls");
       New_Line;
-      Put_Line ("  -d size     default for unbounded (dynamic) calls");
+      Put_Line ("  -d size      default for unbounded (dynamic) calls");
       New_Line;
-      Put_Line ("  -a          analyze all subprograms");
+      Put_Line ("  -a           analyze all subprograms");
+      Put_Line ("  -e <list>    list of entry points (e1,e2,...)");
+      Put_Line ("  -r <reg-exp> analyze subprograms matching the pattern");
       New_Line;
-      Put_Line ("  -e <list>   list of entry points (e1,e2,...)");
+      Put_Line ("  -g file      output graph file");
       New_Line;
-      Put_Line ("  -g file     output graph file");
-      New_Line;
-      Put_Line ("  <files>     list of .ci files (c1.ci c2.ci ...)");
+      Put_Line ("  <files>      list of .ci files (c1.ci c2.ci ...)");
       New_Line;
    end Usage;
 

@@ -40,6 +40,10 @@ package Options is
    List_Of_Entry_Points : GNAT.Strings.String_Access := null;
    --  List of entry points to be analyzed
 
+   Entry_Point_Pattern : GNAT.Strings.String_Access := null;
+   --  Consider as entry points all the subprograms containing this pattern in
+   --  the symbol name.
+
    Output_File : GNAT.Strings.String_Access := null;
    --  Name of the generated call graph file
 

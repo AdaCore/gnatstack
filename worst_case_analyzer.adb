@@ -21,7 +21,6 @@
 
 with Options;
 --  Used for Verbose
---           Explore_All
 
 with Ada.Text_IO;
 --  Used for Put_Line
@@ -53,24 +52,6 @@ package body Worst_Case_Analyzer is
    procedure Compute_Worst_Case (Position : in Static_Stack_Analysis.Node_Id);
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
-
-   procedure Add_Entry_Point (Position : in Static_Stack_Analysis.Node_Id);
-   --  Add the node to the list of entry points to analyze if it contains a
-   --  subprogram that is part of the application code.
-
-   ---------------------
-   -- Add_Entry_Point --
-   ---------------------
-
-   procedure Add_Entry_Point (Position : in Static_Stack_Analysis.Node_Id) is
-      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
-        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
-
-   begin
-      if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
-         Static_Stack_Analysis.Entry_Points.Append (Position);
-      end if;
-   end Add_Entry_Point;
 
    ------------------------
    -- Compute_Worst_Case --
@@ -202,14 +183,6 @@ package body Worst_Case_Analyzer is
 
    procedure Worst_Case_Analysis is
    begin
-      if Options.Explore_All then
-         --  Explore every node that contains subprograms defined within the
-         --  application
-
-         Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms, Add_Entry_Point'Access);
-      end if;
-
       --  Explore every entry point
 
       Static_Stack_Analysis.List_Of_Entry_Points.Iterate
