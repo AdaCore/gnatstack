@@ -36,10 +36,18 @@ package body Worst_Case_Analyzer is
    package Ordered_Edges is
      new Static_Stack_Analysis.List_Of_Edges.Generic_Sorting
        (Static_Stack_Analysis.Stack_Usage_Order);
+   --  Edges (calls to subprograms) are ordered according to stack usage
 
    ----------------------
    -- Local procedures --
    ----------------------
+
+   procedure Add_Node_To_Path
+     (Cycle : in Static_Stack_Analysis.Cycle;
+      Node  : in Static_Stack_Analysis.Node_Id);
+   --  This procedure adds the specified node to the , and
+   --  annotates the nodes belonging to this cycle to mark that the node is
+   --  part of the new cycle.
 
    procedure Compute_Worst_Case
      (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor);
@@ -52,6 +60,69 @@ package body Worst_Case_Analyzer is
    procedure Compute_Worst_Case (Position : in Static_Stack_Analysis.Node_Id);
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
+
+   ----------------------
+   -- Add_Node_To_Path --
+   ----------------------
+
+   procedure Add_Node_To_Path
+     (Cycle : in Static_Stack_Analysis.Cycle;
+      Node  : in Static_Stack_Analysis.Node_Id)
+   is
+      use type Static_Stack_Analysis.Edge_Id;
+      use type Static_Stack_Analysis.Node_Id;
+
+      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Node);
+
+      Next_Node : Static_Stack_Analysis.Node_Id;
+
+      Found : Boolean := False;
+
+      Index : Static_Stack_Analysis.Edge_Id;
+
+      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge);
+
+      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge) is
+      begin
+         Found := Target.Under_Analysis;
+      end Is_Under_Analysis;
+
+   begin
+      --  Get the edge that is under analysis
+
+      Index := Explored_Node.Target_Calls.First;
+
+      loop
+         Static_Stack_Analysis.List_Of_Edges.Query_Element
+           (Index, Is_Under_Analysis'Access);
+
+         exit when Found;
+
+         Static_Stack_Analysis.List_Of_Edges.Next (Index);
+
+         pragma Assert
+           (Index /= Static_Stack_Analysis.List_Of_Edges.No_Element);
+      end loop;
+
+      --  Add the node to the path
+
+      Cycle.Path.Append (Static_Stack_Analysis.Path_Element'
+          (Source_Node => Node,
+           Call_To     => Index));
+
+      --  Mark the node as belonging to this cycle
+
+      Explored_Node.Cycles.Append (Cycle);
+
+      --  Add next node to the path, if not already in the list
+
+      Next_Node := Static_Stack_Analysis.List_Of_Edges.Element (Index).Target;
+
+      if Next_Node /= Cycle.Path.First_Element.Source_Node then
+         Add_Node_To_Path (Cycle, Next_Node);
+      end if;
+   end Add_Node_To_Path;
 
    ------------------------
    -- Compute_Worst_Case --
@@ -70,11 +141,21 @@ package body Worst_Case_Analyzer is
    procedure Compute_Worst_Case
      (Position : in Static_Stack_Analysis.Edge_Id)
    is
+      Explored_Edge : constant Static_Stack_Analysis.Edge :=
+        Static_Stack_Analysis.List_Of_Edges.Element (Position);
+
    begin
+      --  Mark it under analysis
+
+      Explored_Edge.Under_Analysis := True;
+
       --  Analyze the node to which this call points
 
-      Compute_Worst_Case
-        (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
+      Compute_Worst_Case (Explored_Edge.Target);
+
+      --  Mark the end of the analysis for this edge
+
+      Explored_Edge.Under_Analysis := False;
    end Compute_Worst_Case;
 
    procedure Compute_Worst_Case
@@ -89,15 +170,32 @@ package body Worst_Case_Analyzer is
       if Explored_Node.Under_Analysis then
          --  Cycle detected
 
-         if Options.Verbose then
-            Ada.Text_IO.Put_Line ("Cycle detected");
-         end if;
+         declare
+            New_Cycle : constant Static_Stack_Analysis.Cycle :=
+              new Static_Stack_Analysis.Cycle_Element'
+                (Path => Static_Stack_Analysis.Paths.Empty_Vector,
+                 Iterations => 1);
+         begin
+            if Options.Verbose then
+               Ada.Text_IO.Put_Line ("Cycle detected");
+            end if;
 
-         --  Break the cycle in the worst case computation. Assume that the
-         --  cycle is executed only once.
+            --  Now we need to extract and identify this cycle. We need to
+            --  follow the path marked by the Under_Analysis flag.
 
-         return;
+            --  Add the new cycle to the list of detected cycles
 
+            Static_Stack_Analysis.Cycles.Append (New_Cycle);
+
+            --  Add current node to the path information
+
+            Add_Node_To_Path (New_Cycle, Position);
+
+            --  Break the cycle in the worst case computation. Assume that the
+            --  cycle is executed only once.
+
+            return;
+         end;
       else
          --  Mark it under analysis
 
@@ -148,32 +246,42 @@ package body Worst_Case_Analyzer is
    -- Get_Longest_Path --
    ----------------------
 
-   function Get_Longest_Path
-     (Target : Static_Stack_Analysis.Node_Id)
-      return Static_Stack_Analysis.Paths.Vector
+   procedure Get_Longest_Path
+     (Path   : in out Static_Stack_Analysis.Paths.Vector;
+      Target : in Static_Stack_Analysis.Node_Id)
    is
+      use type Static_Stack_Analysis.Edge_Id;
+
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Target);
 
+      Call : constant Static_Stack_Analysis.Edge_Id :=
+        Static_Stack_Analysis.List_Of_Edges.First (Node.Target_Calls);
+      --  The longest path is the one in the first position of the sorted list
+
    begin
-      if Static_Stack_Analysis.List_Of_Edges.Is_Empty (Node.Target_Calls) then
-         return
-           Static_Stack_Analysis.Paths.To_Vector
-             (New_Item => Static_Stack_Analysis.Path_Element'
-                  (Target, Static_Stack_Analysis.List_Of_Edges.No_Element),
-              Length   => 1);
+      --  Stop if we find a cycle
 
-      else
-         --  The longest path is the one in the last position of the sorted
-         --  list.
+      if not Node.Under_Analysis then
+         --  Mark node under analysis
 
-         return Static_Stack_Analysis.Paths."&"
-           (Static_Stack_Analysis.Path_Element'
-              (Target,
-               Static_Stack_Analysis.List_Of_Edges.Last (Node.Target_Calls)),
+         Node.Under_Analysis := True;
+
+         --  Add this node to the path
+
+         Path.Append (Static_Stack_Analysis.Path_Element'(Target, Call));
+
+         --  Add subsequent calls to the path. Cycles must be handled
+
+         if Call /= Static_Stack_Analysis.List_Of_Edges.No_Element then
             Get_Longest_Path
-              (Static_Stack_Analysis.List_Of_Edges.First_Element
-                 (Node.Target_Calls).Target));
+              (Path,
+               Static_Stack_Analysis.List_Of_Edges.Element (Call).Target);
+         end if;
+
+         --  Mark the end of the analysis for this node
+
+         Node.Under_Analysis := False;
       end if;
    end Get_Longest_Path;
 

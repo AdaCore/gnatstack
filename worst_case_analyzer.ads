@@ -23,9 +23,10 @@ with Static_Stack_Analysis;
 
 package Worst_Case_Analyzer is
 
-   function Get_Longest_Path (Target : Static_Stack_Analysis.Node_Id)
-                              return Static_Stack_Analysis.Paths.Vector;
-   --  This function returns the longest path, in terms of stack usage, that
+   procedure Get_Longest_Path
+     (Path   : in out Static_Stack_Analysis.Paths.Vector;
+      Target : in Static_Stack_Analysis.Node_Id);
+   --  This procedure returns the longest path, in terms of stack usage, that
    --  can be followed starting from the specified node.
 
    procedure Worst_Case_Analysis;

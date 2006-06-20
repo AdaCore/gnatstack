@@ -107,9 +107,14 @@ package body Display is
       --  Print the longest path for the specified entry point
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.Node_Id) is
+        (Position : in Static_Stack_Analysis.Node_Id)
+      is
+         Path : Static_Stack_Analysis.Paths.Vector :=
+           Static_Stack_Analysis.Paths.Empty_Vector;
+
       begin
-         Print_Path (Worst_Case_Analyzer.Get_Longest_Path (Position));
+         Worst_Case_Analyzer.Get_Longest_Path (Path, Position);
+         Print_Path (Path);
       end Print_Longest_Path;
 
       procedure Print_Longest_Path

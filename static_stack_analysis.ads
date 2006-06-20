@@ -1,3 +1,24 @@
+------------------------------------------------------------------------------
+--                        STATIC STACK ANALYSIS TOOL                        --
+--                                                                          --
+--                 S T A T I C _ S T A C K _ A N A L Y S I S                --
+--                                                                          --
+--                                 S p e c                                  --
+--                                                                          --
+--                     Copyright (C) 2005-2006, AdaCore                     --
+--                                                                          --
+-- SSAT is free software;  you can  redistribute it  and/or modify it under --
+-- terms of the  GNU General Public License as published  by the Free Soft- --
+-- ware  Foundation;  either version 2,  or (at your option) any later ver- --
+-- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
+-- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
+-- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
+-- for  more details.  You should have  received  a copy of the GNU General --
+-- Public License  distributed with GNAT;  see file COPYING.  If not, write --
+-- to  the  Free Software Foundation,  51  Franklin  Street,  Fifth  Floor, --
+-- Boston, MA 02110-1301, USA.                                              --
+------------------------------------------------------------------------------
+
 with Ada.Containers.Vectors;
 with Ada.Containers.Ordered_Sets;
 
@@ -132,7 +153,7 @@ package Static_Stack_Analysis is
    -- Edges (subprogram calls) --
    ------------------------------
 
-   type Edge is record
+   type Edge_Element is record
       Target        : Node_Id;
       --  Target node for this edge
 
@@ -143,7 +164,14 @@ package Static_Stack_Analysis is
       --  Flag that indicates whether the this theoretical call is feasible or
       --  not. For example, the user may mark a certain call as not possible
       --  given the operational conditions of the program.
+
+      Under_Analysis : Boolean;
+      --  Indicates whether the edge is part of the path being analyzed for
+      --  obtaining the worst case stack usage. It is very useful for
+      --  detecting cycles in the call graph.
    end record;
+
+   type Edge is access all Edge_Element;
    --  Edge joins the caller to the callee. This information is stored in the
    --  caller.
 
@@ -173,6 +201,26 @@ package Static_Stack_Analysis is
    package Paths is new Ada.Containers.Vectors (Natural, Path_Element);
    --  Paths are represented as a set of nodes together with the calls between
    --  two adjacent nodes.
+
+   ------------
+   -- Cycles --
+   ------------
+
+   type Cycle_Element is record
+      Path       : Paths.Vector;
+      Iterations : Natural;
+   end record;
+
+   type Cycle is access all Cycle_Element;
+   --  What identifies a cycle is the path (set of nodes and edges that make
+   --  up the cycle) and the number of iterations that we consider.
+
+   package List_Of_Cycles is new Ada.Containers.Vectors (Natural, Cycle);
+   --  Package used for identifying collections of call graph cycles
+
+   Cycles : List_Of_Cycles.Vector := List_Of_Cycles.Empty_Vector;
+   --  List of paths corresponding to the different cycles that have been
+   --  detected.
 
    ------------------
    -- Entry points --
@@ -207,12 +255,19 @@ package Static_Stack_Analysis is
          --  Indicates whether the node is part of the path being analyzed for
          --  obtaining the worst case stack usage. It is very useful for
          --  detecting cycles in the call graph.
+
+         Cycles : List_Of_Cycles.Vector;
+         --  A node may be part of different cycles in the call graph, and
+         --  this field contains the set of cycles to which this node belongs.
       end record;
    --  The only information that is required for every node is  the
    --  accumulated stack information, including the pointer to the next node
    --  belonging to the longest path, which is very practical if we want to
    --  retrieve partial stack requirements. There is a boolean variable which
    --  indicates whether the node is part of the path currently under analysis.
+   --  Nodes contain also the set of cycles in the call graph to which they
+   --  belong so we can take that information into account when analyzing the
+   --  longest paths.
    --
    --  For the purpose of generating a call graph, we can distinguish several
    --  types of calling methods:

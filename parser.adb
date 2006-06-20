@@ -549,7 +549,8 @@ package body Parser is
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
-                  Under_Analysis          => False);
+                  Under_Analysis          => False,
+                  Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
             end if;
@@ -569,7 +570,8 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Stack_Info              => Stack_Info,
-                  Under_Analysis          => False);
+                  Under_Analysis          => False,
+                  Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
 
@@ -607,7 +609,8 @@ package body Parser is
                      Location_List           => Locations_Set,
                      Subprogram              => Symbol_Name,
                      Stack_Info              => Stack_Info,
-                     Under_Analysis          => False);
+                     Under_Analysis          => False,
+                     Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
 
@@ -852,7 +855,8 @@ package body Parser is
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              => Name,
-               Under_Analysis          => False);
+               Under_Analysis          => False,
+               Cycles                  => List_Of_Cycles.Empty_Vector);
 
             List_Of_Subprograms.Insert (Source_Ptr, Source_Id, Inserted);
 
@@ -877,7 +881,8 @@ package body Parser is
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              => Name,
-               Under_Analysis          => False);
+               Under_Analysis          => False,
+               Cycles                  => List_Of_Cycles.Empty_Vector);
 
             List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
 
@@ -888,7 +893,12 @@ package body Parser is
          --  source and the target.
 
          Static_Stack_Analysis.List_Of_Edges.Append
-           (Source_Ptr.Target_Calls, (Target_Id, Null_Location, True));
+           (Source_Ptr.Target_Calls,
+            new Static_Stack_Analysis.Edge_Element'(
+              Target         => Target_Id,
+              Point_Of_Call  => Null_Location,
+              Feasible_Call  => True,
+              Under_Analysis => False));
 
       else
          raise Parser_Error;
