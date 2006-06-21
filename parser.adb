@@ -60,6 +60,8 @@ with GNAT.Strings;
 with GNAT.OS_Lib;
 --  Used for OS_Exit
 
+with Ada.Unchecked_Deallocation;
+
 package body Parser is
 
    use type Static_Stack_Analysis.Node_Id;
@@ -88,6 +90,9 @@ package body Parser is
    procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
+
+   procedure Free is new
+     Ada.Unchecked_Deallocation (String, GNAT.OS_Lib.String_Access);
 
    ------------------------
    -- Handle input files --
@@ -261,12 +266,38 @@ package body Parser is
       --  Get options
 
       loop
-         case GNAT.Command_Line.Getopt ("h v o= a u: d: e: r: g:") is
+         case GNAT.Command_Line.Getopt ("h v W! o= a u: d: e: r: g:") is
             when ASCII.NUL =>
                exit;
 
             when 'v' =>
                Options.Verbose := True;
+
+            when 'W' =>
+               declare
+                  Parameter : constant String := GNAT.Command_Line.Parameter;
+               begin
+                  for Index in Parameter'Range loop
+                     case Parameter (Index) is
+                        when 'a' =>
+                           Options.Warnings := (others => True);
+
+                        when 'c' =>
+                           Options.Warnings (Options.Cycle) := True;
+
+                        when 'u' =>
+                           Options.Warnings (Options.Unbounded) := True;
+
+                        when 'e' =>
+                           Options.Warnings (Options.External) := True;
+
+                        when others =>
+                           Ada.Text_IO.Put_Line ("Bad warning (-W) option");
+                           Usage;
+                           GNAT.OS_Lib.OS_Exit (1);
+                     end case;
+                  end loop;
+               end;
 
             when 'o' =>
                declare
@@ -295,14 +326,17 @@ package body Parser is
                  Natural'Value (GNAT.Command_Line.Parameter);
 
             when 'e' =>
+               Free (Options.List_Of_Entry_Points);
                Options.List_Of_Entry_Points :=
                  new String'(GNAT.Command_Line.Parameter);
 
             when 'r' =>
+               Free (Options.Entry_Point_Pattern);
                Options.Entry_Point_Pattern :=
                  new String'(GNAT.Command_Line.Parameter);
 
             when 'g' =>
+               Free (Options.Output_File);
                Options.Output_File :=
                  new String'(GNAT.Command_Line.Parameter);
 
@@ -936,6 +970,12 @@ package body Parser is
       Put_Line ("  -h           display help message");
       New_Line;
       Put_Line ("  -v           verbose");
+      New_Line;
+      Put_Line ("  -Wxx         enable warnings, xx = list of parameters:");
+      Put_Line ("    a          turn on all optional warnings");
+      Put_Line ("    c          turn on warnings for cycles");
+      Put_Line ("    u          turn on warnings for unbounded frames");
+      Put_Line ("    e          turn on warnings for external calls");
       New_Line;
       Put_Line ("  -o={a,s}     order for displaying call graphs");
       Put_Line ("  -o=a         alphabetical");

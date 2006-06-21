@@ -21,14 +21,7 @@
 
 package Display is
 
-   procedure Generate_VCG_Graph;
-   --  Generate a VCG file containing the annotated callgraph
-
-   procedure Print_Longest_Paths;
-   --  Generate the callgraph chains that contains the longest paths with
-   --  respect to stack usage. It will generate the worst case call chain for
-   --  every entry point (if specific entry points have been indicated) or for
-   --  every subprogram (if the flag for analyzing every subprogram has been
-   --  set).
+   procedure Results;
+   --  Generate all the information requested by the user
 
 end Display;

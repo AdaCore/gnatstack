@@ -26,8 +26,8 @@ with Worst_Case_Analyzer;
 --  Used for Worst_Case_Analysis
 
 with Display;
---  Used for Generate_VCG_Graph
---           Print_Longest_Path;
+--  Used for Results
+
 procedure SSAT is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
@@ -40,7 +40,5 @@ begin
 
    --  Display results
 
-   Display.Generate_VCG_Graph;
-
-   Display.Print_Longest_Paths;
+   Display.Results;
 end SSAT;
