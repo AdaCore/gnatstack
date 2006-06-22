@@ -25,6 +25,8 @@ with Options;
 with Ada.Text_IO;
 --  Used for Put_Line
 
+with Ada.Unchecked_Deallocation;
+
 package body Worst_Case_Analyzer is
 
    use type Static_Stack_Analysis.Stack_Usage_Info;
@@ -45,9 +47,8 @@ package body Worst_Case_Analyzer is
    procedure Add_Node_To_Path
      (Cycle : in Static_Stack_Analysis.Cycle;
       Node  : in Static_Stack_Analysis.Node_Id);
-   --  This procedure adds the specified node to the , and
-   --  annotates the nodes belonging to this cycle to mark that the node is
-   --  part of the new cycle.
+   --  This procedure adds the specified node to the cycle and annotates the
+   --  node belonging to this cycle to mark that the node is part of the cycle.
 
    procedure Compute_Worst_Case
      (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor);
@@ -60,6 +61,14 @@ package body Worst_Case_Analyzer is
    procedure Compute_Worst_Case (Position : in Static_Stack_Analysis.Node_Id);
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
+
+   function Already_Detected_Cycle
+     (Cycle : Static_Stack_Analysis.Cycle) return Boolean;
+   --  Check whether the cycle is already within the list of detected cycles
+
+   procedure Free is new
+     Ada.Unchecked_Deallocation
+       (Static_Stack_Analysis.Cycle_Element, Static_Stack_Analysis.Cycle);
 
    ----------------------
    -- Add_Node_To_Path --
@@ -102,7 +111,7 @@ package body Worst_Case_Analyzer is
          Static_Stack_Analysis.List_Of_Edges.Next (Index);
 
          pragma Assert
-           (Index /= Static_Stack_Analysis.List_Of_Edges.No_Element);
+           (Static_Stack_Analysis.List_Of_Edges.Has_Element (Index));
       end loop;
 
       --  Add the node to the path
@@ -110,10 +119,6 @@ package body Worst_Case_Analyzer is
       Cycle.Path.Append (Static_Stack_Analysis.Path_Element'
           (Source_Node => Node,
            Call_To     => Index));
-
-      --  Mark the node as belonging to this cycle
-
-      Explored_Node.Cycles.Append (Cycle);
 
       --  Add next node to the path, if not already in the list
 
@@ -123,6 +128,88 @@ package body Worst_Case_Analyzer is
          Add_Node_To_Path (Cycle, Next_Node);
       end if;
    end Add_Node_To_Path;
+
+   ----------------------------
+   -- Already_Detected_Cycle --
+   ----------------------------
+
+   function Already_Detected_Cycle
+     (Cycle : Static_Stack_Analysis.Cycle) return Boolean
+   is
+      use type Static_Stack_Analysis.List_Of_Nodes.Set;
+
+      Found : Boolean := False;
+      --  Set to True if the cycle is already in the list
+
+      Reference_Set : Static_Stack_Analysis.List_Of_Nodes.Set :=
+        Static_Stack_Analysis.List_Of_Nodes.Empty_Set;
+      --  Set of subprograms belonging to the cycle that we are studying
+
+      Index : Static_Stack_Analysis.Paths.Cursor;
+
+      procedure Check_Cycle
+        (Position : Static_Stack_Analysis.List_Of_Cycles.Cursor);
+      --  Compare the indicated cycle (the set of subprograms that make up the
+      --  callgraph cycle) against the reference one(Reference_Set). If they
+      --  are the same then it means that the cycle has already been detected
+      --  and it must not be added again to the list of known cycles.
+
+      procedure Check_Cycle
+        (Position : Static_Stack_Analysis.List_Of_Cycles.Cursor)
+      is
+         Explored_Path : constant Static_Stack_Analysis.Paths.Vector :=
+           Static_Stack_Analysis.List_Of_Cycles.Element (Position).Path;
+
+         Explored_Set : Static_Stack_Analysis.List_Of_Nodes.Set :=
+           Static_Stack_Analysis.List_Of_Nodes.Empty_Set;
+
+      begin
+         if not Found then
+            --  Get the set of subprograms that make up the callgraph cycle
+            --  that we want to compare.
+
+            Index := Explored_Path.First;
+
+            while Static_Stack_Analysis.Paths.Has_Element (Index) loop
+               Static_Stack_Analysis.List_Of_Nodes.Insert
+                 (Explored_Set,
+                  Static_Stack_Analysis.List_Of_Nodes.Element
+                    (Static_Stack_Analysis.Paths.Element (Index).Source_Node));
+
+               Static_Stack_Analysis.Paths.Next (Index);
+            end loop;
+
+            --  Compare the generated set with the reference one
+
+            if Explored_Set = Reference_Set then
+               Found := True;
+            end if;
+         end if;
+      end Check_Cycle;
+
+   begin
+      --  The cycle may have already been detected in a different order. That
+      --  is the reason why we use the set of nodes belonging to the path
+      --  (in alphabetical order) to compare.
+
+      Index := Cycle.Path.First;
+
+      while Static_Stack_Analysis.Paths.Has_Element (Index) loop
+         Static_Stack_Analysis.List_Of_Nodes.Insert
+           (Reference_Set,
+            Static_Stack_Analysis.List_Of_Nodes.Element
+              (Static_Stack_Analysis.Paths.Element (Index).Source_Node));
+
+         Static_Stack_Analysis.Paths.Next (Index);
+      end loop;
+
+      --  Compare the detected cycle against the list of already detected
+      --  cycles.
+
+      Static_Stack_Analysis.Cycles.Iterate (Check_Cycle'Access);
+
+      return Found;
+   end Already_Detected_Cycle;
 
    ------------------------
    -- Compute_Worst_Case --
@@ -168,13 +255,32 @@ package body Worst_Case_Analyzer is
       --  Check against cycles
 
       if Explored_Node.Under_Analysis then
-         --  Cycle detected
+         --  Cycle detected. It may be a new or an already detected cycle
 
          declare
-            New_Cycle : constant Static_Stack_Analysis.Cycle :=
+            New_Cycle : Static_Stack_Analysis.Cycle :=
               new Static_Stack_Analysis.Cycle_Element'
-                (Path => Static_Stack_Analysis.Paths.Empty_Vector,
+                (Id         => 0,
+                 Path       => Static_Stack_Analysis.Paths.Empty_Vector,
                  Iterations => 1);
+
+            procedure Mark_Nodes
+              (Position : Static_Stack_Analysis.Paths.Cursor);
+            --  Mark the referenced node as belonging to the detected cycle
+
+            procedure Mark_Nodes
+              (Position : Static_Stack_Analysis.Paths.Cursor)
+            is
+               Element : constant Static_Stack_Analysis.Node_Class_Access :=
+                 Static_Stack_Analysis.List_Of_Nodes.Element
+                   (Static_Stack_Analysis.Paths.Element
+                        (Position).Source_Node);
+
+            begin
+               Static_Stack_Analysis.Node (Element.all).Cycles.Append
+                    (New_Cycle);
+            end Mark_Nodes;
+
          begin
             if Options.Verbose then
                Ada.Text_IO.Put_Line ("Cycle detected");
@@ -183,13 +289,31 @@ package body Worst_Case_Analyzer is
             --  Now we need to extract and identify this cycle. We need to
             --  follow the path marked by the Under_Analysis flag.
 
+            --  Add current node (and all the subprograms that make up the
+            --  cycle) to the path information.
+
+               Add_Node_To_Path (New_Cycle, Position);
+
             --  Add the new cycle to the list of detected cycles
 
-            Static_Stack_Analysis.Cycles.Append (New_Cycle);
+            if Already_Detected_Cycle (New_Cycle) then
+               New_Cycle.Path.Clear;
 
-            --  Add current node to the path information
+               Free (New_Cycle);
 
-            Add_Node_To_Path (New_Cycle, Position);
+            else
+               --  Add cycle
+
+               Static_Stack_Analysis.Cycles.Append (New_Cycle);
+
+               --  Update Id
+
+               New_Cycle.Id := Static_Stack_Analysis.Cycles.Last_Index;
+
+               --  Mark the nodes as belonging to this cycle
+
+               New_Cycle.Path.Iterate (Mark_Nodes'Access);
+            end if;
 
             --  Break the cycle in the worst case computation. Assume that the
             --  cycle is executed only once.
@@ -273,7 +397,7 @@ package body Worst_Case_Analyzer is
 
          --  Add subsequent calls to the path. Cycles must be handled
 
-         if Call /= Static_Stack_Analysis.List_Of_Edges.No_Element then
+         if Static_Stack_Analysis.List_Of_Edges.Has_Element (Call) then
             Get_Longest_Path
               (Path,
                Static_Stack_Analysis.List_Of_Edges.Element (Call).Target);

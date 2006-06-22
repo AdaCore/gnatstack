@@ -116,6 +116,10 @@ package body Display is
    --  subprograms in the path (if Verbose is False), and it will also
    --  include local and accumulated stack consumption (if Verbose is True).
 
+   procedure Print_Cycle_Id
+     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
+   --  Print the unique identifier associated to the cycle
+
    procedure Print_Cycle
      (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
    --  Print the set of subprograms belonging to the cycle
@@ -344,39 +348,49 @@ package body Display is
    procedure Expand_Stack_Usage
      (Stack_Info : Static_Stack_Analysis.Stack_Usage_Info)
    is
+      use type Static_Stack_Analysis.Stack_Usage;
+
    begin
       Ada.Integer_Text_IO.Put
         (Integer (Stack_Info.Static_Usage + Stack_Info.Dynamic_Usage +
                   Stack_Info.Unknown_Usage),
          0);
 
-      Ada.Text_IO.Put (" (");
+      Ada.Text_IO.Put (" bytes");
 
-      Ada.Integer_Text_IO.Put (Integer (Stack_Info.Static_Usage), 0);
+      --  Clarify stack usage information when we have something which is not
+      --  static
 
-      Ada.Text_IO.Put (" + ");
+      if Stack_Info.Frame_Type /= Static_Stack_Analysis.Static then
+         Ada.Text_IO.Put (" (");
 
-      Ada.Integer_Text_IO.Put (Integer (Stack_Info.Dynamic_Usage), 0);
+         if Stack_Info.Static_Usage /= 0 then
+            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Static_Usage), 0);
+            Ada.Text_IO.Put ("s");
+         end if;
 
-      Ada.Text_IO.Put (" + ");
+         if Stack_Info.Dynamic_Usage /= 0 then
+            if Stack_Info.Static_Usage /= 0 then
+               Ada.Text_IO.Put (",");
+            end if;
 
-      Ada.Integer_Text_IO.Put (Integer (Stack_Info.Unknown_Usage), 0);
+            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Dynamic_Usage), 0);
+            Ada.Text_IO.Put ("u");
+         end if;
 
-      Ada.Text_IO.Put (") bytes ");
+         if Stack_Info.Unknown_Usage /= 0 then
+            if Stack_Info.Static_Usage /= 0
+              or else Stack_Info.Dynamic_Usage /= 0
+            then
+               Ada.Text_IO.Put (",");
+            end if;
 
-      case Stack_Info.Frame_Type is
-         when Static_Stack_Analysis.Static =>
-            Ada.Text_IO.Put ("(static)");
+            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Unknown_Usage), 0);
+            Ada.Text_IO.Put ("e");
+         end if;
 
-         when Static_Stack_Analysis.Bounded =>
-            Ada.Text_IO.Put ("(dynamic,bounded)");
-
-         when Static_Stack_Analysis.Unbounded =>
-            Ada.Text_IO.Put ("(dynamic)");
-
-         when Static_Stack_Analysis.Unknown =>
-            Ada.Text_IO.Put ("(unknown)");
-      end case;
+         Ada.Text_IO.Put (")");
+      end if;
    end Expand_Stack_Usage;
 
    ----------------
@@ -396,8 +410,9 @@ package body Display is
    begin
       --  Print node
 
-      if Explored_Item.Source_Node /=
-        Static_Stack_Analysis.List_Of_Nodes.No_Element
+      if
+        Static_Stack_Analysis.List_Of_Nodes.Has_Element
+          (Explored_Item.Source_Node)
       then
          Explored_Node := Static_Stack_Analysis.List_Of_Nodes.Element
            (Explored_Item.Source_Node);
@@ -437,6 +452,18 @@ package body Display is
 
                Expand_Stack_Usage (Explored_Node.Accumulated_Stack_Usage);
             end if;
+         end if;
+
+         --  Information about cycles
+
+         if not Static_Stack_Analysis.List_Of_Cycles.Is_Empty
+           (Explored_Node.Cycles)
+         then
+            Ada.Text_IO.Put (" (");
+
+            Explored_Node.Cycles.Iterate (Print_Cycle_Id'Access);
+
+            Ada.Text_IO.Put (")");
          end if;
 
          Ada.Text_IO.New_Line;
@@ -482,11 +509,9 @@ package body Display is
         Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Path;
 
    begin
-      Ada.Text_IO.Put
-        ("<Cycle" &
-         Natural'Image
-           (Static_Stack_Analysis.List_Of_Cycles.To_Index (Cycle)) &
-         "> ");
+      Print_Cycle_Id (Cycle);
+
+      Ada.Text_IO.Put (" ");
 
       Print_Path (Path);
 
@@ -496,6 +521,21 @@ package body Display is
 
       Ada.Text_IO.New_Line;
    end Print_Cycle;
+
+   --------------------
+   -- Print_Cycle_Id --
+   --------------------
+
+   procedure Print_Cycle_Id
+     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor) is
+   begin
+      Ada.Text_IO.Put ("<c");
+
+      Ada.Integer_Text_IO.Put
+        (Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Id, 0);
+
+      Ada.Text_IO.Put (">");
+   end Print_Cycle_Id;
 
    --------------------
    -- Print_External --

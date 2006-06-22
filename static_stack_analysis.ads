@@ -207,8 +207,14 @@ package Static_Stack_Analysis is
    ------------
 
    type Cycle_Element is record
+      Id         : Natural;
+      --  Unique identifier
+
       Path       : Paths.Vector;
+      --  Subprograms that make up the callgraph cycle
+
       Iterations : Natural;
+      --  Upper bound to the number of times the cycle is executed
    end record;
 
    type Cycle is access all Cycle_Element;
