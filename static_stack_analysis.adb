@@ -250,8 +250,7 @@ package body Static_Stack_Analysis is
       if Target.Stack_Info.Frame_Type > Stack_Usage.Frame_Type then
          Target.Stack_Info := Stack_Usage;
 
-      elsif
-        Target.Stack_Info.Frame_Type = Stack_Usage.Frame_Type then
+      elsif Target.Stack_Info.Frame_Type = Stack_Usage.Frame_Type then
          --  Both values have the same amount of information so we take the
          --  worst case.
 

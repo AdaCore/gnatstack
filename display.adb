@@ -65,6 +65,8 @@ package body Display is
    package Ordered_Entries is
      new Static_Stack_Analysis.List_Of_Entry_Points.Generic_Sorting
        (Static_Stack_Analysis.Stack_Usage_Order);
+   --  This package is used for ordering edges (call-to-subprograms) according
+   --  to their stack usage.
 
    ----------------
    -- Local data --
@@ -106,6 +108,9 @@ package body Display is
    procedure Print_External (Position : in Static_Stack_Analysis.Node_Id);
    --  Print the subprogram name if the position corresponds to a node with
    --  no information about stack usage.
+
+   procedure Print_Indirect (Position : in Static_Stack_Analysis.Node_Id);
+   --  Print the information about an indirect (including dispatching) call
 
    procedure Print_Node (Position : in Static_Stack_Analysis.Paths.Cursor);
    --  Print the information about this concrete node (name, location,
@@ -424,8 +429,7 @@ package body Display is
          --  Print subprogram name
 
          Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name
-              (Explored_Node.all).all);
+           (Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all);
 
          --  Print location list
 
@@ -552,6 +556,21 @@ package body Display is
       end if;
    end Print_External;
 
+   --------------------
+   -- Print_Indirect --
+   --------------------
+
+   procedure Print_Indirect (Position : in Static_Stack_Analysis.Node_Id) is
+      Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+   begin
+      if Node.all in Static_Stack_Analysis.Fake_Node'Class then
+         Ada.Text_IO.Put_Line
+           ("  " & Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+      end if;
+   end Print_Indirect;
+
    ---------------------
    -- Print_Unbounded --
    ---------------------
@@ -606,6 +625,16 @@ package body Display is
            ("List of external subprograms:");
          Static_Stack_Analysis.List_Of_Subprograms.Iterate
            (Print_External'Access);
+         Ada.Text_IO.New_Line;
+      end if;
+
+      --  Information about indirect (including dispatching) calls
+
+      if Options.Warnings (Options.Indirect) then
+         Ada.Text_IO.Put_Line
+           ("List of indirect (including dispatching) calls:");
+         Static_Stack_Analysis.List_Of_Subprograms.Iterate
+           (Print_Indirect'Access);
          Ada.Text_IO.New_Line;
       end if;
 

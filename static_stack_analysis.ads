@@ -59,7 +59,8 @@ package Static_Stack_Analysis is
 
    package List_Of_Locations is new
      Ada.Containers.Ordered_Sets (Location, Alphabetical_Order, "=");
-   --  Package used for storing lists of locations
+   --  Package used for storing lists of locations. They are ordered
+   --  alphabetically.
 
    -----------------
    -- Stack usage --
@@ -192,7 +193,10 @@ package Static_Stack_Analysis is
 
    type Path_Element is record
       Source_Node : Node_Id;
+      --  Subprogram
+
       Call_To     : Edge_Id;
+      --  Call-to-subprogram
    end record;
    --  An element of a path (or call chain) is represented as a set of couples
    --  made up by the source node and the edge that represent the call from

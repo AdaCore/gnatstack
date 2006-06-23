@@ -117,8 +117,7 @@ package body Worst_Case_Analyzer is
       --  Add the node to the path
 
       Cycle.Path.Append (Static_Stack_Analysis.Path_Element'
-          (Source_Node => Node,
-           Call_To     => Index));
+                           (Source_Node => Node, Call_To => Index));
 
       --  Add next node to the path, if not already in the list
 
@@ -345,7 +344,7 @@ package body Worst_Case_Analyzer is
          --  Update info
 
          if Static_Stack_Analysis.List_Of_Edges.Is_Empty
-           (Explored_Node.Target_Calls)
+              (Explored_Node.Target_Calls)
          then
             Explored_Node.Accumulated_Stack_Usage :=
               Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all);

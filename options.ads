@@ -34,10 +34,11 @@ package Options is
    --  either in alphabetical order (according to the symbol name), or in
    --  decreasing order of stack usage.
 
-   type Warning_Options is (Cycle, Unbounded, External);
+   type Warning_Options is (Cycle, Unbounded, External, Indirect);
 
    Warnings : array (Warning_Options) of Boolean := (others => False);
-   --  Active warnings (for cycles, unbounded frames, and external calls)
+   --  Active warnings (for cycles, unbounded frames, external calls, and
+   --  indirect calls)
 
    Explore_All : Boolean := False;
    --  Compute worst case stack usage for every node in the partition

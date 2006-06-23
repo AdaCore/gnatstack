@@ -106,7 +106,7 @@ package body Parser is
      Ada.Containers.Vectors (Natural, GNAT.Strings.String_Access, Equal);
 
    Input_Files : List_Of_Files.Vector := List_Of_Files.Empty_Vector;
-   --  List of input files containing
+   --  List of input files containing stack usage information (.ci files)
 
    subtype File_Id is List_Of_Files.Cursor;
    --  Unique identifier for files
@@ -212,6 +212,10 @@ package body Parser is
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
    begin
+      --  Consider only explicit nodes as potential entry points, which means
+      --  excluding external subprograms and indirect (including dispatching)
+      --  calls.
+
       if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
          Static_Stack_Analysis.Entry_Points.Append (Position);
       end if;
@@ -228,6 +232,10 @@ package body Parser is
       Matches : GNAT.Regpat.Match_Array (0 .. 1);
 
    begin
+      --  If the referenced node describes a subprogram containing the pattern
+      --  defined in Options.Entry_Point_Pattern we add this subprogram to the
+      --  list of potential entry points.
+
       GNAT.Regpat.Match
         (Options.Entry_Point_Pattern.all,
          Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all,
@@ -270,9 +278,11 @@ package body Parser is
             when ASCII.NUL =>
                exit;
 
+            --  Verbose
             when 'v' =>
                Options.Verbose := True;
 
+            --  Warnings
             when 'W' =>
                declare
                   Parameter : constant String := GNAT.Command_Line.Parameter;
@@ -291,6 +301,9 @@ package body Parser is
                         when 'e' =>
                            Options.Warnings (Options.External) := True;
 
+                        when 'i' =>
+                           Options.Warnings (Options.Indirect) := True;
+
                         when others =>
                            Ada.Text_IO.Put_Line ("Bad warning (-W) option");
                            Usage;
@@ -299,6 +312,7 @@ package body Parser is
                   end loop;
                end;
 
+            --  Ordering
             when 'o' =>
                declare
                   Parameter : constant String := GNAT.Command_Line.Parameter;
@@ -314,27 +328,33 @@ package body Parser is
                   end if;
                end;
 
+            --  Consider all subprograms as potential entry points
             when 'a' =>
                Options.Explore_All := True;
 
+            --  Default stack requirements for unknown (external) calls
             when 'u' =>
                Options.Default_Unknown :=
                  Natural'Value (GNAT.Command_Line.Parameter);
 
+            --  Default stack requirements for unbounded (dynamic) calls
             when 'd' =>
                Options.Default_Unbounded :=
                  Natural'Value (GNAT.Command_Line.Parameter);
 
+            --  List of entry points
             when 'e' =>
                Free (Options.List_Of_Entry_Points);
                Options.List_Of_Entry_Points :=
                  new String'(GNAT.Command_Line.Parameter);
 
+            --  Pattern for subprograms to be considered entry points
             when 'r' =>
                Free (Options.Entry_Point_Pattern);
                Options.Entry_Point_Pattern :=
                  new String'(GNAT.Command_Line.Parameter);
 
+            --  Output graph file
             when 'g' =>
                Free (Options.Output_File);
                Options.Output_File :=
@@ -494,8 +514,7 @@ package body Parser is
 
       Matches         : GNAT.Regpat.Match_Array (0 .. 3);
 
-      Locations_Set   : List_Of_Locations.Set :=
-        List_Of_Locations.Empty_Set;
+      Locations_Set   : List_Of_Locations.Set := List_Of_Locations.Empty_Set;
 
    begin
       --  The pattern of the input line is:
@@ -567,7 +586,16 @@ package body Parser is
          if Symbol_Name.all = Indirect_Call.all then
             --  This is an indirect call. We cannot get any more information
 
-            null;
+            --  ??? We do not have enough information yet to distinguish an
+            --  indirect call from a dispatching call.
+
+            Node_Ptr := new Indirect_Node'
+                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Under_Analysis          => False,
+                  Cycles                  => List_Of_Cycles.Empty_Vector);
+
+            List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
 
          --  Unresolved
          elsif not Locally_Defined then
@@ -671,8 +699,7 @@ package body Parser is
    is
    begin
       if Input'Length /= 0 then
-         Symbol :=
-           new String'(Input);
+         Symbol := new String'(Input);
       else
          raise Parser_Error;
       end if;
@@ -813,16 +840,16 @@ package body Parser is
             Stack.Dynamic_Usage := 0;
             Stack.Unknown_Usage := 0;
 
-         elsif Input (Matches (2).First .. Matches (2).Last) =
-               " (dynamic)"
+         elsif
+           Input (Matches (2).First .. Matches (2).Last) = " (dynamic)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Unbounded;
             Stack.Dynamic_Usage :=
               Static_Stack_Analysis.Frame_Size (Options.Default_Unbounded);
             Stack.Unknown_Usage := 0;
 
-         elsif Input (Matches (2).First .. Matches (2).Last) =
-               " (dynamic,bounded)"
+         elsif
+           Input (Matches (2).First .. Matches (2).Last) = " (dynamic,bounded)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Bounded;
             Stack.Dynamic_Usage := 0;
@@ -835,7 +862,6 @@ package body Parser is
       else
          raise Parser_Error;
       end if;
-
    end Parse_Stack_Usage;
 
    -----------------
@@ -844,6 +870,9 @@ package body Parser is
 
    procedure Parse_Shape (Input : in String; Local : out Boolean) is
    begin
+      --  The mark 'ellipse' indicates an external subprogram, i.e., not
+      --  locally defined.
+
       Local := Input /= " shape : ellipse";
    end Parse_Shape;
 
@@ -949,6 +978,8 @@ package body Parser is
       Ada.Text_IO.Open
         (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
 
+      --  Parse information line by line
+
       while not Ada.Text_IO.End_Of_File (Descriptor) loop
          Parse_Input_Line (Ada.Text_IO.Get_Line (Descriptor));
       end loop;
@@ -976,6 +1007,7 @@ package body Parser is
       Put_Line ("    c          turn on warnings for cycles");
       Put_Line ("    u          turn on warnings for unbounded frames");
       Put_Line ("    e          turn on warnings for external calls");
+      Put_Line ("    i          turn on warnings for indirect calls");
       New_Line;
       Put_Line ("  -o={a,s}     order for displaying call graphs");
       Put_Line ("  -o=a         alphabetical");
