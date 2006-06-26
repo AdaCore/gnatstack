@@ -27,6 +27,9 @@ with Static_Stack_Analysis;
 --           Entry_Points
 --           Unknown_Stack_Usage
 
+with Call_Graph_Cycles;
+--  Used for Extract_Cycles
+
 with Options;
 --  Used for Verbose
 --           Explore_All
@@ -397,6 +400,10 @@ package body Parser is
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
       end if;
 
+      --  Extract the cycles in the call graph
+
+      Call_Graph_Cycles.Extract_Cycles;
+
       --  Get the list of subprograms to be considered as entry points
 
       if Options.List_Of_Entry_Points /= null then
@@ -584,18 +591,12 @@ package body Parser is
       begin
          --  Indirect call
          if Symbol_Name.all = Indirect_Call.all then
-            --  This is an indirect call. We cannot get any more information
+            --  This is an indirect call. We cannot get any more information.
+            --  These nodes are there only for supporting edges representing
+            --  indirect calls. The indirect nodes are created when analyzing
+            --  the edges, so we do not need to create any node here.
 
-            --  ??? We do not have enough information yet to distinguish an
-            --  indirect call from a dispatching call.
-
-            Node_Ptr := new Indirect_Node'
-                 (Target_Calls            => List_Of_Edges.Empty_Vector,
-                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                  Under_Analysis          => False,
-                  Cycles                  => List_Of_Cycles.Empty_Vector);
-
-            List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
+            null;
 
          --  Unresolved
          elsif not Locally_Defined then
@@ -908,7 +909,6 @@ package body Parser is
          Source_Id := Get_Node (Input (Matches (1).First .. Matches (1).Last));
 
          if not List_Of_Nodes.Has_Element (Source_Id) then
-
             Source_Ptr := new Unresolved_Node'
               (Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,

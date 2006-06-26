@@ -199,6 +199,25 @@ package body Display is
       Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
    end Expand_Location;
 
+   ----------------------
+   -- Generate_Results --
+   ----------------------
+
+   procedure Generate_Results is
+   begin
+      --  Generate file containing the whole call graph
+
+      Generate_VCG_Graph;
+
+      --  Print the stack usage information
+
+      Ada.Text_IO.Put_Line ("Stack usage information");
+
+      Ada.Text_IO.New_Line;
+
+      Print_Longest_Paths;
+   end Generate_Results;
+
    ------------------------
    -- Generate_VCG_Graph --
    ------------------------
@@ -242,6 +261,58 @@ package body Display is
 
       Ada.Text_IO.Close (VCG_Descriptor);
    end Generate_VCG_Graph;
+
+   -----------------------
+   -- Generate_Warnings --
+   -----------------------
+
+   procedure Generate_Warnings is
+   begin
+            --  Information about cycles
+
+      if Options.Warnings (Options.Cycle) then
+         Ada.Text_IO.Put_Line
+           ("List of cycles:");
+         Ada.Text_IO.New_Line;
+         Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
+         Ada.Text_IO.New_Line;
+      end if;
+
+      --  Print the list of subprograms with dynamic frames whose maximum
+      --  bounds cannot be statically computed.
+
+      if Options.Warnings (Options.Unbounded) then
+         Ada.Text_IO.Put_Line
+           ("List of subprograms with dynamic unbounded frames:");
+         Ada.Text_IO.New_Line;
+         Static_Stack_Analysis.List_Of_Subprograms.Iterate
+           (Print_Unbounded'Access);
+         Ada.Text_IO.New_Line;
+      end if;
+
+      --  Information about subprograms for which we do not have any stack
+      --  usage
+
+      if Options.Warnings (Options.Unbounded) then
+         Ada.Text_IO.Put_Line
+           ("List of external subprograms:");
+         Ada.Text_IO.New_Line;
+         Static_Stack_Analysis.List_Of_Subprograms.Iterate
+           (Print_External'Access);
+         Ada.Text_IO.New_Line;
+      end if;
+
+      --  Information about indirect (including dispatching) calls
+
+      if Options.Warnings (Options.Indirect) then
+         Ada.Text_IO.Put_Line
+           ("List of indirect (including dispatching) calls:");
+         Ada.Text_IO.New_Line;
+         Static_Stack_Analysis.List_Of_Subprograms.Iterate
+           (Print_Indirect'Access);
+         Ada.Text_IO.New_Line;
+      end if;
+   end Generate_Warnings;
 
    -----------------
    -- Expand_Node --
@@ -625,68 +696,4 @@ package body Display is
       end if;
    end Print_Unbounded;
 
-   -------------
-   -- Results --
-   -------------
-
-   procedure Results is
-   begin
-      --  Information about cycles
-
-      if Options.Warnings (Options.Cycle) then
-         Ada.Text_IO.Put_Line
-           ("List of cycles:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
-         Ada.Text_IO.New_Line;
-      end if;
-
-      --  Print the list of subprograms with dynamic frames whose maximum
-      --  bounds cannot be statically computed.
-
-      if Options.Warnings (Options.Unbounded) then
-         Ada.Text_IO.Put_Line
-           ("List of subprograms with dynamic unbounded frames:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_Unbounded'Access);
-         Ada.Text_IO.New_Line;
-      end if;
-
-      --  Information about subprograms for which we do not have any stack
-      --  usage
-
-      if Options.Warnings (Options.Unbounded) then
-         Ada.Text_IO.Put_Line
-           ("List of external subprograms:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_External'Access);
-         Ada.Text_IO.New_Line;
-      end if;
-
-      --  Information about indirect (including dispatching) calls
-
-      if Options.Warnings (Options.Indirect) then
-         Ada.Text_IO.Put_Line
-           ("List of indirect (including dispatching) calls:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_Indirect'Access);
-         Ada.Text_IO.New_Line;
-      end if;
-
-      --  Generate file containing the whole call graph
-
-      Generate_VCG_Graph;
-
-      --  Print the stack usage information
-
-      Ada.Text_IO.Put_Line ("Stack usage information");
-
-      Ada.Text_IO.New_Line;
-
-      Print_Longest_Paths;
-
-   end Results;
 end Display;

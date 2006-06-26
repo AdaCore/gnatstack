@@ -21,7 +21,12 @@
 
 package Display is
 
-   procedure Results;
-   --  Generate all the information requested by the user
+   procedure Generate_Warnings;
+   --  Generate all the information about incomplete information (missing stack
+   --  usage data, indirect, dispatching and external calls, etc.).
+
+   procedure Generate_Results;
+   --  Generate all the results of the analysis (call graph and worst case
+   --  stack usage information).
 
 end Display;

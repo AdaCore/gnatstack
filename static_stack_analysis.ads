@@ -117,11 +117,7 @@ package Static_Stack_Analysis is
    function Alphabetical_Order
      (Left, Right : Node_Class_Access) return Boolean;
    --  Returns True if Left is alphabetically before Right, False otherwise.
-   --  It is used for ordering sets of nodes alphabetically. Note that fake
-   --  nodes (indirect and dispatching) do not have an associated symbol name.
-   --  We consider that fake node are always after real nodes, and among
-   --  different fake nodes the order is according to their addresses
-   --  (arbitrary but deterministic choice).
+   --  It is used for ordering sets of nodes alphabetically.
 
    function Stack_Usage_Order
      (Left, Right : Node_Class_Access) return Boolean;

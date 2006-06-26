@@ -26,7 +26,8 @@ with Worst_Case_Analyzer;
 --  Used for Worst_Case_Analysis
 
 with Display;
---  Used for Results
+--  Used for Generate_Results
+--           Generate_Warnings
 
 procedure SSAT is
 begin
@@ -34,11 +35,15 @@ begin
 
    Parser.Parse_Arguments;
 
+   --  Display incomplete information
+
+   Display.Generate_Warnings;
+
    --  Analyze stack usage
 
    Worst_Case_Analyzer.Worst_Case_Analysis;
 
    --  Display results
 
-   Display.Results;
+   Display.Generate_Results;
 end SSAT;
