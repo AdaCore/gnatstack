@@ -19,6 +19,9 @@
 -- Boston, MA 02110-1301, USA.                                              --
 ------------------------------------------------------------------------------
 
+with System;
+--  Used for Address
+
 with Options;
 --  Used for Default_Unknown
 
@@ -101,12 +104,34 @@ package body Static_Stack_Analysis is
    end Alphabetical_Order;
 
    function Alphabetical_Order
-     (Left, Right : Node_Class_Access) return Boolean is
-   begin
-      --  Compare the associated symbol names
+     (Left, Right : Node_Class_Access) return Boolean
+   is
+      use type System.Address;
 
-      return Get_Subprogram_Name (Left.all).all <
-        Get_Subprogram_Name (Right.all).all;
+   begin
+      --  Ordering among fake nodes is according to their addresses
+      if Left.all in Fake_Node'Class
+        and then Right.all in Fake_Node'Class
+      then
+         return Left.all'Address < Right.all'Address;
+
+      --  Left is fake and right is real so we consider left greater than right
+      elsif Left.all in Fake_Node'Class
+        and then Right.all in Real_Node'Class
+      then
+         return False;
+
+      --  Left is real and right is fake so we consider right greater than left
+      elsif Left.all in Real_Node'Class
+        and then Right.all in Fake_Node'Class
+      then
+         return True;
+
+      --  Normal comparison according to symbol names
+      else
+         return Get_Subprogram_Name (Left.all).all <
+                Get_Subprogram_Name (Right.all).all;
+      end if;
    end Alphabetical_Order;
 
    -----------

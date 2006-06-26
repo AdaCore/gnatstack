@@ -117,7 +117,11 @@ package Static_Stack_Analysis is
    function Alphabetical_Order
      (Left, Right : Node_Class_Access) return Boolean;
    --  Returns True if Left is alphabetically before Right, False otherwise.
-   --  It is used for ordering sets of nodes alphabetically.
+   --  It is used for ordering sets of nodes alphabetically. Note that fake
+   --  nodes (indirect and dispatching) do not have an associated symbol name.
+   --  We consider that fake node are always after real nodes, and among
+   --  different fake nodes the order is according to their addresses
+   --  (arbitrary but deterministic choice).
 
    function Stack_Usage_Order
      (Left, Right : Node_Class_Access) return Boolean;
@@ -169,7 +173,7 @@ package Static_Stack_Analysis is
       Under_Analysis : Boolean;
       --  Indicates whether the edge is part of the path being analyzed for
       --  obtaining the worst case stack usage. It is very useful for
-      --  detecting cycles in the call graph.
+      --  detecting and handling cycles in the call graph.
    end record;
 
    type Edge is access all Edge_Element;
@@ -264,7 +268,7 @@ package Static_Stack_Analysis is
          Under_Analysis : Boolean;
          --  Indicates whether the node is part of the path being analyzed for
          --  obtaining the worst case stack usage. It is very useful for
-         --  detecting cycles in the call graph.
+         --  detecting and handling cycles in the call graph.
 
          Cycles : List_Of_Cycles.Vector;
          --  A node may be part of different cycles in the call graph, and
