@@ -891,8 +891,6 @@ package body Parser is
       Source_Ptr : Static_Stack_Analysis.Node_Class_Access;
       Target_Ptr : Static_Stack_Analysis.Node_Class_Access;
 
-      Name       : Subprogram_Name;
-
       Inserted   : Boolean;
 
    begin
@@ -911,13 +909,12 @@ package body Parser is
 
          if not List_Of_Nodes.Has_Element (Source_Id) then
 
-            Name := new String'(Input (Matches (1).First .. Matches (1).Last));
-
             Source_Ptr := new Unresolved_Node'
               (Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
-               Subprogram              => Name,
+               Subprogram              =>
+                 new String'(Input (Matches (1).First .. Matches (1).Last)),
                Under_Analysis          => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
@@ -937,15 +934,28 @@ package body Parser is
 
          if not List_Of_Nodes.Has_Element (Target_Id) then
 
-            Name := new String'(Input (Matches (2).First .. Matches (2).Last));
+            --  Create an indirect node for an indirect call
+            if
+              Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
+            then
+               Target_Ptr := new Indirect_Node'
+                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Under_Analysis          => False,
+                  Cycles                  => List_Of_Cycles.Empty_Vector);
 
-            Target_Ptr := new Unresolved_Node'
-              (Target_Calls            => List_Of_Edges.Empty_Vector,
-               Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Location_List           => List_Of_Locations.Empty_Set,
-               Subprogram              => Name,
-               Under_Analysis          => False,
-               Cycles                  => List_Of_Cycles.Empty_Vector);
+            --  This node is considered unresolved for the moment. It can be
+            --  later modified if we find more information.
+            else
+               Target_Ptr := new Unresolved_Node'
+                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Location_List           => List_Of_Locations.Empty_Set,
+                  Subprogram              =>
+                    new String'(Input (Matches (2).First .. Matches (2).Last)),
+                  Under_Analysis          => False,
+                  Cycles                  => List_Of_Cycles.Empty_Vector);
+            end if;
 
             List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
 

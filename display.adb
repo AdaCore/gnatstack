@@ -110,7 +110,8 @@ package body Display is
    --  no information about stack usage.
 
    procedure Print_Indirect (Position : in Static_Stack_Analysis.Node_Id);
-   --  Print the information about an indirect (including dispatching) call
+   --  Print the information about indirect (including dispatching) calls made
+   --  by this subprogram.
 
    procedure Print_Node (Position : in Static_Stack_Analysis.Paths.Cursor);
    --  Print the information about this concrete node (name, location,
@@ -564,10 +565,43 @@ package body Display is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
+      Counter : Natural := 0;
+      --  Number of indirect calls made by the node under analysis
+
+      procedure Is_Indirect (Position : in Static_Stack_Analysis.Edge_Id);
+      --  If the referenced call is an indirect call Counter is incremented
+
+      procedure Is_Indirect (Position : in Static_Stack_Analysis.Edge_Id) is
+
+         procedure Is_Indirect
+           (Target : Static_Stack_Analysis.Node_Class_Access);
+
+         procedure Is_Indirect
+           (Target : Static_Stack_Analysis.Node_Class_Access) is
+         begin
+            if Target.all in Static_Stack_Analysis.Fake_Node'Class then
+               Counter := Counter + 1;
+            end if;
+         end Is_Indirect;
+
+      begin
+         Static_Stack_Analysis.List_Of_Nodes.Query_Element
+           (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target,
+            Is_Indirect'Access);
+      end Is_Indirect;
+
    begin
-      if Node.all in Static_Stack_Analysis.Fake_Node'Class then
+      Node.Target_Calls.Iterate (Is_Indirect'Access);
+
+      if Counter > 0 then
+         Ada.Text_IO.Put ("  ");
+
+         Ada.Integer_Text_IO.Put (Counter, 0);
+
+         Ada.Text_IO.Put (" indirect calls in: ");
+
          Ada.Text_IO.Put_Line
-           ("  " & Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
       end if;
    end Print_Indirect;
 
@@ -602,6 +636,7 @@ package body Display is
       if Options.Warnings (Options.Cycle) then
          Ada.Text_IO.Put_Line
            ("List of cycles:");
+         Ada.Text_IO.New_Line;
          Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
          Ada.Text_IO.New_Line;
       end if;
@@ -612,6 +647,7 @@ package body Display is
       if Options.Warnings (Options.Unbounded) then
          Ada.Text_IO.Put_Line
            ("List of subprograms with dynamic unbounded frames:");
+         Ada.Text_IO.New_Line;
          Static_Stack_Analysis.List_Of_Subprograms.Iterate
            (Print_Unbounded'Access);
          Ada.Text_IO.New_Line;
@@ -623,6 +659,7 @@ package body Display is
       if Options.Warnings (Options.Unbounded) then
          Ada.Text_IO.Put_Line
            ("List of external subprograms:");
+         Ada.Text_IO.New_Line;
          Static_Stack_Analysis.List_Of_Subprograms.Iterate
            (Print_External'Access);
          Ada.Text_IO.New_Line;
@@ -633,6 +670,7 @@ package body Display is
       if Options.Warnings (Options.Indirect) then
          Ada.Text_IO.Put_Line
            ("List of indirect (including dispatching) calls:");
+         Ada.Text_IO.New_Line;
          Static_Stack_Analysis.List_Of_Subprograms.Iterate
            (Print_Indirect'Access);
          Ada.Text_IO.New_Line;
