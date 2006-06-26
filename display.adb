@@ -293,7 +293,7 @@ package body Display is
       --  Information about subprograms for which we do not have any stack
       --  usage
 
-      if Options.Warnings (Options.Unbounded) then
+      if Options.Warnings (Options.External) then
          Ada.Text_IO.Put_Line
            ("List of external subprograms:");
          Ada.Text_IO.New_Line;
