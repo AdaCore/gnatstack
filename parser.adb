@@ -36,7 +36,7 @@ with Options;
 --           Default_Unknown
 --           Default_Unbounded
 --           List_Of_Entry_Points
---           Output_File
+--           Output_VCG
 --           Order
 
 with Ada.Containers.Vectors;
@@ -359,8 +359,8 @@ package body Parser is
 
             --  Output graph file
             when 'g' =>
-               Free (Options.Output_File);
-               Options.Output_File :=
+               Free (Options.Output_VCG);
+               Options.Output_VCG :=
                  new String'(GNAT.Command_Line.Parameter);
 
             when others =>

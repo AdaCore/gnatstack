@@ -20,7 +20,7 @@
 ------------------------------------------------------------------------------
 
 with Options;
---  Used for Output_File
+--  Used for Output_VCG
 --           Explore_All
 --           Verbose
 --           Order
@@ -75,6 +75,9 @@ package body Display is
    VCG_Descriptor : Ada.Text_IO.File_Type;
    --  File where the VCG callgraph is stored
 
+   Undefined_Descriptor : Ada.Text_IO.File_Type;
+   --  File
+
    -----------------------
    -- Local subprograms --
    -----------------------
@@ -113,9 +116,29 @@ package body Display is
    --  Print the information about indirect (including dispatching) calls made
    --  by this subprogram.
 
-   procedure Print_Node (Position : in Static_Stack_Analysis.Paths.Cursor);
-   --  Print the information about this concrete node (name, location,
-   --  stack usage, and subprogram called).
+   procedure Print_Node
+     (Subprogram_Name          : String;
+      Local_Stack_Usage       : in Static_Stack_Analysis.Stack_Usage_Info;
+      Accumulated_Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info;
+      Locations               : in Static_Stack_Analysis.List_Of_Locations.Set;
+      Unresolved              : in Boolean := False;
+      To_Undefined_File       : in Boolean := False);
+   --  Print the information about this concrete subprogram with the format
+   --  used by the compiler when generating call graph and stack usage
+   --  information. If To_Undefined_File is True then the node is generated in
+   --  an intermediate file that is used as a stub that can be later filled by
+   --  the user (or any external tool). Otherwise the output is sent to the
+   --  file containing the VCG call graph being generated.
+
+   procedure Print_Edge (Source : in String; Target : in String);
+   --  Print the information about this concrete call-to-subprogram with the
+   --  format used by the compiler when generating call graph and stack usage
+   --  information.
+
+   procedure Print_Node_In_Path
+     (Position : in Static_Stack_Analysis.Paths.Cursor);
+   --  Print the information about this concrete node (name, location, stack
+   --  usage, and subprogram called, depending on the verbosity chosen).
 
    procedure Print_Path (Path : in Static_Stack_Analysis.Paths.Vector);
    --  Print the specify path. The displayed information will be the set of
@@ -130,9 +153,56 @@ package body Display is
      (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
    --  Print the set of subprograms belonging to the cycle
 
-   ------------------------
+   ---------------------
+   -- Expand_Location --
+   ---------------------
+
+   procedure Expand_Location
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+   is
+      Location : constant Static_Stack_Analysis.Location :=
+        Static_Stack_Analysis.List_Of_Locations.Element (Position);
+
+   begin
+      Ada.Text_IO.Put (Location.File.all & ":");
+      Ada.Text_IO.Put (Location.Demangled.all & ":");
+      Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+      Ada.Text_IO.Put (":");
+      Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+
+      if Static_Stack_Analysis.List_Of_Locations.Has_Element
+        (Static_Stack_Analysis.List_Of_Locations.Next (Position))
+      then
+         --  Separator among locations
+
+         Ada.Text_IO.Put (",");
+      end if;
+   end Expand_Location;
+
+   ----------------
+   -- Print_Edge --
+   ----------------
+
+   procedure Print_Edge (Source : in String; Target : in String) is
+   begin
+      --  Caller
+
+      Ada.Text_IO.Put ("edge: { sourcename: """);
+      Ada.Text_IO.Put (Source);
+
+      --  Callee
+
+      Ada.Text_IO.Put (""" targetname: """);
+      Ada.Text_IO.Put (Target);
+
+      --  Type of line
+
+      Ada.Text_IO.Put_Line (""" priority: 100 linestyle: solid }");
+   end Print_Edge;
+
+   -------------------------
    -- Print_Longest_Paths --
-   ------------------------
+   -------------------------
 
    procedure Print_Longest_Paths is
 
@@ -181,23 +251,67 @@ package body Display is
          Print_Longest_Path'Access);
    end Print_Longest_Paths;
 
-   ---------------------
-   -- Expand_Location --
-   ---------------------
+   ----------------
+   -- Print_Node --
+   ----------------
 
-   procedure Expand_Location
-     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
-   is
-      Location : constant Static_Stack_Analysis.Location :=
-        Static_Stack_Analysis.List_Of_Locations.Element (Position);
-
+   procedure Print_Node
+     (Subprogram_Name         : in String;
+      Local_Stack_Usage       : in Static_Stack_Analysis.Stack_Usage_Info;
+      Accumulated_Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info;
+      Locations               : in Static_Stack_Analysis.List_Of_Locations.Set;
+      Unresolved              : in Boolean := False;
+      To_Undefined_File       : in Boolean := False) is
    begin
-      Ada.Text_IO.Put (Location.File.all & ":");
-      Ada.Text_IO.Put (Location.Demangled.all & ":");
-      Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
-      Ada.Text_IO.Put (":");
-      Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
-   end Expand_Location;
+      --  Generate the node line
+
+      --  Open node
+
+      Ada.Text_IO.Put ("node: {");
+
+      --  Title
+
+      Ada.Text_IO.Put (" title: """ & Subprogram_Name & '"');
+
+      --  Label
+
+      Ada.Text_IO.Put (" label: """);
+
+      if not Locations.Is_Empty then
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Locations, Expand_Location'Access);
+
+         Ada.Text_IO.Put ("\n");
+      end if;
+
+      --  Print stack usage for the subprogram
+
+      if Unresolved and then To_Undefined_File then
+         Ada.Text_IO.Put ("XXX bytes""");
+      else
+         Ada.Text_IO.Put ("Local: ");
+
+         Expand_Stack_Usage (Local_Stack_Usage);
+
+         --  Print the maximum accumulated stack usage
+
+         Ada.Text_IO.Put ("\nAccumulated: ");
+
+         Expand_Stack_Usage (Accumulated_Stack_Usage);
+
+         Ada.Text_IO.Put ('"');
+      end if;
+
+      --  Shape
+
+      if Unresolved and then not To_Undefined_File then
+         Ada.Text_IO.Put (" shape : ellipse");
+      end if;
+
+      --  Close node
+
+      Ada.Text_IO.Put_Line (" }");
+   end Print_Node;
 
    ----------------------
    -- Generate_Results --
@@ -228,21 +342,39 @@ package body Display is
       Success : Boolean;
 
    begin
-      --  If no file has been specified as output use the default graph.vcg
+      --  If no file has been specified as call graph output use the default
+      --  graph.vcg.
 
-      if Options.Output_File = null then
-         Options.Output_File := new String'("graph.vcg");
+      if Options.Output_VCG = null then
+         Options.Output_VCG := new String'("graph.vcg");
       end if;
 
-      if GNAT.OS_Lib.Is_Regular_File (Options.Output_File.all) then
-         GNAT.OS_Lib.Delete_File (Options.Output_File.all, Success);
+      if GNAT.OS_Lib.Is_Regular_File (Options.Output_VCG.all) then
+         GNAT.OS_Lib.Delete_File (Options.Output_VCG.all, Success);
          pragma Assert (Success);
       end if;
 
       Ada.Text_IO.Create
-        (VCG_Descriptor, Ada.Text_IO.Out_File, Options.Output_File.all);
+        (VCG_Descriptor, Ada.Text_IO.Out_File, Options.Output_VCG.all);
 
       Ada.Text_IO.Set_Output (VCG_Descriptor);
+
+      --  If no file has been specified as output for undefined information
+      --  use the default undefined.ciu.
+
+      if Options.Output_Undefined = null then
+         Options.Output_Undefined := new String'("undefined.ciu");
+      end if;
+
+      if GNAT.OS_Lib.Is_Regular_File (Options.Output_Undefined.all) then
+         GNAT.OS_Lib.Delete_File (Options.Output_Undefined.all, Success);
+         pragma Assert (Success);
+      end if;
+
+      Ada.Text_IO.Create
+        (Undefined_Descriptor,
+         Ada.Text_IO.Out_File,
+         Options.Output_Undefined.all);
 
       --  Graph header
 
@@ -259,6 +391,8 @@ package body Display is
 
       Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
 
+      Ada.Text_IO.Close (Undefined_Descriptor);
+
       Ada.Text_IO.Close (VCG_Descriptor);
    end Generate_VCG_Graph;
 
@@ -268,7 +402,7 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
-            --  Information about cycles
+      --  Information about cycles
 
       if Options.Warnings (Options.Cycle) then
          Ada.Text_IO.Put_Line
@@ -322,93 +456,70 @@ package body Display is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
+      Unresolved : constant Boolean :=
+        Node.all in Static_Stack_Analysis.Unresolved_Node'Class;
+
       Stack : constant Static_Stack_Analysis.Stack_Usage_Info :=
         Static_Stack_Analysis.Get_Stack_Usage (Node.all);
+
+      Caller : constant String :=
+        Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all;
+
+      Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
+           Static_Stack_Analysis.Get_Location_List (Node.all);
 
       procedure Expand_Edge (Position : in Static_Stack_Analysis.Edge_Id);
       --  Generate the information about this call to subprogram
 
       procedure Expand_Edge (Position : in Static_Stack_Analysis.Edge_Id) is
-         Edge : constant Static_Stack_Analysis.Edge :=
-           Static_Stack_Analysis.List_Of_Edges.Element (Position);
-
          Target : constant Static_Stack_Analysis.Node_Class_Access :=
-           Static_Stack_Analysis.List_Of_Nodes.Element (Edge.Target);
+           Static_Stack_Analysis.List_Of_Nodes.Element
+             (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
+
+         Callee : constant String :=
+           Static_Stack_Analysis.Get_Subprogram_Name (Target.all).all;
 
       begin
-         --  Caller
+         --  Print both to the VCG file containing the call graph and to the
+         --  file that will be later filled by the user.
 
-         Ada.Text_IO.Put ("edge: { sourcename: """);
-         Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+         Ada.Text_IO.Set_Output (VCG_Descriptor);
 
-         --  Callee
+         Print_Edge (Source => Caller, Target => Callee);
 
-         Ada.Text_IO.Put (""" targetname: """);
-         Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name (Target.all).all);
+         if Target.all in Static_Stack_Analysis.Fake_Node'Class then
+            Ada.Text_IO.Set_Output (Undefined_Descriptor);
 
-         --  Type of line
+            Print_Edge (Source => Caller, Target => "XXX");
+         end if;
 
-         Ada.Text_IO.Put_Line (""" priority: 100 linestyle: solid }");
       end Expand_Edge;
 
    begin
-      --  Generate the node line
+      --  Print both to the VCG file containing the call graph and to the file
+      --  that will be later filled by the user.
 
-      --  Open node
+      Ada.Text_IO.Set_Output (VCG_Descriptor);
 
-      Ada.Text_IO.Put ("node: {");
+      Print_Node
+        (Subprogram_Name         => Caller,
+         Local_Stack_Usage       => Stack,
+         Accumulated_Stack_Usage => Node.Accumulated_Stack_Usage,
+         Locations               => Locations,
+         Unresolved              => Unresolved,
+         To_Undefined_File       => False);
 
-      --  Title
+      if Unresolved then
+         Ada.Text_IO.Set_Output (Undefined_Descriptor);
 
-      Ada.Text_IO.Put (" title: """);
-
-      Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
-
-      Ada.Text_IO.Put ('"');
-
-      --  Label
-
-      Ada.Text_IO.Put (" label: """);
-
-      declare
-         Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
-           Static_Stack_Analysis.Get_Location_List (Node.all);
-
-      begin
-         if not Locations.Is_Empty then
-            Ada.Text_IO.Put ("\n");
-
-            Static_Stack_Analysis.List_Of_Locations.Iterate
-              (Locations, Expand_Location'Access);
-         end if;
-      end;
-
-      --  Print stack usage for the subprogram
-
-      Ada.Text_IO.Put ("\nLocal: ");
-
-      Expand_Stack_Usage (Stack);
-
-      --  Print the maximum accumulated stack usage
-
-      Ada.Text_IO.Put ("\nAccumulated: ");
-
-      Expand_Stack_Usage (Node.Accumulated_Stack_Usage);
-
-      Ada.Text_IO.Put ('"');
-
-      --  Shape
-
-      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class then
-         Ada.Text_IO.Put (" shape : ellipse");
+         Print_Node
+           (Subprogram_Name         => Caller,
+            Local_Stack_Usage       => Stack,
+            Accumulated_Stack_Usage => Node.Accumulated_Stack_Usage,
+            Locations               => Locations,
+            Unresolved              => Unresolved,
+            To_Undefined_File       => True);
       end if;
-
-      --  Close node
-
-      Ada.Text_IO.Put_Line (" }");
 
       --  Generate the edges (that is, all the calls to subprogram) that have
       --  this subprogram as caller.
@@ -474,7 +585,7 @@ package body Display is
    -- Print_Node --
    ----------------
 
-   procedure Print_Node
+   procedure Print_Node_In_Path
      (Position : in Static_Stack_Analysis.Paths.Cursor)
    is
       Explored_Item : constant Static_Stack_Analysis.Path_Element :=
@@ -544,7 +655,7 @@ package body Display is
 
          Ada.Text_IO.New_Line;
       end if;
-   end Print_Node;
+   end Print_Node_In_Path;
 
    ----------------
    -- Print_Path --
@@ -571,7 +682,7 @@ package body Display is
 
       --  Print the call chain
 
-      Static_Stack_Analysis.Paths.Iterate (Path, Print_Node'Access);
+      Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
    end Print_Path;
 
    -----------------
@@ -591,9 +702,9 @@ package body Display is
 
       Print_Path (Path);
 
-      --  We repeat the first node just for better clarity
+      --  We repeat the first node just for clarity
 
-      Print_Node (Static_Stack_Analysis.Paths.First (Path));
+      Print_Node_In_Path (Static_Stack_Analysis.Paths.First (Path));
 
       Ada.Text_IO.New_Line;
    end Print_Cycle;

@@ -50,8 +50,12 @@ package Options is
    --  Consider as entry points all the subprograms containing this pattern in
    --  the symbol name.
 
-   Output_File : GNAT.Strings.String_Access := null;
+   Output_VCG : GNAT.Strings.String_Access := null;
    --  Name of the generated call graph file
+
+   Output_Undefined : GNAT.Strings.String_Access := null;
+   --  Name of the generated file containing undefined information, such as
+   --  external and indirect calls.
 
    Default_Unknown : Natural := 200;
    --  Value used (in bytes) when there is no information about stack usage
