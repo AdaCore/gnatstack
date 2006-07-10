@@ -86,6 +86,11 @@ package body Parser is
    procedure Usage;
    --  Print how to use the tool
 
+   procedure Add_Ada_Entry_Points
+     (Position : in Static_Stack_Analysis.Node_Id);
+   --  Add the entry points corresponding to the main procedure and the task
+   --  entry points.
+
    procedure Add_Local_Entry (Position : in Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if it contains a
    --  subprogram that is part of the application code.
@@ -205,6 +210,29 @@ package body Parser is
    procedure Parse_Edge (Input : String);
    --  Get caller and callee in a subprogram call.
    --  Format : ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
+
+   --------------------------
+   -- Add_Ada_Entry_Points --
+   --------------------------
+
+   procedure Add_Ada_Entry_Points
+     (Position : in Static_Stack_Analysis.Node_Id)
+   is
+      Subprogram : constant Static_Stack_Analysis.Subprogram_Name :=
+        Static_Stack_Analysis.Get_Subprogram_Name
+          (Static_Stack_Analysis.List_Of_Nodes.Element (Position).all);
+
+   begin
+      --  If the referenced node describes a subprogram containing the pattern
+      --  defined in Options.Entry_Point_Pattern we add this subprogram to the
+      --  list of potential entry points.
+
+      if Subprogram.all = "_ada_main"
+        or else GNAT.Regpat.Match ("TKB", Subprogram.all)
+      then
+         Static_Stack_Analysis.Entry_Points.Append (Position);
+      end if;
+   end Add_Ada_Entry_Points;
 
    ---------------------
    -- Add_Local_Entry --
@@ -380,7 +408,7 @@ package body Parser is
          end case;
       end loop;
 
-      --  Get list of entry files
+      --  Get list of input files
 
       loop
          declare
@@ -416,6 +444,14 @@ package body Parser is
       Call_Graph_Cycles.Extract_Cycles;
 
       --  Get the list of subprograms to be considered as entry points
+
+      --  Automatic entry points (main procedure and task entry points)
+
+      Static_Stack_Analysis.List_Of_Nodes.Iterate
+           (Static_Stack_Analysis.List_Of_Subprograms,
+            Add_Ada_Entry_Points'Access);
+
+      --  Entry points specified by hand
 
       if Options.List_Of_Entry_Points /= null then
          --  Add the entry points that have been specified in the command line

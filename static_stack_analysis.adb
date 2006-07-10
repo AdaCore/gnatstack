@@ -129,12 +129,6 @@ package body Static_Stack_Analysis is
       return Target.Accumulated_Stack_Usage;
    end Get_Accumulated_Stack_Usage;
 
-   --  function Get_Accumulated_Stack_Usage
-   --    (Target : Cycle) return Stack_Usage_Info is
-   --  begin
-   --
-   --  end Get_Accumulated_Stack_Usage;
-
    -----------------------
    -- Get_Location_List --
    -----------------------
