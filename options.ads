@@ -43,6 +43,11 @@ package Options is
    Explore_All : Boolean := False;
    --  Compute worst case stack usage for every node in the partition
 
+   Compute_All_Cycles : Boolean := False;
+   --  Flag that indicates whether we want to get the full list of potential
+   --  cycles in the program (True) or simply to know if a subprogram belong
+   --  to at least one cycle.
+
    List_Of_Entry_Points : GNAT.Strings.String_Access := null;
    --  List of entry points to be analyzed
 

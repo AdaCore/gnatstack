@@ -76,14 +76,17 @@ package body Display is
    --  File where the VCG callgraph is stored
 
    Undefined_Descriptor : Ada.Text_IO.File_Type;
-   --  File
+   --  File containing undefined information (unknown stack usage, indirect
+   --  calls, etc.).
 
    -----------------------
    -- Local subprograms --
    -----------------------
 
-   procedure Generate_VCG_Graph;
-   --  Generate a VCG file containing the annotated callgraph
+   procedure Generate_Output_Files;
+   --  Generate a VCG file containing the annotated call graph and the file
+   --  containing undefined information (unknown stack usage, indirect calls,
+   --  etc.).
 
    procedure Print_Longest_Paths;
    --  Generate the callgraph chains that contains the longest paths with
@@ -319,9 +322,10 @@ package body Display is
 
    procedure Generate_Results is
    begin
-      --  Generate file containing the whole call graph
+      --  Generate the files containing the whole call graph and the undefined
+      --  references.
 
-      Generate_VCG_Graph;
+      Generate_Output_Files;
 
       --  Print the stack usage information
 
@@ -332,11 +336,11 @@ package body Display is
       Print_Longest_Paths;
    end Generate_Results;
 
-   ------------------------
-   -- Generate_VCG_Graph --
-   ------------------------
+   ---------------------------
+   -- Generate_Output_Files --
+   ---------------------------
 
-   procedure Generate_VCG_Graph is
+   procedure Generate_Output_Files is
       use type GNAT.Strings.String_Access;
 
       Success : Boolean;
@@ -394,7 +398,7 @@ package body Display is
       Ada.Text_IO.Close (Undefined_Descriptor);
 
       Ada.Text_IO.Close (VCG_Descriptor);
-   end Generate_VCG_Graph;
+   end Generate_Output_Files;
 
    -----------------------
    -- Generate_Warnings --

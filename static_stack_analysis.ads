@@ -126,6 +126,8 @@ package Static_Stack_Analysis is
    --  to their total accumulated stack usage (in decreasing order).
 
    function Equal (Left, Right : Node_Class_Access) return Boolean;
+   --  Equality operation between two nodes. They are equal if they contain
+   --  the same information (subprogram name, calls, etc.).
 
    package List_Of_Nodes is
      new Ada.Containers.Ordered_Sets
@@ -136,6 +138,11 @@ package Static_Stack_Analysis is
 
    subtype Node_Id is List_Of_Nodes.Cursor;
    --  Unique identifier for subprograms
+
+   function "=" (Left, Right : Node_Id) return Boolean;
+
+   package List_Of_Node_Ids is new Ada.Containers.Vectors (Natural, Node_Id);
+   --  Package used for storing lists of Node_Ids
 
    function Stack_Usage_Order (Left, Right : Node_Id) return Boolean;
    --  Returns True if Left has a total accumulated stack usage greater than
@@ -158,8 +165,10 @@ package Static_Stack_Analysis is
       Target        : Node_Id;
       --  Target node for this edge
 
-      Point_Of_Call : Location;
-      --  Location where the call associated to this edge appears
+      Point_Of_Call : List_Of_Locations.Set;
+      --  Set of locations where the call associated to this edge appears.
+      --  There may be more than one location because the caller may make
+      --  multiple calls to a certain callee.
 
       Feasible_Call : Boolean;
       --  Flag that indicates whether the this theoretical call is feasible or
@@ -215,7 +224,7 @@ package Static_Stack_Analysis is
       --  Unique identifier
 
       Path       : Paths.Vector;
-      --  Subprograms that make up the callgraph cycle
+      --  Subprograms that make up the call graph cycle
 
       Iterations : Natural;
       --  Upper bound to the number of times the cycle is executed
@@ -224,6 +233,9 @@ package Static_Stack_Analysis is
    type Cycle is access all Cycle_Element;
    --  What identifies a cycle is the path (set of nodes and edges that make
    --  up the cycle) and the number of iterations that we consider.
+
+   Empty_Cycle : constant Cycle_Element;
+   --  Cycle with no elements inside
 
    package List_Of_Cycles is new Ada.Containers.Vectors (Natural, Cycle);
    --  Package used for identifying collections of call graph cycles
@@ -235,8 +247,6 @@ package Static_Stack_Analysis is
    ------------------
    -- Entry points --
    ------------------
-
-   function "=" (Left, Right : Node_Id) return Boolean;
 
    package List_Of_Entry_Points is new
      Ada.Containers.Vectors (Natural, Node_Id, "=");
@@ -265,6 +275,11 @@ package Static_Stack_Analysis is
          --  Indicates whether the node is part of the path being analyzed for
          --  obtaining the worst case stack usage. It is very useful for
          --  detecting and handling cycles in the call graph.
+
+         Cycle_Analysis_Finished : Boolean;
+         --  Indicates whether we already have the list of call graph cycles
+         --  to which this node belongs. Once this flag is set to True, any
+         --  cycle computation arriving to this node can stop.
 
          Cycles : List_Of_Cycles.Vector;
          --  A node may be part of different cycles in the call graph, and
@@ -434,5 +449,10 @@ private
       Static_Usage  => 0,
       Dynamic_Usage => 0,
       Unknown_Usage => 0);
+
+   Empty_Cycle : constant Cycle_Element :=
+     (Id         => 0,
+      Path       => Static_Stack_Analysis.Paths.Empty_Vector,
+      Iterations => 1);
 
 end Static_Stack_Analysis;

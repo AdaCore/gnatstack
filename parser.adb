@@ -277,13 +277,24 @@ package body Parser is
       --  Get options
 
       loop
-         case GNAT.Command_Line.Getopt ("h v W! o= a u: d: e: r: g:") is
+         case GNAT.Command_Line.Getopt ("h v ca W! o= a u: d: e: r: g:") is
             when ASCII.NUL =>
                exit;
 
             --  Verbose
             when 'v' =>
                Options.Verbose := True;
+
+            --  All cycles
+            when 'c' =>
+               if GNAT.Command_Line.Full_Switch = "ca" then
+                  Options.Compute_All_Cycles := True;
+               else
+                  Ada.Text_IO.Put_Line
+                    ("Unknown option: " & GNAT.Command_Line.Full_Switch);
+                  Usage;
+                  GNAT.OS_Lib.OS_Exit (1);
+               end if;
 
             --  Warnings
             when 'W' =>
@@ -613,6 +624,7 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Under_Analysis          => False,
+                  Cycle_Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
@@ -634,6 +646,7 @@ package body Parser is
                   Subprogram              => Symbol_Name,
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
+                  Cycle_Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
@@ -673,6 +686,7 @@ package body Parser is
                      Subprogram              => Symbol_Name,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
+                     Cycle_Analysis_Finished         => False,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
@@ -916,6 +930,7 @@ package body Parser is
                Subprogram              =>
                  new String'(Input (Matches (1).First .. Matches (1).Last)),
                Under_Analysis          => False,
+               Cycle_Analysis_Finished => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             List_Of_Subprograms.Insert (Source_Ptr, Source_Id, Inserted);
@@ -942,6 +957,7 @@ package body Parser is
                  (Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Under_Analysis          => False,
+                  Cycle_Analysis_Finished => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
             --  This node is considered unresolved for the moment. It can be
@@ -954,6 +970,7 @@ package body Parser is
                   Subprogram              =>
                     new String'(Input (Matches (2).First .. Matches (2).Last)),
                   Under_Analysis          => False,
+                  Cycle_Analysis_Finished => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
             end if;
 
@@ -962,17 +979,43 @@ package body Parser is
             pragma Assert (Inserted);
          end if;
 
-         --  Now we create the edge with the information that we have about the
-         --  source and the target.
+         --  Now we need to check whether there is already an edge joining
+         --  these two subprograms. We add the new location if the node exists,
+         --  or create a new edge otherwise.
 
-         Static_Stack_Analysis.List_Of_Edges.Append
-           (Source_Ptr.Target_Calls,
-            new Static_Stack_Analysis.Edge_Element'(
-              Target         => Target_Id,
-              Point_Of_Call  => Null_Location,
-              Feasible_Call  => True,
-              Under_Analysis => False));
+         declare
+            Index : Static_Stack_Analysis.Edge_Id :=
+              Source_Ptr.Target_Calls.First;
 
+            Call : Static_Stack_Analysis.Edge;
+
+         begin
+            while Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) loop
+               Call := Static_Stack_Analysis.List_Of_Edges.Element (Index);
+
+               if Static_Stack_Analysis."=" (Call.Target, Target_Id) then
+                  --  Add new location. We do not have yet the information ???
+
+                  exit;
+
+               else
+                  Static_Stack_Analysis.List_Of_Edges.Next (Index);
+               end if;
+            end loop;
+
+            if not Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) then
+               --  Create new edge with the information that we have about the
+               --  source and the target.
+
+               Static_Stack_Analysis.List_Of_Edges.Append
+                 (Source_Ptr.Target_Calls,
+                  new Static_Stack_Analysis.Edge_Element'(
+                    Target         => Target_Id,
+                    Point_Of_Call  => List_Of_Locations.Empty_Set,
+                    Feasible_Call  => True,
+                    Under_Analysis => False));
+            end if;
+         end;
       else
          raise Parser_Error;
       end if;
@@ -1011,6 +1054,8 @@ package body Parser is
       Put_Line ("  -h           display help message");
       New_Line;
       Put_Line ("  -v           verbose");
+      New_Line;
+      Put_Line ("  -ca          extract all cycles");
       New_Line;
       Put_Line ("  -Wxx         enable warnings, xx = list of parameters:");
       Put_Line ("    a          turn on all optional warnings");

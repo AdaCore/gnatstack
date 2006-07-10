@@ -91,56 +91,54 @@ package body Worst_Case_Analyzer is
    begin
       --  Check against cycles
 
-      if Explored_Node.Under_Analysis then
-         --  Break the cycle in the worst case computation. Assume that the
-         --  cycle is executed only once.
+      --  Break the cycle in the worst case computation. Assume that the
+      --  cycle is executed only once.
 
-         return;
-
-      else
+      if not Explored_Node.Under_Analysis then
          --  Mark it under analysis
 
          Explored_Node.Under_Analysis := True;
-      end if;
 
-      if Explored_Node.Accumulated_Stack_Usage =
-         Static_Stack_Analysis.Unknown_Stack_Usage
-      then
-         --  For a given node we need to explore all the possible target calls
-         --  (getting their accumulated stack usage) and then order these calls
-         --  according to to the previously computed value.
-
-         --  Iterate
-
-         Static_Stack_Analysis.List_Of_Edges.Iterate
-           (Explored_Node.Target_Calls, Compute_Worst_Case'Access);
-
-         --  Sort
-
-         Ordered_Edges.Sort (Explored_Node.Target_Calls);
-
-         --  Update info
-
-         if Static_Stack_Analysis.List_Of_Edges.Is_Empty
-              (Explored_Node.Target_Calls)
+         if Explored_Node.Accumulated_Stack_Usage =
+           Static_Stack_Analysis.Unknown_Stack_Usage
          then
-            Explored_Node.Accumulated_Stack_Usage :=
-              Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all);
+            --  For a given node we need to explore all the possible target
+            --  calls (getting their accumulated stack usage) and then order
+            --  these calls according to to the previously computed value.
 
-         else
-            Explored_Node.Accumulated_Stack_Usage :=
-              Static_Stack_Analysis."+"
-                (Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all),
-                 Static_Stack_Analysis.Get_Accumulated_Stack_Usage
-                   (Static_Stack_Analysis.List_Of_Nodes.Element
-                      (Static_Stack_Analysis.List_Of_Edges.First_Element
-                         (Explored_Node.Target_Calls).Target).all));
+            --  Iterate
+
+            Static_Stack_Analysis.List_Of_Edges.Iterate
+              (Explored_Node.Target_Calls, Compute_Worst_Case'Access);
+
+            --  Sort
+
+            Ordered_Edges.Sort (Explored_Node.Target_Calls);
+
+            --  Update info
+
+            if Static_Stack_Analysis.List_Of_Edges.Is_Empty
+              (Explored_Node.Target_Calls)
+            then
+               Explored_Node.Accumulated_Stack_Usage :=
+                 Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all);
+
+            else
+               Explored_Node.Accumulated_Stack_Usage :=
+                 Static_Stack_Analysis."+"
+                   (Static_Stack_Analysis.Get_Stack_Usage (Explored_Node.all),
+                    Static_Stack_Analysis.Get_Accumulated_Stack_Usage
+                      (Static_Stack_Analysis.List_Of_Nodes.Element
+                         (Static_Stack_Analysis.List_Of_Edges.First_Element
+                            (Explored_Node.Target_Calls).Target).all));
+            end if;
          end if;
+
+         --  Mark the end of the analysis for this node
+
+         Explored_Node.Under_Analysis := False;
+
       end if;
-
-      --  Mark the end of the analysis for this node
-
-      Explored_Node.Under_Analysis := False;
    end Compute_Worst_Case;
 
    ----------------------
