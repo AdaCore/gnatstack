@@ -227,8 +227,8 @@ package body Parser is
       --  defined in Options.Entry_Point_Pattern we add this subprogram to the
       --  list of potential entry points.
 
-      if Subprogram.all = "_ada_main"
-        or else GNAT.Regpat.Match ("TKB", Subprogram.all)
+      if Subprogram.all = "main"
+        or else GNAT.Regpat.Match ("B", Subprogram.all)
       then
          Static_Stack_Analysis.Entry_Points.Append (Position);
       end if;
