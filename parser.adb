@@ -461,12 +461,6 @@ package body Parser is
 
       --  Get the list of subprograms to be considered as entry points
 
-      --  Automatic entry points (main procedure and task entry points)
-
-      Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms,
-            Add_Ada_Entry_Points'Access);
-
       --  Entry points specified by hand
 
       if Options.List_Of_Entry_Points /= null then
@@ -487,6 +481,13 @@ package body Parser is
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Static_Stack_Analysis.List_Of_Subprograms, Add_Local_Entry'Access);
+
+      else
+         --  Automatic entry points (main procedure and task entry points)
+
+         Static_Stack_Analysis.List_Of_Nodes.Iterate
+           (Static_Stack_Analysis.List_Of_Subprograms,
+            Add_Ada_Entry_Points'Access);
       end if;
 
    exception
