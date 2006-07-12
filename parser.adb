@@ -218,9 +218,13 @@ package body Parser is
    procedure Add_Ada_Entry_Points
      (Position : in Static_Stack_Analysis.Node_Id)
    is
+      Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
       Subprogram : constant Static_Stack_Analysis.Subprogram_Name :=
-        Static_Stack_Analysis.Get_Subprogram_Name
-          (Static_Stack_Analysis.List_Of_Nodes.Element (Position).all);
+        Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
+
+      use type Static_Stack_Analysis.Node_Id;
 
    begin
       --  If the referenced node describes a subprogram containing the pattern
@@ -228,9 +232,21 @@ package body Parser is
       --  list of potential entry points.
 
       if Subprogram.all = "main"
-        or else GNAT.Regpat.Match ("B", Subprogram.all)
+        or else
+          (GNAT.Regpat.Match ("B", Subprogram.all)
+           and then not GNAT.Regpat.Match ("(BIP|_B)", Subprogram.all))
       then
          Static_Stack_Analysis.Entry_Points.Append (Position);
+      end if;
+
+      --  Get the task wrapper information in case this data has been
+      --  generated.
+
+      if not Static_Stack_Analysis.List_Of_Nodes.Has_Element
+               (Static_Stack_Analysis.Task_Wrapper)
+        and then GNAT.Regpat.Match ("stages__task_wrapper$", Subprogram.all)
+      then
+         Static_Stack_Analysis.Task_Wrapper := Position;
       end if;
    end Add_Ada_Entry_Points;
 
@@ -722,7 +738,7 @@ package body Parser is
                      Subprogram              => Symbol_Name,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
-                     Cycle_Analysis_Finished         => False,
+                     Cycle_Analysis_Finished => False,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list

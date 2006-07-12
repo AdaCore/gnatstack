@@ -157,6 +157,11 @@ package Static_Stack_Analysis is
    List_Of_Subprograms : List_Of_Nodes.Set := List_Of_Nodes.Empty_Set;
    --  List of all nodes under analysis
 
+   Task_Wrapper : List_Of_Nodes.Cursor := List_Of_Nodes.No_Element;
+   --  When we have a tasking program the task wrapper is the one that calls
+   --  the code belonging to the different tasks so we need to take into
+   --  account this information for computing stack usage for all the tasks.
+
    ------------------------------
    -- Edges (subprogram calls) --
    ------------------------------
