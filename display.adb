@@ -159,10 +159,8 @@ package body Display is
      (Position : in Static_Stack_Analysis.Paths.Cursor);
    --  Iterator for printing all the nodes in a path
 
-   procedure Print_Path (Path : in Static_Stack_Analysis.Paths.Vector);
-   --  Print the specify path. The displayed information will be the set of
-   --  subprograms in the path (if Verbose is False), and it will also
-   --  include local and accumulated stack consumption (if Verbose is True).
+   procedure Print_Entry (Root : Static_Stack_Analysis.Node_Class_Access);
+   --  Print a summary of the stack requirements for an entry point
 
    procedure Print_Cycle_Id
      (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
@@ -255,8 +253,18 @@ package body Display is
            Static_Stack_Analysis.Paths.Empty_Vector;
 
       begin
+         --  Get the worst-case path
+
          Worst_Case_Analyzer.Get_Longest_Path (Path, Position);
-         Print_Path (Path);
+
+         --  Print a summary of the worst-case stack usage
+
+         Print_Entry (Static_Stack_Analysis.List_Of_Nodes.Element (Position));
+
+         --  Print the call chain
+
+         Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
+
          Ada.Text_IO.New_Line;
       end Print_Longest_Path;
 
@@ -353,35 +361,34 @@ package body Display is
 
       Ada.Text_IO.Put (" +-> ");
 
-      --  Print subprogram name
-
-      Print_Subprogram_Name (Node);
-
-      --  Print location list
+      --  Subprogram name
 
       if Options.Verbose then
+         --  Symbol name
+
+         Ada.Text_IO.Put
+           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+
+         --  Location list
          Ada.Text_IO.Put (" at ");
 
          Static_Stack_Analysis.List_Of_Locations.Iterate
            (Static_Stack_Analysis.Get_Location_List (Node.all),
             Expand_Location'Access);
+
+      else
+         --  Print subprogram name
+
+         Print_Subprogram_Name (Node);
       end if;
 
-      --  Print local and accumulated stack usage
+      --  Print local stack usage
 
       if Options.Verbose then
          Ada.Text_IO.Put (" : ");
 
          Expand_Stack_Usage
            (Static_Stack_Analysis.Get_Stack_Usage (Node.all));
-
-         --  Print local and accumulated stack usage
-
-         if Options.Verbose then
-            Ada.Text_IO.Put (" Accumulated : ");
-
-            Expand_Stack_Usage (Node.Accumulated_Stack_Usage);
-         end if;
       end if;
 
       --  Information about cycles
@@ -428,8 +435,14 @@ package body Display is
            Static_Stack_Analysis.List_Of_Locations.Element (Location_Index);
 
          if Location.Demangled /= null then
-               Ada.Text_IO.Put (Location.Demangled.all);
-               Found := True;
+            if Found then
+               --  Separator between demangled names
+
+               Ada.Text_IO.Put (",");
+            end if;
+
+            Ada.Text_IO.Put (Location.Demangled.all);
+            Found := True;
          end if;
 
          Static_Stack_Analysis.List_Of_Locations.Next (Location_Index);
@@ -725,9 +738,9 @@ package body Display is
       end if;
    end Expand_Stack_Usage;
 
-   ----------------
-   -- Print_Node --
-   ----------------
+   ------------------------
+   -- Print_Node_In_Path --
+   ------------------------
 
    procedure Print_Node_In_Path
      (Position : in Static_Stack_Analysis.Paths.Cursor)
@@ -752,11 +765,7 @@ package body Display is
    -- Print_Path --
    ----------------
 
-   procedure Print_Path (Path : in Static_Stack_Analysis.Paths.Vector) is
-      Top_Subprogram : constant Static_Stack_Analysis.Node_Class_Access :=
-        Static_Stack_Analysis.List_Of_Nodes.Element
-          (Static_Stack_Analysis.Paths.First_Element (Path).Source_Node);
-
+   procedure Print_Entry (Root : Static_Stack_Analysis.Node_Class_Access) is
       Task_Wrapper : Static_Stack_Analysis.Node_Class_Access := null;
 
       Is_Task : Boolean;
@@ -767,7 +776,7 @@ package body Display is
    begin
       --  Print the global information
 
-      Is_Task := Is_Task_Entry (Top_Subprogram);
+      Is_Task := Is_Task_Entry (Root);
 
       if Is_Task then
          --  This is an Ada task
@@ -775,14 +784,14 @@ package body Display is
          Ada.Text_IO.Put ("Task ");
       end if;
 
-      Print_Subprogram_Name (Top_Subprogram);
+      Print_Subprogram_Name (Root);
 
       Ada.Text_IO.Put (" : total ");
 
       --  For tasks we need to add the task wrapper
 
       if Is_Task and then
-         Static_Stack_Analysis.List_Of_Nodes.Has_Element
+        Static_Stack_Analysis.List_Of_Nodes.Has_Element
           (Static_Stack_Analysis.Task_Wrapper)
       then
          Task_Wrapper :=
@@ -790,10 +799,8 @@ package body Display is
              (Static_Stack_Analysis.Task_Wrapper);
 
          Expand_Stack_Usage
-           (Static_Stack_Analysis.Get_Accumulated_Stack_Usage
-              (Top_Subprogram.all) +
-            Static_Stack_Analysis.Get_Stack_Usage
-              (Task_Wrapper.all));
+           (Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all) +
+            Static_Stack_Analysis.Get_Stack_Usage (Task_Wrapper.all));
 
          Ada.Text_IO.New_Line;
 
@@ -803,16 +810,11 @@ package body Display is
 
       else
          Expand_Stack_Usage
-           (Static_Stack_Analysis.Get_Accumulated_Stack_Usage
-              (Top_Subprogram.all));
+           (Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all));
 
          Ada.Text_IO.New_Line;
       end if;
-
-      --  Print the call chain
-
-      Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
-   end Print_Path;
+   end Print_Entry;
 
    -----------------
    -- Print_Cycle --
@@ -824,18 +826,28 @@ package body Display is
       Path : constant Static_Stack_Analysis.Paths.Vector :=
         Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Path;
 
+      Root : constant Static_Stack_Analysis.Paths.Cursor :=
+        Static_Stack_Analysis.Paths.First (Path);
+
    begin
       Print_Cycle_Id (Cycle);
 
       Ada.Text_IO.Put (" ");
 
-      Print_Path (Path);
+      Print_Subprogram_Name
+        (Static_Stack_Analysis.List_Of_Nodes.Element
+           (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
+
+      Ada.Text_IO.New_Line;
+
+      --  Print the call chain
+
+      Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
 
       --  We repeat the first node just for clarity
 
-      Print_Node_In_Path (Static_Stack_Analysis.Paths.First (Path));
+      Print_Node_In_Path (Root);
 
-      Ada.Text_IO.New_Line;
    end Print_Cycle;
 
    --------------------
