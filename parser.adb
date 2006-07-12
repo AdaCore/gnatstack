@@ -1125,9 +1125,11 @@ package body Parser is
       New_Line;
       Put_Line ("  -d size      default for unbounded (dynamic) calls");
       New_Line;
-      Put_Line ("  -a           analyze all subprograms");
-      Put_Line ("  -e <list>    list of entry points (e1,e2,...)");
-      Put_Line ("  -r <reg-exp> analyze subprograms matching the pattern");
+      Put_Line ("  -a           use all  subprograms as entry points");
+      Put_Line ("  -e <list>    use specific list of subprograms as entry " &
+                                "points (e1,e2,...)");
+      Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
+                                "entry points");
       New_Line;
       Put_Line ("  -g file      output graph file");
       New_Line;
