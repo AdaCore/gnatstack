@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 --                        STATIC STACK ANALYSIS TOOL                        --
 --                                                                          --
---                     C A L L _ G R A P H _ C Y C L E S                    --
+--                           C A L L _ G R A P H S                          --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -19,9 +19,29 @@
 -- Boston, MA 02110-1301, USA.                                              --
 ------------------------------------------------------------------------------
 
-package Call_Graph_Cycles is
+with Static_Stack_Analysis;
 
-   procedure Extract_Cycles;
-   --  Extract all the cycles existing in the call graph
+package Call_Graphs is
 
-end Call_Graph_Cycles;
+   Unbounded_Frames : Boolean := False;
+   --  Flag indicating whether there is a subprogram that can be reached from
+   --  any entry point whose stack usage cannot be bounded at compile-time
+   --  because it depends on data arguments passed to the frame.
+
+   External_Calls : Boolean := False;
+   --  Flag indicating whether there is a subprogram that can be reached from
+   --  any entry point for which we have neither stack usage not call graph
+   --  information.
+
+   Indirect_Calls : Boolean := False;
+   --  Flag indicating whether there is a subprogram that can be reached from
+   --  any entry point that represents an indirect (including dispatching)
+   --  call.
+
+   procedure Check_Accuracy
+     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+   --  Depending on the selected flags, this procedure will extract all the
+   --  cycles that can be reached from the specified entry point, as well as
+   --  undefined references, indirect calls and unbounded frames.
+
+end Call_Graphs;

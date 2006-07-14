@@ -22,6 +22,9 @@
 with Options;
 --  Used for Default_Unknown
 
+with GNAT.Regpat;
+--  Used for Match
+
 package body Static_Stack_Analysis is
 
    -----------
@@ -201,6 +204,18 @@ package body Static_Stack_Analysis is
    begin
       return Indirect_Call;
    end Get_Subprogram_Name;
+
+   -------------------
+   -- Is_Task_Entry --
+   -------------------
+
+   function Is_Task_Entry (Name : Subprogram_Name) return Boolean is
+   begin
+      --  ??? This pattern matching is not accurate. It will notify as task
+      --  entry points subprograms that are not.
+
+      return GNAT.Regpat.Match ("(TKB|[^\\_]B|B\.([0-9]+))$", Name.all);
+   end Is_Task_Entry;
 
    ---------
    -- Key --

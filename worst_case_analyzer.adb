@@ -37,7 +37,7 @@ package body Worst_Case_Analyzer is
    ----------------------
 
    procedure Compute_Worst_Case
-     (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor);
+     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
    --  Compute the worst case stack usage starting from the indicated entry
    --  point.
 
@@ -53,13 +53,13 @@ package body Worst_Case_Analyzer is
    ------------------------
 
    procedure Compute_Worst_Case
-     (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor)
+     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
    is
    begin
       --  Analyze the indicated node
 
       Compute_Worst_Case
-        (Static_Stack_Analysis.List_Of_Entry_Points.Element (Position));
+        (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
    end Compute_Worst_Case;
 
    procedure Compute_Worst_Case
@@ -192,7 +192,7 @@ package body Worst_Case_Analyzer is
    begin
       --  Explore every entry point
 
-      Static_Stack_Analysis.List_Of_Entry_Points.Iterate
+      Static_Stack_Analysis.List_Of_Node_Ids.Iterate
         (Static_Stack_Analysis.Entry_Points, Compute_Worst_Case'Access);
    end Worst_Case_Analysis;
 

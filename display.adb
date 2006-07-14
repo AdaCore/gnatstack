@@ -34,6 +34,9 @@ with Static_Stack_Analysis;
 --           Get_Stack_Usage
 --           Get_Subprogram_Name
 
+with Call_Graphs;
+--  Used for Extract_Cycles
+
 with Worst_Case_Analyzer;
 --  Used for Get_Longest_Path
 
@@ -66,7 +69,7 @@ package body Display is
    --------------------------
 
    package Ordered_Entries is
-     new Static_Stack_Analysis.List_Of_Entry_Points.Generic_Sorting
+     new Static_Stack_Analysis.List_Of_Node_Ids.Generic_Sorting
        (Static_Stack_Analysis.Stack_Usage_Order);
    --  This package is used for ordering edges (call-to-subprograms) according
    --  to their stack usage.
@@ -98,7 +101,13 @@ package body Display is
    --  every subprogram (if the flag for analyzing every subprogram has been
    --  set).
 
-   procedure Print_Subprogram_Name
+   procedure Print_Name
+     (Node : Static_Stack_Analysis.Node_Class_Access);
+   --  Print the subprogram name associated to the node. Depending on the
+   --  active verbosity it will print only the Ada name or it will print also
+   --  the symbol name and its location.
+
+   procedure Print_Ada_Name
      (Node : Static_Stack_Analysis.Node_Class_Access);
    --  Print the subprogram name associated to the node. It will use the
    --  demangled Ada name, if possible, remove path information, and use task
@@ -106,7 +115,7 @@ package body Display is
 
    procedure Expand_Location
         (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
-   --  Print the location using the format: file:demangled:line:column
+   --  Print the location using the format: demangled(:|\n)file:line:column
 
    procedure Expand_Stack_Usage
      (Stack_Info : Static_Stack_Analysis.Stack_Usage_Info);
@@ -115,10 +124,6 @@ package body Display is
    procedure Expand_Node (Position : in Static_Stack_Analysis.Node_Id);
    --  Print the information about the specified node, including stack usage
    --  (and accumulated stack usage), and subprograms that are called.
-
-   function Is_Task_Entry
-     (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean;
-   --  Returns True if the node corresponds to a task entry
 
    procedure Print_Unbounded (Position : in Static_Stack_Analysis.Node_Id);
    --  Print the subprogram name if the position corresponds to a node with a
@@ -180,9 +185,27 @@ package body Display is
       Location : constant Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
+      use type Ada.Text_IO.File_Access;
+
    begin
+      --  Demangled name
+
+      Ada.Text_IO.Put (Location.Demangled.all);
+
+      --  Separator between the Ada name and the file location
+
+      if Ada.Text_IO.Is_Open (VCG_Descriptor) then
+         --  Separator for the VCG file
+
+         Ada.Text_IO.Put ("\n");
+
+      else
+         Ada.Text_IO.Put (":");
+      end if;
+
+      --  File location
+
       Ada.Text_IO.Put (Location.File.all & ":");
-      Ada.Text_IO.Put (Location.Demangled.all & ":");
       Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
       Ada.Text_IO.Put (":");
       Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
@@ -195,21 +218,6 @@ package body Display is
          Ada.Text_IO.Put (",");
       end if;
    end Expand_Location;
-
-   -------------------
-   -- Is_Task_Entry --
-   -------------------
-
-   function Is_Task_Entry
-     (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean
-   is
-      Subprogram : constant Static_Stack_Analysis.Subprogram_Name :=
-        Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
-
-   begin
-      return GNAT.Regpat.Match ("B", Subprogram.all)
-        and then not GNAT.Regpat.Match ("(BIP|_B)", Subprogram.all);
-   end Is_Task_Entry;
 
    ----------------
    -- Print_Edge --
@@ -243,7 +251,7 @@ package body Display is
       --  Print the longest path for the specified subprogram
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor);
+        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
       --  Print the longest path for the specified entry point
 
       procedure Print_Longest_Path
@@ -269,10 +277,10 @@ package body Display is
       end Print_Longest_Path;
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.List_Of_Entry_Points.Cursor) is
+        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
       begin
          Print_Longest_Path
-           (Static_Stack_Analysis.List_Of_Entry_Points.Element (Position));
+           (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
       end Print_Longest_Path;
 
       use type Options.Order_Type;
@@ -288,10 +296,35 @@ package body Display is
 
       --  Generate the worst case graph for every entry point
 
-      Static_Stack_Analysis.List_Of_Entry_Points.Iterate
-        (Static_Stack_Analysis.Entry_Points,
-         Print_Longest_Path'Access);
+      Static_Stack_Analysis.List_Of_Node_Ids.Iterate
+        (Static_Stack_Analysis.Entry_Points, Print_Longest_Path'Access);
    end Print_Longest_Paths;
+
+   ----------------
+   -- Print_Name --
+   ----------------
+
+   procedure Print_Name (Node : Static_Stack_Analysis.Node_Class_Access) is
+   begin
+      if Options.Verbose then
+         --  Symbol name
+
+         Ada.Text_IO.Put
+           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+
+         --  Location list
+         Ada.Text_IO.Put (" at ");
+
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Static_Stack_Analysis.Get_Location_List (Node.all),
+            Expand_Location'Access);
+
+      else
+         --  Print subprogram name
+
+         Print_Ada_Name (Node);
+      end if;
+   end Print_Name;
 
    ----------------
    -- Print_Node --
@@ -363,24 +396,7 @@ package body Display is
 
       --  Subprogram name
 
-      if Options.Verbose then
-         --  Symbol name
-
-         Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
-
-         --  Location list
-         Ada.Text_IO.Put (" at ");
-
-         Static_Stack_Analysis.List_Of_Locations.Iterate
-           (Static_Stack_Analysis.Get_Location_List (Node.all),
-            Expand_Location'Access);
-
-      else
-         --  Print subprogram name
-
-         Print_Subprogram_Name (Node);
-      end if;
+      Print_Name (Node);
 
       --  Print local stack usage
 
@@ -404,11 +420,11 @@ package body Display is
       Ada.Text_IO.New_Line;
    end Print_Node;
 
-   ---------------------------
-   -- Print_Subprogram_Name --
-   ---------------------------
+   --------------------
+   -- Print_Ada_Name --
+   --------------------
 
-   procedure Print_Subprogram_Name
+   procedure Print_Ada_Name
      (Node : Static_Stack_Analysis.Node_Class_Access)
    is
       Name : constant Static_Stack_Analysis.Subprogram_Name :=
@@ -467,7 +483,7 @@ package body Display is
             end if;
          end;
       end if;
-   end Print_Subprogram_Name;
+   end Print_Ada_Name;
 
    ----------------------
    -- Generate_Results --
@@ -559,49 +575,74 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
-      --  Information about cycles
+      if Options.Warnings (Options.Cycle)
+        or else Options.Warnings (Options.Unbounded)
+        or else Options.Warnings (Options.External)
+        or else Options.Warnings (Options.Indirect)
+      then
+         --  Analyze the graph
 
-      if Options.Warnings (Options.Cycle) then
-         Ada.Text_IO.Put_Line
-           ("List of cycles:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
-         Ada.Text_IO.New_Line;
-      end if;
+         Static_Stack_Analysis.Entry_Points.Iterate
+           (Call_Graphs.Check_Accuracy'Access);
 
-      --  Print the list of subprograms with dynamic frames whose maximum
-      --  bounds cannot be statically computed.
+         --  Information about cycles
 
-      if Options.Warnings (Options.Unbounded) then
-         Ada.Text_IO.Put_Line
-           ("List of subprograms with dynamic unbounded frames:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_Unbounded'Access);
-         Ada.Text_IO.New_Line;
-      end if;
+         if Options.Warnings (Options.Cycle)
+           and then not Static_Stack_Analysis.Cycles.Is_Empty
+         then
+            --  Extract the cycles in the call graph
 
-      --  Information about subprograms for which we do not have any stack
-      --  usage
+            --  Static_Stack_Analysis.Entry_Points.Iterate
+            --    (Call_Graph_Cycles.Extract_Cycles'Access);
 
-      if Options.Warnings (Options.External) then
-         Ada.Text_IO.Put_Line
-           ("List of external subprograms:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_External'Access);
-         Ada.Text_IO.New_Line;
-      end if;
+            --  if not Static_Stack_Analysis.Cycles.Is_Empty then
+            Ada.Text_IO.Put_Line
+              ("List of cycles:");
+            Ada.Text_IO.New_Line;
+            Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
+            Ada.Text_IO.New_Line;
+         end if;
 
-      --  Information about indirect (including dispatching) calls
+         --  Print the list of subprograms with dynamic frames whose maximum
+         --  bounds cannot be statically computed.
 
-      if Options.Warnings (Options.Indirect) then
-         Ada.Text_IO.Put_Line
-           ("List of indirect (including dispatching) calls:");
-         Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_Indirect'Access);
-         Ada.Text_IO.New_Line;
+         if Options.Warnings (Options.Unbounded)
+           and then Call_Graphs.Unbounded_Frames
+         then
+            Ada.Text_IO.Put_Line
+              ("List of subprograms with dynamic unbounded frames:");
+            Ada.Text_IO.New_Line;
+            Static_Stack_Analysis.List_Of_Subprograms.Iterate
+              (Print_Unbounded'Access);
+            Ada.Text_IO.New_Line;
+         end if;
+
+         --  Information about subprograms for which we do not have any stack
+         --  usage
+
+         if Options.Warnings (Options.External)
+           and then Call_Graphs.External_Calls
+         then
+            Ada.Text_IO.Put_Line
+              ("List of external subprograms:");
+            Ada.Text_IO.New_Line;
+            Static_Stack_Analysis.List_Of_Subprograms.Iterate
+              (Print_External'Access);
+            Ada.Text_IO.New_Line;
+         end if;
+
+         --  Information about indirect (including dispatching) calls
+
+         if Options.Warnings (Options.Indirect)
+           and then Call_Graphs.Indirect_Calls
+         then
+            Ada.Text_IO.Put_Line
+              ("List of indirect (including dispatching) calls:");
+            Ada.Text_IO.New_Line;
+            Static_Stack_Analysis.List_Of_Subprograms.Iterate
+              (Print_Indirect'Access);
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
    end Generate_Warnings;
 
@@ -776,7 +817,9 @@ package body Display is
    begin
       --  Print the global information
 
-      Is_Task := Is_Task_Entry (Root);
+      Is_Task :=
+        Static_Stack_Analysis.Is_Task_Entry
+          (Static_Stack_Analysis.Get_Subprogram_Name (Root.all));
 
       if Is_Task then
          --  This is an Ada task
@@ -784,7 +827,7 @@ package body Display is
          Ada.Text_IO.Put ("Task ");
       end if;
 
-      Print_Subprogram_Name (Root);
+      Print_Ada_Name (Root);
 
       Ada.Text_IO.Put (" : total ");
 
@@ -834,7 +877,7 @@ package body Display is
 
       Ada.Text_IO.Put (" ");
 
-      Print_Subprogram_Name
+      Print_Ada_Name
         (Static_Stack_Analysis.List_Of_Nodes.Element
            (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
 
@@ -847,6 +890,8 @@ package body Display is
       --  We repeat the first node just for clarity
 
       Print_Node_In_Path (Root);
+
+      Ada.Text_IO.New_Line;
 
    end Print_Cycle;
 
@@ -874,7 +919,9 @@ package body Display is
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
    begin
-      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class then
+      if Node.Analysis_Finished
+        and then Node.all in Static_Stack_Analysis.Unresolved_Node'Class
+      then
          Ada.Text_IO.Put_Line
            ("  " & Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
       end if;
@@ -914,18 +961,20 @@ package body Display is
       end Is_Indirect;
 
    begin
-      Node.Target_Calls.Iterate (Is_Indirect'Access);
+      if Node.Analysis_Finished then
+         Node.Target_Calls.Iterate (Is_Indirect'Access);
 
-      if Counter > 0 then
-         Ada.Text_IO.Put ("  ");
+         if Counter > 0 then
+            Ada.Text_IO.Put ("  ");
 
-         Ada.Integer_Text_IO.Put (Counter, 0);
+            Ada.Integer_Text_IO.Put (Counter, 0);
 
-         Ada.Text_IO.Put (" indirect calls in: ");
+            Ada.Text_IO.Put (" indirect calls in: ");
 
-         Print_Subprogram_Name (Node);
+            Print_Name (Node);
 
-         Ada.Text_IO.New_Line;
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
    end Print_Indirect;
 
@@ -940,13 +989,14 @@ package body Display is
       use type Static_Stack_Analysis.Stack_Usage;
 
    begin
-      if
-        Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
-        Static_Stack_Analysis.Unbounded
+      if Node.Analysis_Finished
+        and then
+          Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
+          Static_Stack_Analysis.Unbounded
       then
          Ada.Text_IO.Put ("  ");
 
-         Print_Subprogram_Name (Node);
+         Print_Name (Node);
 
          Ada.Text_IO.New_Line;
       end if;

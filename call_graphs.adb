@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 --                        STATIC STACK ANALYSIS TOOL                        --
 --                                                                          --
---                     C A L L _ G R A P H _ C Y C L E S                    --
+--                           C A L L _ G R A P H S                          --
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
@@ -23,33 +23,29 @@ with Options;
 --  Used for Verbose
 --           Compute_All_Cycles
 
-with Static_Stack_Analysis;
---  Used for Cycle
---           Cycle_Element
---           Node_Id
-
 with Ada.Text_IO;
 --  Used for Put_Line
 
 with Ada.Unchecked_Deallocation;
 
-package body Call_Graph_Cycles is
+package body Call_Graphs is
 
    -----------------------
    -- Local subprograms --
    -----------------------
 
-   procedure Analyze_Cycles (Position : in Static_Stack_Analysis.Edge_Id);
-   --  Check whether this call is already part of the path being analyzed (and
-   --  hence it is part of a call graph cycle).
+   procedure Analyze_Call (Position : in Static_Stack_Analysis.Edge_Id);
+   --  Analyze potential problems for this call (cycles, external or indirect
+   --  calls, or unbounded frames).
 
-   procedure Analyze_Cycles (Position : in Static_Stack_Analysis.Node_Id);
-   --  Check whether this subprogram is already part of the path being analyzed
-   --  (and hence it is part of a call graph cycle).
+   procedure Analyze_Node (Position : in Static_Stack_Analysis.Node_Id);
+   --  Analyze potential problems for this call (cycles, external or indirect
+   --  calls, or unbounded frames).
 
    procedure Analyze_Detected_Cycle
      (Position : in Static_Stack_Analysis.Node_Id);
-   --  Check whether the detected cycle is already known
+   --  Check whether the detected cycle (the one whose root is the indicated
+   --  node) is already known.
 
    procedure Add_Node_To_Path
      (Cycle : in Static_Stack_Analysis.Cycle;
@@ -241,20 +237,22 @@ package body Call_Graph_Cycles is
       return Found;
    end Already_Detected_Cycle;
 
-   --------------------
-   -- Analyze_Cycles --
-   --------------------
+   ------------------
+   -- Analyze_Node --
+   ------------------
 
-   procedure Analyze_Cycles (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Analyze_Node (Position : in Static_Stack_Analysis.Node_Id) is
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+      use type Static_Stack_Analysis.Stack_Usage;
 
    begin
       --  Do nothing if this node has been fully analyzed. It means that all
       --  the cycles to which it belongs are already known.
 
       if not Analyze_Later
-        and then not Explored_Node.Cycle_Analysis_Finished
+        and then not Explored_Node.Analysis_Finished
       then
          --  First we check for cycles
 
@@ -263,26 +261,53 @@ package body Call_Graph_Cycles is
 
             Analyze_Detected_Cycle (Position);
 
-         elsif Options.Compute_All_Cycles
-           or else Explored_Node.Cycles.Is_Empty
-         then
+         else
             --  Mark it under analysis
 
             Explored_Node.Under_Analysis := True;
 
+            --  Update accuracy of the explored entry point
+
+            if not Unbounded_Frames
+              and then
+                Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class
+              and then
+                Static_Stack_Analysis.Explicit_Node
+                  (Explored_Node.all).Stack_Info.Frame_Type =
+                Static_Stack_Analysis.Unbounded
+            then
+               Unbounded_Frames := True;
+
+            elsif not External_Calls
+              and then Explored_Node.all in
+                Static_Stack_Analysis.Unresolved_Node'Class
+            then
+               External_Calls := True;
+
+            elsif not Indirect_Calls
+              and then Explored_Node.all in
+                Static_Stack_Analysis.Fake_Node'Class
+            then
+               Indirect_Calls := True;
+            end if;
+
             --  Explore all the possible target calls.
 
             Static_Stack_Analysis.List_Of_Edges.Iterate
-              (Explored_Node.Target_Calls, Analyze_Cycles'Access);
+              (Explored_Node.Target_Calls, Analyze_Call'Access);
 
             --  Mark the end of the analysis for this node
+
+            if not Options.Compute_All_Cycles then
+               Explored_Node.Analysis_Finished := True;
+            end if;
 
             Explored_Node.Under_Analysis := False;
          end if;
       end if;
-   end Analyze_Cycles;
+   end Analyze_Node;
 
-   procedure Analyze_Cycles (Position : in Static_Stack_Analysis.Edge_Id) is
+   procedure Analyze_Call (Position : in Static_Stack_Analysis.Edge_Id) is
       Explored_Edge : constant Static_Stack_Analysis.Edge :=
         Static_Stack_Analysis.List_Of_Edges.Element (Position);
 
@@ -296,13 +321,13 @@ package body Call_Graph_Cycles is
 
          --  Analyze the node to which this call points
 
-         Analyze_Cycles (Explored_Edge.Target);
+         Analyze_Node (Explored_Edge.Target);
 
          --  Mark the end of the analysis for this edge
 
          Explored_Edge.Under_Analysis := False;
       end if;
-   end Analyze_Cycles;
+   end Analyze_Call;
 
    ----------------------------
    -- Analyze_Detected_Cycle --
@@ -343,13 +368,9 @@ package body Call_Graph_Cycles is
       --  Now we need to extract and identify this cycle. We need to
       --  follow the path marked by the Under_Analysis flag.
 
-      --  Add current node (and all the subprograms that make up the
-      --  cycle) to the path information.
-
       Add_Node_To_Path (New_Cycle, Position);
 
-      --  Add the new cycle to the list of detected cycles, if not
-      --  there yet.
+      --  Add the new cycle to the list of detected cycles, if not there yet.
 
       if Already_Detected_Cycle (New_Cycle) then
          New_Cycle.Path.Clear;
@@ -370,83 +391,69 @@ package body Call_Graph_Cycles is
 
          --  We mark this cycle to be analyzed later
 
-         if Options.Compute_All_Cycles
-           and then not Nodes_With_Cycles.Contains (Position)
-         then
-            Static_Stack_Analysis.List_Of_Node_Ids.Append
-              (Nodes_With_Cycles, Position);
+         if Options.Compute_All_Cycles then
+            if not Nodes_With_Cycles.Contains (Position) then
+               Static_Stack_Analysis.List_Of_Node_Ids.Append
+                 (Nodes_With_Cycles, Position);
+            end if;
+
+            --  Stop the analysis so we start the analysis of the
+            --  already detected cycles.
+
+            Analyze_Later := True;
          end if;
-
-         --  Stop the analysis so we start the analysis of the
-         --  already detected cycles.
-
-         Analyze_Later := True;
       end if;
    end Analyze_Detected_Cycle;
 
    --------------------
-   -- Extract_Cycles --
+   -- Check_Accuracy --
    --------------------
 
-   procedure Extract_Cycles is
-      Index : Static_Stack_Analysis.Node_Id :=
-        Static_Stack_Analysis.List_Of_Subprograms.First;
+   procedure Check_Accuracy
+     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
+   is
+      Node : constant Static_Stack_Analysis.Node_Id :=
+        Static_Stack_Analysis.List_Of_Node_Ids.Element (Position);
 
       Cycle_Index : Static_Stack_Analysis.Node_Id;
 
    begin
-      while Static_Stack_Analysis.List_Of_Nodes.Has_Element (Index) loop
-         --  Start analysis from this node
+      --  Start analysis from this node
+
+      Analyze_Later := False;
+
+      --  Check for potential problems (such as cycles, indirect or external
+      --  calls or unbounded frames) if it has not been done yet.
+
+      Analyze_Node (Node);
+
+      --  If no new cycles have been found then we can mark this node (and
+      --  all the nodes called by this one) as analyzed.
+
+      --  We must analyze the new cycles that have been found. The goal
+      --  is to analyze cycles as soon as possible so we can mark then
+      --  as analyzed, avoinding repeating the same analysis again.
+
+      while not Nodes_With_Cycles.Is_Empty loop
+         --  Start analysis of this new cycle
 
          Analyze_Later := False;
 
-         --  Check for cycles if it has not been done yet
+         Cycle_Index := Nodes_With_Cycles.Last_Element;
 
-         Analyze_Cycles (Index);
+         Nodes_With_Cycles.Delete_Last;
 
-         --  If no new cycles have been found then we can mark this node (and
-         --  all the nodes called by this one) as analyzed.
-
-         if Nodes_With_Cycles.Is_Empty then
-            if Options.Compute_All_Cycles then
-               Mark_End_Of_Analysis
-                 (Static_Stack_Analysis.List_Of_Nodes.Element (Index));
-            else
-               Static_Stack_Analysis.List_Of_Nodes.Element
-                 (Index).Cycle_Analysis_Finished := True;
-            end if;
-
-            Static_Stack_Analysis.List_Of_Nodes.Next (Index);
-
-         else
-            --  We must analyze the new cycles that have been found. The goal
-            --  is to analyze cycles as soon as possible so we can mark then
-            --  as analyzed, avoinding repeating the same analysis again.
-
-            while not Nodes_With_Cycles.Is_Empty loop
-               --  Start analysis of this new cycle
-
-               Analyze_Later := False;
-
-               Cycle_Index := Nodes_With_Cycles.Last_Element;
-
-               Nodes_With_Cycles.Delete_Last;
-
-               Analyze_Cycles (Cycle_Index);
-
-               --  If the analysis did not find any new cycle then we can mark
-               --  all the elements belonging to this cycle (and all the nodes
-               --  called by them) as analyzed.
-
-               if not Analyze_Later then
-                  Mark_End_Of_Analysis
-                    (Static_Stack_Analysis.List_Of_Nodes.Element
-                       (Cycle_Index));
-               end if;
-            end loop;
-         end if;
+         Analyze_Node (Cycle_Index);
       end loop;
-   end Extract_Cycles;
+
+      --  If no new cycles have been found then we can mark this node (and
+      --  all the nodes called by this one) as analyzed.
+
+      if Options.Compute_All_Cycles then
+         Mark_End_Of_Analysis
+           (Static_Stack_Analysis.List_Of_Nodes.Element (Node));
+      end if;
+   end Check_Accuracy;
 
    --------------------------
    -- Mark_End_Of_Analysis --
@@ -472,12 +479,12 @@ package body Call_Graph_Cycles is
       --  mark this node as analyzed and all the nodes recursively called by
       --  this one.
 
-      if not Node.Cycle_Analysis_Finished then
-         Node.Cycle_Analysis_Finished := True;
+      if not Node.Analysis_Finished then
+         Node.Analysis_Finished := True;
 
          Static_Stack_Analysis.List_Of_Edges.Iterate
            (Node.Target_Calls, Mark_End_Of_Analysis'Access);
       end if;
    end Mark_End_Of_Analysis;
 
-end Call_Graph_Cycles;
+end Call_Graphs;

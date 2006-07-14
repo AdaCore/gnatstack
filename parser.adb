@@ -27,11 +27,9 @@ with Static_Stack_Analysis;
 --           Entry_Points
 --           Unknown_Stack_Usage
 
-with Call_Graph_Cycles;
---  Used for Extract_Cycles
-
 with Options;
 --  Used for Verbose
+--           Debug
 --           Explore_All
 --           Default_Unknown
 --           Default_Unbounded
@@ -232,9 +230,7 @@ package body Parser is
       --  list of potential entry points.
 
       if Subprogram.all = "main"
-        or else
-          (GNAT.Regpat.Match ("B", Subprogram.all)
-           and then not GNAT.Regpat.Match ("(BIP|_B)", Subprogram.all))
+        or else Static_Stack_Analysis.Is_Task_Entry (Subprogram)
       then
          Static_Stack_Analysis.Entry_Points.Append (Position);
       end if;
@@ -455,10 +451,6 @@ package body Parser is
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
       end if;
 
-      --  Extract the cycles in the call graph
-
-      Call_Graph_Cycles.Extract_Cycles;
-
       --  Get the list of subprograms to be considered as entry points
 
       --  Entry points specified by hand
@@ -559,7 +551,7 @@ package body Parser is
       elsif GNAT.Regpat.Match (Edge_Regexp, Input) then
          Parse_Edge (Input);
 
-      elsif Options.Verbose then
+      elsif Options.Debug then
          Ada.Text_IO.Put_Line ("Skipping: " & Input);
       end if;
 
@@ -677,7 +669,7 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Under_Analysis          => False,
-                  Cycle_Analysis_Finished         => False,
+                  Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
@@ -699,7 +691,7 @@ package body Parser is
                   Subprogram              => Symbol_Name,
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
-                  Cycle_Analysis_Finished         => False,
+                  Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
@@ -739,7 +731,7 @@ package body Parser is
                      Subprogram              => Symbol_Name,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
-                     Cycle_Analysis_Finished => False,
+                     Analysis_Finished => False,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
@@ -983,7 +975,7 @@ package body Parser is
                Subprogram              =>
                  new String'(Input (Matches (1).First .. Matches (1).Last)),
                Under_Analysis          => False,
-               Cycle_Analysis_Finished => False,
+               Analysis_Finished       => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             List_Of_Subprograms.Insert (Source_Ptr, Source_Id, Inserted);
@@ -995,27 +987,36 @@ package body Parser is
             Source_Ptr := List_Of_Nodes.Element (Source_Id);
          end if;
 
-         --  Look for the source node in the list, or create the node if it
+         --  Look for the target node in the list, or create the node if it
          --  does not exist yet.
 
-         Target_Id := Get_Node (Input (Matches (2).First .. Matches (2).Last));
+         --  Create an indirect node for an indirect call
+         if
+           Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
+         then
+            Target_Ptr := new Indirect_Node'
+              (Target_Calls            => List_Of_Edges.Empty_Vector,
+               Accumulated_Stack_Usage => Unknown_Stack_Usage,
+               Under_Analysis          => False,
+               Analysis_Finished       => False,
+               Cycles                  => List_Of_Cycles.Empty_Vector);
 
-         if not List_Of_Nodes.Has_Element (Target_Id) then
+            List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
 
-            --  Create an indirect node for an indirect call
-            if
-              Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
-            then
-               Target_Ptr := new Indirect_Node'
-                 (Target_Calls            => List_Of_Edges.Empty_Vector,
-                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                  Under_Analysis          => False,
-                  Cycle_Analysis_Finished => False,
-                  Cycles                  => List_Of_Cycles.Empty_Vector);
+            --  ??? For the moment we create the same indirect node for all
+            --  indirect calls. We should create different ones, but there
+            --  is no means yet to distinguish them. It will be possible when
+            --  we add the location to the calls.
 
-            --  This node is considered unresolved for the moment. It can be
-            --  later modified if we find more information.
-            else
+            --  pragma Assert (Inserted);
+
+         else
+            Target_Id :=
+              Get_Node (Input (Matches (2).First .. Matches (2).Last));
+
+            if not List_Of_Nodes.Has_Element (Target_Id) then
+               --  This node is considered unresolved for the moment. It can be
+               --  later modified if we find more information.
                Target_Ptr := new Unresolved_Node'
                  (Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
@@ -1023,26 +1024,38 @@ package body Parser is
                   Subprogram              =>
                     new String'(Input (Matches (2).First .. Matches (2).Last)),
                   Under_Analysis          => False,
-                  Cycle_Analysis_Finished => False,
+                  Analysis_Finished       => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
+
+               List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
+
+               pragma Assert (Inserted);
             end if;
-
-            List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
-
-            pragma Assert (Inserted);
          end if;
 
          --  Now we need to check whether there is already an edge joining
          --  these two subprograms. We add the new location if the node exists,
-         --  or create a new edge otherwise.
+         --  or create a new edge otherwise. For indirect calls we keep the
+         --  different edges.
 
          declare
-            Index : Static_Stack_Analysis.Edge_Id :=
-              Source_Ptr.Target_Calls.First;
+            Index : Static_Stack_Analysis.Edge_Id;
 
             Call : Static_Stack_Analysis.Edge;
 
          begin
+            --  For indirect calls we created a new node, and hence we will
+            --  create a new edge.
+
+            if
+              Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
+            then
+               Index := Static_Stack_Analysis.List_Of_Edges.No_Element;
+
+            else
+               Index := Source_Ptr.Target_Calls.First;
+            end if;
+
             while Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) loop
                Call := Static_Stack_Analysis.List_Of_Edges.Element (Index);
 

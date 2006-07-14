@@ -253,13 +253,12 @@ package Static_Stack_Analysis is
    -- Entry points --
    ------------------
 
-   package List_Of_Entry_Points is new
-     Ada.Containers.Vectors (Natural, Node_Id, "=");
-
-   Entry_Points : List_Of_Entry_Points.Vector :=
-     List_Of_Entry_Points.Empty_Vector;
+   Entry_Points : List_Of_Node_Ids.Vector := List_Of_Node_Ids.Empty_Vector;
    --  List of nodes to be used as entry points in the partition. They are
    --  the roots for computing the call graphs.
+
+   function Is_Task_Entry (Name : Subprogram_Name) return Boolean;
+   --  Returns True if the node corresponds to a task entry
 
    -------------------
    -- Abstract node --
@@ -281,10 +280,10 @@ package Static_Stack_Analysis is
          --  obtaining the worst case stack usage. It is very useful for
          --  detecting and handling cycles in the call graph.
 
-         Cycle_Analysis_Finished : Boolean;
-         --  Indicates whether we already have the list of call graph cycles
-         --  to which this node belongs. Once this flag is set to True, any
-         --  cycle computation arriving to this node can stop.
+         Analysis_Finished : Boolean;
+         --  Indicates whether we already have analyzed all the call graphs
+         --  (including cycles) to which this node belongs. Once this flag is
+         --  set to True, any analysis arriving to this node can stop.
 
          Cycles : List_Of_Cycles.Vector;
          --  A node may be part of different cycles in the call graph, and

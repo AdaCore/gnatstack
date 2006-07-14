@@ -27,6 +27,9 @@ package Options is
    Verbose : Boolean := False;
    --  Verbose output
 
+   Debug : Boolean := False;
+   --  Debug output
+
    type Order_Type is (Alphabetical, Stack_Usage);
 
    Order : Order_Type := Stack_Usage;
