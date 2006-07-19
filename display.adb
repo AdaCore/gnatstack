@@ -46,6 +46,9 @@ with Ada.Text_IO;
 --           Put
 --           Put_Line
 
+with Ada.Containers;
+--  Used for Count_Type
+
 with Ada.Integer_Text_IO;
 --  Used for Put
 
@@ -175,6 +178,10 @@ package body Display is
      (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
    --  Print the set of subprograms belonging to the cycle
 
+   procedure Print_Biggest_Frames (Frames : Natural);
+   --  Print the indicated number of subprograms corresponding to those
+   --  requiring the biggest local stack usage.
+
    ---------------------
    -- Expand_Location --
    ---------------------
@@ -218,6 +225,118 @@ package body Display is
          Ada.Text_IO.Put (",");
       end if;
    end Expand_Location;
+
+   --------------------------
+   -- Print_Biggest_Frames --
+   --------------------------
+
+   procedure Print_Biggest_Frames (Frames : Natural) is
+      function Local_Usage_Ordering
+        (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean;
+      --  Returns True if Left has a local stack usage greater than Right,
+      --  False otherwise. It is used for ordering sets of nodes according
+      --  to their local stack usage (in decreasing order).
+
+      procedure Get_Biggest_Frame
+        (Position : in Static_Stack_Analysis.Node_Id);
+      --  Check whether this node is one of those with the biggest stack
+      --  requirements and add it to the list if that is the case.
+
+      procedure Print_Node
+        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+      --  Print the subprogram name and its local stack usage
+
+      package Ordered_Frames is
+        new Static_Stack_Analysis.List_Of_Node_Ids.Generic_Sorting
+          (Local_Usage_Ordering);
+      --  Subprograms ordered according to their local stack usage
+
+      Big_Frames : Static_Stack_Analysis.List_Of_Node_Ids.Vector;
+      --  List of subprograms with the biggest local stack usage
+
+      function Local_Usage_Ordering
+        (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean is
+      begin
+         return
+           Static_Stack_Analysis."<"
+             (Static_Stack_Analysis.Get_Stack_Usage
+                (Static_Stack_Analysis.List_Of_Nodes.Element (Right).all),
+              Static_Stack_Analysis.Get_Stack_Usage
+                (Static_Stack_Analysis.List_Of_Nodes.Element (Left).all));
+      end Local_Usage_Ordering;
+
+      procedure Get_Biggest_Frame
+        (Position : in Static_Stack_Analysis.Node_Id)
+      is
+         Node : constant Static_Stack_Analysis.Node_Class_Access :=
+           Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+         use type Ada.Containers.Count_Type;
+
+      begin
+         --  Add only those frames with a known stack usage and that are
+         --  reachable from any entry point.
+
+         if Node.all in Static_Stack_Analysis.Explicit_Node'Class
+           and then
+             Node.Analysis_Finished
+           and then
+             (Static_Stack_Analysis.List_Of_Node_Ids.Length (Big_Frames) <
+              Ada.Containers.Count_Type (Frames)
+                or else
+              Local_Usage_Ordering (Position, Big_Frames.Last_Element))
+         then
+            --  Insert the element in the list and reorder the resulting list
+            --  according to the local stack consumption.
+
+            Big_Frames.Append (Position);
+
+            Ordered_Frames.Sort (Big_Frames);
+
+            if Static_Stack_Analysis.List_Of_Node_Ids.Length (Big_Frames) >
+               Ada.Containers.Count_Type (Frames)
+            then
+               --  Remove the last one. The list is already ordered so the last
+               --  one is that with the smallest stack usage.
+
+               Static_Stack_Analysis.List_Of_Node_Ids.Delete_Last (Big_Frames);
+            end if;
+         end if;
+      end Get_Biggest_Frame;
+
+      procedure Print_Node
+        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
+      is
+         Node : constant Static_Stack_Analysis.Node_Class_Access :=
+           Static_Stack_Analysis.List_Of_Nodes.Element
+             (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
+
+      begin
+         --  Subprogram name
+
+         Print_Name (Node);
+
+         Ada.Text_IO.Put (": ");
+
+         --  Local stack usage
+
+         Expand_Stack_Usage (Static_Stack_Analysis.Get_Stack_Usage (Node.all));
+
+         Ada.Text_IO.New_Line;
+      end Print_Node;
+
+   begin
+      --  Iterate the list of subprograms looking for the most stack consumming
+      --  subprograms.
+
+      Static_Stack_Analysis.List_Of_Nodes.Iterate
+        (Static_Stack_Analysis.List_Of_Subprograms, Get_Biggest_Frame'Access);
+
+      --  Print the results
+
+      Static_Stack_Analysis.List_Of_Node_Ids.Iterate
+        (Big_Frames, Print_Node'Access);
+   end Print_Biggest_Frames;
 
    ----------------
    -- Print_Edge --
@@ -579,6 +698,7 @@ package body Display is
         or else Options.Warnings (Options.Unbounded)
         or else Options.Warnings (Options.External)
         or else Options.Warnings (Options.Indirect)
+        or else Options.Number_Of_Biggest_Frames > 0
       then
          --  Analyze the graph
 
@@ -590,12 +710,6 @@ package body Display is
          if Options.Warnings (Options.Cycle)
            and then not Static_Stack_Analysis.Cycles.Is_Empty
          then
-            --  Extract the cycles in the call graph
-
-            --  Static_Stack_Analysis.Entry_Points.Iterate
-            --    (Call_Graph_Cycles.Extract_Cycles'Access);
-
-            --  if not Static_Stack_Analysis.Cycles.Is_Empty then
             Ada.Text_IO.Put_Line
               ("List of cycles:");
             Ada.Text_IO.New_Line;
@@ -641,6 +755,18 @@ package body Display is
             Ada.Text_IO.New_Line;
             Static_Stack_Analysis.List_Of_Subprograms.Iterate
               (Print_Indirect'Access);
+            Ada.Text_IO.New_Line;
+         end if;
+
+         --  Print subprograms ordered by local stack usage
+
+         if Options.Number_Of_Biggest_Frames > 0 then
+            Ada.Text_IO.Put_Line ("Local stack usage information");
+
+            Ada.Text_IO.New_Line;
+
+            Print_Biggest_Frames (Options.Number_Of_Biggest_Frames);
+
             Ada.Text_IO.New_Line;
          end if;
       end if;

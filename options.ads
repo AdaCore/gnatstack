@@ -30,6 +30,10 @@ package Options is
    Debug : Boolean := False;
    --  Debug output
 
+   Number_Of_Biggest_Frames : Natural := 0;
+   --  Print this number of subprograms corresponding to those requiring the
+   --  biggest local stack usage.
+
    type Order_Type is (Alphabetical, Stack_Usage);
 
    Order : Order_Type := Stack_Usage;

@@ -317,13 +317,24 @@ package body Parser is
       --  Get options
 
       loop
-         case GNAT.Command_Line.Getopt ("h v ca W! o= a u: d: e: r: g:") is
+         case
+           GNAT.Command_Line.Getopt ("h g v l: ca W! o= a u: d: e: r: f:")
+         is
             when ASCII.NUL =>
                exit;
 
             --  Verbose
             when 'v' =>
                Options.Verbose := True;
+
+            --  Debug
+            when 'g' =>
+               Options.Debug := True;
+
+            --  Biggest local stack usage
+            when 'l' =>
+               Options.Number_Of_Biggest_Frames :=
+                 Natural'Value (GNAT.Command_Line.Parameter);
 
             --  All cycles
             when 'c' =>
@@ -409,7 +420,7 @@ package body Parser is
                  new String'(GNAT.Command_Line.Parameter);
 
             --  Output graph file
-            when 'g' =>
+            when 'f' =>
                Free (Options.Output_VCG);
                Options.Output_VCG :=
                  new String'(GNAT.Command_Line.Parameter);
@@ -1113,13 +1124,18 @@ package body Parser is
    procedure Usage is
       use Ada.Text_IO;
    begin
-      Put_Line ("Usage: ssat [args ...] <files>");
+      Put_Line ("Usage: ssat [args ...] <.ci files>");
       New_Line;
       Put_Line ("where possible arguments are:");
       New_Line;
       Put_Line ("  -h           display help message");
       New_Line;
+      Put_Line ("  -g           debug information");
+      New_Line;
       Put_Line ("  -v           verbose");
+      New_Line;
+      Put_Line ("  -l n         print the n subprograms requiring the " &
+                               "biggest local stack usage");
       New_Line;
       Put_Line ("  -ca          extract all cycles");
       New_Line;
@@ -1140,11 +1156,11 @@ package body Parser is
       New_Line;
       Put_Line ("  -a           use all  subprograms as entry points");
       Put_Line ("  -e <list>    use specific list of subprograms as entry " &
-                                "points (e1,e2,...)");
+                               "points (e1,e2,...)");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
-                                "entry points");
+                               "entry points");
       New_Line;
-      Put_Line ("  -g file      output graph file");
+      Put_Line ("  -f file      output graph file");
       New_Line;
       Put_Line ("  <files>      list of .ci files (c1.ci c2.ci ...)");
       New_Line;

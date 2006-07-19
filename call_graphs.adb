@@ -109,6 +109,7 @@ package body Call_Graphs is
       --  Set to True when the next node in the cycle has been found
 
       Index : Static_Stack_Analysis.Edge_Id;
+      --  Index used to explore calls made by this subprogram
 
       procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge);
       --  Check whether the target of this call is part ot the cycle that we
@@ -361,7 +362,7 @@ package body Call_Graphs is
       end Mark_Nodes;
 
    begin
-      if Options.Verbose then
+      if Options.Debug then
          Ada.Text_IO.Put_Line ("Cycle detected");
       end if;
 
@@ -392,13 +393,16 @@ package body Call_Graphs is
          --  We mark this cycle to be analyzed later
 
          if Options.Compute_All_Cycles then
+            --  Add the subprogram to the list to be analyzed later if not
+            --  already there.
+
             if not Nodes_With_Cycles.Contains (Position) then
                Static_Stack_Analysis.List_Of_Node_Ids.Append
                  (Nodes_With_Cycles, Position);
             end if;
 
-            --  Stop the analysis so we start the analysis of the
-            --  already detected cycles.
+            --  Stop the analysis so we start the analysis of the already
+            --  detected cycles.
 
             Analyze_Later := True;
          end if;
@@ -427,9 +431,6 @@ package body Call_Graphs is
 
       Analyze_Node (Node);
 
-      --  If no new cycles have been found then we can mark this node (and
-      --  all the nodes called by this one) as analyzed.
-
       --  We must analyze the new cycles that have been found. The goal
       --  is to analyze cycles as soon as possible so we can mark then
       --  as analyzed, avoinding repeating the same analysis again.
@@ -446,8 +447,11 @@ package body Call_Graphs is
          Analyze_Node (Cycle_Index);
       end loop;
 
-      --  If no new cycles have been found then we can mark this node (and
-      --  all the nodes called by this one) as analyzed.
+      --  Once all the reachable cycles from this subprogram have been found
+      --  then we can mark this node (and all the nodes called by this one) as
+      --  analyzed. This is the case when computing all cycles. If we are
+      --  trying a simpler (and quicker) cycle detection scheme the nodes will
+      --  be marked as analyzed once we have explored all the possible calls.
 
       if Options.Compute_All_Cycles then
          Mark_End_Of_Analysis
