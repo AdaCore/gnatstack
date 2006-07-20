@@ -1,0 +1,103 @@
+\chapter{Introduction}\label{ch:introduction}
+%----------------------------------------------------------------------
+\section{Purpose}
+%----------------------------------------------------------------------
+
+This document contains the requirements baseline for the \ssat{} that
+will be developed for computing worst-case needs for stack space. Its
+intended readership includes primarily software engineers at AdaCore,
+as well as users wishing to assess the qualification of the tool.
+
+%----------------------------------------------------------------------
+\section{Scope}
+%----------------------------------------------------------------------
+
+Stack overflows are a major threat to many computer applications and
+run-time recovery techniques are not always available or appropriate.
+
+In the safety-critical area, every possible effort must be made to
+prevent such overflows from occurring in the first place, which calls
+for methods to anticipate the worst-case needs for stack space.
+
+The product to be developed will anticipate the stack space
+requirements of applications and allow safe prevention of
+overflow conditions.
+
+The \ssat{} will analyze the application stack space consumption patterns
+and compute worst-case bounds prior to execution time.
+
+%----------------------------------------------------------------------
+\section{Glossary}
+%----------------------------------------------------------------------
+
+\subsection{Acronyms}
+
+\begin{description}
+\item[COTS]  Commercial Off-The-Shelf. 
+\item[GCC]   GNU Compiler Collection.
+\item[GDB]   GNU debugger.
+% \item[GMGPL] GNAT Modified General Public License.
+\item[GNAT]  GNU Ada Translator
+\item[GPL]   General Public License.
+\item[GPS]   GNAT Programming Studio.
+\item[HIS]   High integrity system.
+\item[IDE]   Integrated Development Environment.
+\end{description}
+
+\subsection{Definition of terms}
+
+\begin{description}
+\item[High integrity system.] A system that must be trusted to work
+  dependably and may result in unacceptable loss or harm
+  otherwise. This includes safety-critical systems and other critical
+  systems where, for example, security or financial considerations may
+  be paramount.
+\item[Cross-compilation system.] A compiler that builds programs for a
+  machine different than the one the compiler is run on.
+\item[Host platform.] The machine the toolchain programs will run on.
+\item[Target platform.] The machine the toolchain builds programs for.
+\end{description}
+
+%----------------------------------------------------------------------
+\section{References}
+%----------------------------------------------------------------------
+
+\begin{enumerate}[{R}1.]
+\item \label{ALRM}
+   ANSI/ISO/IEC-8652:1995. \textit{Ada~95 Reference Manual.}
+   See also: S.T. Taft, R.A. Duff, E. Ploederer, \textit{Consolidated
+     Ada Reference Manual}. LNCS 2219, Springer-Verlag.
+\item  \label{HIS}
+   ISO/IEC/TR-15942:2000 \textit{Guide for the use of the Ada programming
+   language in high integrity systems.} 
+\item \label{GNATUG}
+      AdaCore. \textit{GNAT Pro User's Guide}. Version 5.03a1. 2005.
+\item \label{GNATRM}
+      AdaCore. \textit{GNAT Pro Reference Manual}. Version 5.03a1. 2005.
+\item \label{GPS}
+      AdaCore. \textit{GPS User's Guide}. Version 3.0.1. 2005.
+\item \label{GDB}
+      Free Software Foundation. \textit{Debugging with GDB}. Version 6.3 for GNAT Pro 5.03a1. 2005.
+\item \label{AdaQS}
+  C. Ausnit-Hood, K.A. Johnson, R.G. Petit IV, and S.B. Opdahl.
+  \textit{Ada 95 Quality and Style}.
+  Springer-Verlag, LNCS 1344, 1995.
+\item \label{GCC}
+      Free Software Foundation. \textit{GCC, the GNU Compiler Collection}, \url{http://gcc.gnu.org}.
+\item \label{VCG}
+      \textit{Visualization of Compiler Graphs}, \url{http://rw4.cs.uni-sb.de/users/sander/html/gsvcg1.html}.
+\item \label{GCCSTACK}
+      Eric Botcazou, Cyrille Comar, and Olivier Hainque, \textit{Compile-time stack requirements analysis with GCC}. In Proceedings of the 3rd GCC developers summit. 2005.
+\end{enumerate}
+
+%----------------------------------------------------------------------
+\section{Document overview}
+%----------------------------------------------------------------------
+
+This document is organized as follows:
+chapter \ref{ch:description} contains a general description of the
+tool. Chapter \ref{ch:requirements} contains specific baseline
+requirements for this product.
+
+% LocalWords:  AdaCore GCC GDB GMGPL GPL GPS toolchain Ploederer LNCS Ausnit
+% LocalWords:  Petit Opdahl Botcazou Cyrille Comar Hainque
