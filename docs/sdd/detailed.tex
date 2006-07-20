@@ -1,0 +1,342 @@
+%----------------------------------------------------------------------
+\chapter{Software components detailed design}
+\label{ch:detailed}
+%----------------------------------------------------------------------
+
+This chapter describes the detailed implementation of the different
+software components.
+
+%----------------------------------------------------------------------
+\section{Challenges}
+\label{sc:challenges}
+%----------------------------------------------------------------------
+
+Static stack analysis techniques have a common set of challenges that
+need to be addressed:
+
+\begin{itemize}
+
+\item {\it Cycles in the Control Flow Graph}:
+
+In presence of control flow cycles involving stack consumption, the worst case
+bound is a function of the maximum number of cycle iterations.
+
+When bounds on such iteration counts are unknown, the amount of potential
+stack usage is infinite.
+
+Bounding the iteration count is very often difficult or impossible.
+
+\item {\it Indirect jumps or subprogram calls}:
+
+Determining where such transfers of control lead is often not achievable,
+and the corresponding stack usage is then unknown.
+
+\item
+{\it Unresolved calls}:
+
+These are calls to subprograms for which no stack usage information is
+available, introducing an unknown amount of stack usage in a call chain.
+
+\item {\it Dynamic stack allocations}:
+
+For instance from {\tt alloca} with a variable argument in C, or from
+dynamically sized local objects in Ada.
+
+They introduce potentially difficult to bound variable amounts of stack usage
+on the paths where they appear.
+
+\item {\it Possible interrupt events}:
+
+When interrupt (hardware or signal) handlers run on the currently active
+stack, their consumption has to be accounted for when sizing the various areas
+in which they may run.
+
+When they run on their own dedicated stack, this one has to be properly sized
+too.
+
+In any case, how interrupts may preempt each other greatly affects the
+associated possible stack usage and is not easy to determine automatically.
+
+\cite{pal:icse-01, pal:ftrtft-02, pal:sas-03} and
+\cite{reg:emsoft-03} are examples of research literature on this matter.
+
+\item {\it Dynamic global behavior}:
+
+Analysis tools typically include in their evaluations many paths that can
+never be taken at run-time, referenced as False Paths in \cite{bry:thesis} or
+\cite{alt:erts-96}.
+
+Excluding some of such paths on safe grounds may, for instance, allow cutting
+some control flow cycles or the production of tighter worst case bounds,
+saving run-time resources.
+
+\cite {reg:emsoft-03} illustrates the use of such techniques to automatically
+compute the hardware interrupt preemption graph for an AVR target.
+
+This is a hard problem in the general case.
+
+\end{itemize}
+
+It will be shown in the following sections where and how these
+challenges are addressed.
+
+%----------------------------------------------------------------------
+\section{Compiler}
+%----------------------------------------------------------------------
+
+We are only going to describe the implementation of the two new
+command line options used for static stack analysis. The options are
+independent from each other, although we need both in order to get 
+
+\subsubsection{Stack usage}
+
+The general principle is as follows: we directly leverage the long existing
+infrastructure for calculating the frame size of functions, made up of both
+a generic part and a target back-end dependent part, to report the amount of
+static stack usage for the function being compiled.
+
+As the back-end dependent part already needs to gather the final result of
+the calculation before emitting the assembly code, the actual implementation
+essentially boils down to modifying every back-end so as to be able to easily
+retrieve this result by means of a ``target hook''.
+
+We found that, at least for the most common architectures, the changes to
+be made are very localized.
+
+The ``target hook'' implementation model proved to be a very efficient device
+and really minimizes the effort required to add support for a new target.
+
+x86, powerpc, sparc, alpha, mips and hppa have been covered up to now.
+
+The only challenge is to make sure that every single byte allocated on the
+stack by the calling sequence, even if it is not formally part of the frame,
+is taken into account.
+
+In this context, one interesting technical point is of note: the difference in
+treatment between \verb|ACCUMULATE_OUTGOING_ARGS| and \verb|PUSH_ARGS|
+targets.
+
+In the former case, the arguments of called functions are accounted for in the
+final frame size, whereas they are not in the latter case; moreover, another
+subtlety comes into play in the latter case, in the form of the {\tt
+-fdefer-pop} command line option, which instructs the compiler to not pop the
+pushed arguments off the stack immediately after the call returns.
+
+This may result in increased stack usage and requires a special circuitry
+to be properly dealt with at compile-time.
+
+The remaining task is then to detect the dynamic stack usage patterns, much
+like what is implemented to support {\tt -fstack-check}.
+
+For this initial implementation, we mainly operate in the Tree to RTL expander
+by intercepting the requests for dynamic stack allocation.
+
+Moreover, as we are primarily interested in bounding them, we also try to
+deduce from the IL (here RTL) limits easily evaluated at compile-time.
+
+A technical detail that must not be overlooked here is that the compiler
+may generate code to dynamically align the stack pointer.
+
+While the amount of stack usage is easily bounded in that case, it must not be
+forgotten in the final result.
+
+There is certainly room for improvement in either direction on the axis of
+compiler passes: by working later down the RTL optimization passes, one
+should be able to obtain additional constant bounds for dynamic allocation
+cases that are not inherently bounded;
+
+by working closer to the trees handed down by the front-end, one should be
+able to recognize inherently static allocation patterns that happen to require
+a dynamic-like treatment for specific reasons, as is the case for big objects
+when \prog{-fstack-check} is enabled for example.
+
+\subsubsection{Call graph}
+
+We again leverage an existing infrastructure of the compiler to implement
+this command line option, but a much more recent one, that is the "callgraph"
+machinery introduced in the 3.4.x series.
+
+We only use this machinery to gather information all the way through the
+compilation.
+
+We don't drive the compilation with it or attempt to rely on it for any code
+generation purpose, so our approach is not tied to one of the compilation
+modes supported by GCC 3.4.x.
+
+In particular, it works with the unit-at-a-time mode (C and C++ compilers at
+-O2), with the function-at-a-time mode (C and C++ compilers at -O0/-O1) and
+finally the statement-at-a-time mode (Ada compiler).
+
+The general principle is straightforward: we record every direct function
+call the compiler has to process, either at the Tree level in unit-at-a-time
+mode or at the RTL level in non unit-at-a-time modes, and every indirect
+function call at the RTL level.
+
+Of course some of these function calls may end up being optimized away at one
+stage of the compilation but, as we aim at computing a worst case scenario,
+this conservative stance is appropriate.
+
+However, an optimization technique relating to function calls is particularly
+of note since it can bring about huge differences in results for any types of
+callgraph-based analysis, depending on whether it is accounted for or not,
+that is function inlining.
+
+We therefore do arrange for eliminating or not registering in the first place
+in the call graph edges that correspond to function calls for which the callee
+is inlined in the caller in the assembly code emitted by the compiler.
+
+For the example of the {\fsu} option, the immediate benefit is that the
+static stack usage of the callee is guaranteed not to be counted twice
+in the final calculation.
+
+When additional analysis-oriented command line options are passed to the
+compiler, nodes in the call graph can be annotated with additional
+information gathered all the way through the compilation.
+
+The final step is to generate an output suited to the kind of post-processing
+callgraph-based analyzes are naturally likely to require.
+
+In particular, as the process of merging .ci files is somewhat akin to linking
+object files, the problem of the uniqueness of the identifiers for the merge
+points has to be addressed.
+
+The VCG format for the output was chosen as a simple and natural medium
+to convey compiler-generated, callgraph-based information.
+
+It goes without saying that targeting any other (text-based) format is easily
+doable and would only command modifications at the very end of the chain.
+
+
+%----------------------------------------------------------------------
+\section{Call graph generator}
+%----------------------------------------------------------------------
+
+
+%----------------------------------------------------------------------
+\subsection{Cycles}
+%----------------------------------------------------------------------
+
+One of the problems identified in section \ref{sc:challenges} is the
+detection and handling of potential cycles in the control flow. There
+are three basic aspects:
+
+\begin{itemize}
+
+\item How to detect a cycle.
+
+\item How to represent, and identify uniquely, a cycle. A cycle is a set of nodes
+
+\item How to characterize stack usage for a cycle. We need an
+  attribute representing the maximum number 
+
+\end{itemize}
+
+It is important to detect these cycles.
+
+We could thing about using an external tool for bounding these cycles
+using control and data flow analysis. The user can also bound these
+cycles manually.
+
+%----------------------------------------------------------------------
+\subsection{Indirect calls (dereference of access-to-subprogram)}
+%----------------------------------------------------------------------
+
+One challenge defined in section \ref{sc:challenges} has to do
+with indirect calls in the form of a dereference of
+access-to-subprogram. When the compiler detects such a call, it
+generates a \emph{dummy proxy} node into the call graph
+information. In order to fill the information about possible targets
+for this call, we could analyze all the subprograms in the
+partition. All the subprograms to which a \prog{'Access} or
+\prog{'Unrestricted\_Access} apply, and with a signature conforming to
+the access value whose dereference generates the indirect call, are
+potential candidate targets for the indirect call under analysis.
+
+The user can either provide the missing information about the set of
+possible target 
+
+%----------------------------------------------------------------------
+\subsection{Dispatching calls}
+%----------------------------------------------------------------------
+
+Another form of indirect calls is dispatching calls. challenge defined
+in section \ref{sc:challenges} has to do with indirect calls into the
+call graph information. When the compiler detects such a call, it
+generates a \emph{dummy proxy} node. In order to fill the information
+about possible targets for this call, we could analyze all the methods
+that could be the target of the dispatching call being analyzed.
+
+The user can either provide the missing information about the set of
+possible target
+
+%----------------------------------------------------------------------
+\subsection{Unresolved calls}
+%----------------------------------------------------------------------
+
+TBC
+
+%----------------------------------------------------------------------
+\section{Call graph parser}
+%----------------------------------------------------------------------
+
+%----------------------------------------------------------------------
+\subsection{Dynamic frames}
+%----------------------------------------------------------------------
+
+The user will be able to specify
+TBD
+
+%----------------------------------------------------------------------
+\section{Worst case analyzer}
+%----------------------------------------------------------------------
+
+The result of the worst case analyzer will contain markers that will
+indictate how fiable are the results.
+
+There are three major cases:
+
+\begin{itemize}
+
+\item Value computed using only information generated by the
+  compiler. Reliable.
+
+\item Value computed using information provided by the user. Less reliable.
+
+\item Values computed using default values. Even less reliable.
+
+\end{itemize}
+
+TBD
+
+%----------------------------------------------------------------------
+\section{Modes of operation}
+%----------------------------------------------------------------------
+
+There are two major modes of operation: safe and relaxed mode
+
+The safe mode is all about automatically computed bounds. There will
+be warnings for every undefined entity (unresolved or indirect calls,
+user-defined information, unbounded stack frames, etc.)
+
+The relaxed mode is more flexible. User-defined values are allowed,
+and the user may also use defaults for maximum recursion depth, 
+
+   --safe-mode
+   --relaxed-mode
+
+   --recursion\_depth[=1]
+   --dynamic\_frames[=0]
+   --unknown\_call[=0]
+
+The tool will automatically generate skeletons for the missing parts
+in the call graph (unresolved or indirect calls, user-defined
+information, unbounded stack frames, etc.)
+
+   --generate-ciu
+   --overwrite-ciu
+
+%----------------------------------------------------------------------
+\section{GNAT Programming Studio}
+%----------------------------------------------------------------------
+
+TBD
