@@ -26,7 +26,7 @@ package Display is
    --  usage data, indirect, dispatching and external calls, etc.).
 
    procedure Generate_Results;
-   --  Generate all the results of the analysis (call graph and worst case
-   --  stack usage information).
+   --  Generate all the results of the analysis (local stack usage and call
+   --  graph and worst case stack usage information).
 
 end Display;

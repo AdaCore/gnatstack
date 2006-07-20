@@ -29,13 +29,24 @@ with Display;
 --  Used for Generate_Results
 --           Generate_Warnings
 
+with Call_Graphs;
+--  Used for Check_Accuracy
+
+with Static_Stack_Analysis;
+--  Used for Entry_Points
+
 procedure SSAT is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
 
    Parser.Parse_Arguments;
 
-   --  Display incomplete information
+   --  Do accuracy analysis of the graph
+
+   Static_Stack_Analysis.Entry_Points.Iterate
+     (Call_Graphs.Check_Accuracy'Access);
+
+   --  Display incomplete information (if warnings are activated)
 
    Display.Generate_Warnings;
 
