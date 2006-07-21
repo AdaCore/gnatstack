@@ -41,12 +41,43 @@ package body Static_Stack_Analysis is
    -- "+" --
    ---------
 
-   function "+" (Left, Right : Stack_Usage_Info) return Stack_Usage_Info is
+   function "+" (Left, Right : Frame_Size) return Frame_Size is
+      function Normalize (Stack_Usage : Frame_Size) return Integer;
+      --  Function for removing No_Value
+
+      function Normalize (Stack_Usage : Frame_Size) return Integer is
+      begin
+         return Integer'Max (Integer (Stack_Usage), 0);
+      end Normalize;
+
    begin
-      return (Stack_Usage'Max (Left.Frame_Type, Right.Frame_Type),
-              Left.Static_Usage + Right.Static_Usage,
-              Left.Dynamic_Usage + Right.Dynamic_Usage,
-              Left.Unknown_Usage + Right.Unknown_Usage);
+      return Frame_Size (Normalize (Left) + Normalize (Right));
+   end "+";
+
+   function "+" (Left, Right : Stack_Usage_Info) return Stack_Usage_Info is
+      function Local_Add (Left, Right : Frame_Size) return Frame_Size;
+      --  Function for adding the different fields fo Stack_Usage_Info. It is
+      --  different from the normal addition because we want to keep the
+      --  No_Value.
+
+      function Local_Add (Left, Right : Frame_Size) return Frame_Size is
+      begin
+         if Left = No_Value then
+            return Right;
+         elsif Right = No_Value then
+            return Left;
+         else
+            return Left + Right;
+         end if;
+      end Local_Add;
+
+   begin
+      return Stack_Usage_Info'
+        (Frame_Type    => Stack_Usage'Max (Left.Frame_Type, Right.Frame_Type),
+         Static_Usage  => Local_Add (Left.Static_Usage, Right.Static_Usage),
+         Dynamic_Usage => Local_Add (Left.Dynamic_Usage, Right.Dynamic_Usage),
+         Unknown_Usage => Local_Add (Left.Unknown_Usage, Right.Unknown_Usage),
+         Cycle_Usage   => Local_Add (Left.Cycle_Usage, Right.Cycle_Usage));
    end "+";
 
    ---------
@@ -55,8 +86,10 @@ package body Static_Stack_Analysis is
 
    function "<" (Left, Right : Stack_Usage_Info) return Boolean is
    begin
-      return Left.Static_Usage + Left.Dynamic_Usage + Left.Unknown_Usage <
-             Right.Static_Usage + Right.Dynamic_Usage + Right.Unknown_Usage;
+      return Left.Static_Usage + Left.Dynamic_Usage +
+             Left.Unknown_Usage + Left.Cycle_Usage <
+             Right.Static_Usage + Right.Dynamic_Usage +
+             Right.Unknown_Usage + Right.Cycle_Usage;
    end "<";
 
    ---------
@@ -167,14 +200,33 @@ package body Static_Stack_Analysis is
    function Get_Stack_Usage
      (Target : Explicit_Node) return Stack_Usage_Info is
    begin
-      return Target.Stack_Info;
+      if Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Target.Cycles) then
+         return Target.Stack_Info;
+
+      else
+         --  ??? It simply indicates that there is a cycle, but we need to
+         --  find the way for accounting the stack requirements imposed by
+         --  the cycles.
+
+         return Stack_Usage_Info'
+           (Frame_Type    => Target.Stack_Info.Frame_Type,
+            Static_Usage  => Target.Stack_Info.Static_Usage,
+            Dynamic_Usage => Target.Stack_Info.Dynamic_Usage,
+            Unknown_Usage => Target.Stack_Info.Unknown_Usage,
+            Cycle_Usage   => 0);
+      end if;
    end Get_Stack_Usage;
 
    function Get_Stack_Usage
      (Target : Fake_Node) return Stack_Usage_Info is
       pragma Unreferenced (Target);
    begin
-      return Unknown_Stack_Usage;
+      return Stack_Usage_Info'
+        (Frame_Type    => Unknown,
+         Static_Usage  => No_Value,
+         Dynamic_Usage => No_Value,
+         Unknown_Usage => Frame_Size (Options.Default_Unknown),
+         Cycle_Usage   => No_Value);
    end Get_Stack_Usage;
 
    function Get_Stack_Usage
@@ -183,9 +235,10 @@ package body Static_Stack_Analysis is
    begin
       return Stack_Usage_Info'
         (Frame_Type    => Unknown,
-         Static_Usage  => 0,
-         Dynamic_Usage => 0,
-         Unknown_Usage => Frame_Size (Options.Default_Unknown));
+         Static_Usage  => No_Value,
+         Dynamic_Usage => No_Value,
+         Unknown_Usage => Frame_Size (Options.Default_Unknown),
+         Cycle_Usage   => No_Value);
    end Get_Stack_Usage;
 
    -------------------------
@@ -273,8 +326,12 @@ package body Static_Stack_Analysis is
          Target.Stack_Info.Dynamic_Usage := Frame_Size'Max
            (Target.Stack_Info.Dynamic_Usage, Stack_Usage.Dynamic_Usage);
 
-         Target.Stack_Info.Unknown_Usage := Frame_Size'Max
-           (Target.Stack_Info.Unknown_Usage, Stack_Usage.Unknown_Usage);
+         --  There cannot an unknown part for a explicit node
+
+         Target.Stack_Info.Unknown_Usage := No_Value;
+
+         Target.Stack_Info.Cycle_Usage := Frame_Size'Max
+           (Target.Stack_Info.Cycle_Usage, Stack_Usage.Cycle_Usage);
       end if;
 
    end Update_Stack_Usage;

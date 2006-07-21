@@ -149,14 +149,14 @@ package body Worst_Case_Analyzer is
      (Path   : in out Static_Stack_Analysis.Paths.Vector;
       Target : in Static_Stack_Analysis.Node_Id)
    is
-      use type Static_Stack_Analysis.Edge_Id;
-
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Target);
 
       Call : constant Static_Stack_Analysis.Edge_Id :=
         Static_Stack_Analysis.List_Of_Edges.First (Node.Target_Calls);
       --  The longest path is the one in the first position of the sorted list
+
+      use type Static_Stack_Analysis.Edge_Id;
 
    begin
       --  Stop if we find a cycle

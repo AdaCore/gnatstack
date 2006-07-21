@@ -47,6 +47,11 @@ package Options is
    --  Active warnings (for cycles, unbounded frames, external calls, and
    --  indirect calls)
 
+   Display_Call_Chains : Boolean := False;
+   --  Print the call chain information for the different entry points. This
+   --  is the list of subprograms that make up the longest path in terms of
+   --  stack usage.
+
    Explore_All : Boolean := False;
    --  Compute worst case stack usage for every node in the partition
 
@@ -69,11 +74,11 @@ package Options is
    --  Name of the generated file containing undefined information, such as
    --  external and indirect calls.
 
-   Default_Unknown : Natural := 200;
+   Default_Unknown : Natural := 0;
    --  Value used (in bytes) when there is no information about stack usage
    --  for a given subprogram.
 
-   Default_Unbounded : Natural := 100;
+   Default_Unbounded : Natural := 0;
    --  Value used (in bytes) when there is an unbounded stack allocation for
    --  a given subprogram.
 end Options;

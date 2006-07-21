@@ -36,6 +36,7 @@ with Options;
 --           List_Of_Entry_Points
 --           Output_VCG
 --           Order
+--           Display_Call_Chains
 
 with Ada.Containers.Vectors;
 
@@ -318,7 +319,7 @@ package body Parser is
 
       loop
          case
-           GNAT.Command_Line.Getopt ("h g v l: ca W! o= a u: d: e: r: f:")
+           GNAT.Command_Line.Getopt ("h g v l: ca W! o= a u: d: p e: r: f:")
          is
             when ASCII.NUL =>
                exit;
@@ -406,6 +407,10 @@ package body Parser is
             when 'd' =>
                Options.Default_Unbounded :=
                  Natural'Value (GNAT.Command_Line.Parameter);
+
+            --  Display call chain (paths) for the entry points
+            when 'p' =>
+               Options.Display_Call_Chains := True;
 
             --  List of entry points
             when 'e' =>
@@ -908,8 +913,9 @@ package body Parser is
            or else Input (Matches (2).First .. Matches (2).Last) = " (static)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Static;
-            Stack.Dynamic_Usage := 0;
-            Stack.Unknown_Usage := 0;
+            Stack.Dynamic_Usage := Static_Stack_Analysis.No_Value;
+            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
 
          elsif
            Input (Matches (2).First .. Matches (2).Last) = " (dynamic)"
@@ -917,14 +923,16 @@ package body Parser is
             Stack.Frame_Type := Static_Stack_Analysis.Unbounded;
             Stack.Dynamic_Usage :=
               Static_Stack_Analysis.Frame_Size (Options.Default_Unbounded);
-            Stack.Unknown_Usage := 0;
+            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
 
          elsif
            Input (Matches (2).First .. Matches (2).Last) = " (dynamic,bounded)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Bounded;
-            Stack.Dynamic_Usage := 0;
-            Stack.Unknown_Usage := 0;
+            Stack.Dynamic_Usage := Static_Stack_Analysis.No_Value;
+            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
 
          else
             raise Parser_Error;
@@ -1153,6 +1161,8 @@ package body Parser is
       Put_Line ("  -u size      default for unknown (external) calls");
       New_Line;
       Put_Line ("  -d size      default for unbounded (dynamic) calls");
+      New_Line;
+      Put_Line ("  -p           display the worst-case path for entry points");
       New_Line;
       Put_Line ("  -a           use all  subprograms as entry points");
       Put_Line ("  -e <list>    use specific list of subprograms as entry " &

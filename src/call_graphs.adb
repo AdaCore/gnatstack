@@ -358,6 +358,8 @@ package body Call_Graphs is
                   (Position).Source_Node);
 
       begin
+         --  Add the cycle to the list of cycles for this node
+
          Element.Cycles.Append (New_Cycle);
       end Mark_Nodes;
 

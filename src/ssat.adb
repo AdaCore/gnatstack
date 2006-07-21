@@ -34,27 +34,33 @@ with Call_Graphs;
 
 with Static_Stack_Analysis;
 --  Used for Entry_Points
+--           Phase
 
 procedure SSAT is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
 
+   Static_Stack_Analysis.Phase := Static_Stack_Analysis.Parse;
    Parser.Parse_Arguments;
 
    --  Do accuracy analysis of the graph
 
+   Static_Stack_Analysis.Phase := Static_Stack_Analysis.Accuracy_Analysis;
    Static_Stack_Analysis.Entry_Points.Iterate
      (Call_Graphs.Check_Accuracy'Access);
 
    --  Display incomplete information (if warnings are activated)
 
+   Static_Stack_Analysis.Phase := Static_Stack_Analysis.Print_Warnings;
    Display.Generate_Warnings;
 
    --  Analyze stack usage
 
+   Static_Stack_Analysis.Phase := Static_Stack_Analysis.Worst_Case_Analysis;
    Worst_Case_Analyzer.Worst_Case_Analysis;
 
    --  Display results
 
+   Static_Stack_Analysis.Phase := Static_Stack_Analysis.Print_Results;
    Display.Generate_Results;
 end SSAT;

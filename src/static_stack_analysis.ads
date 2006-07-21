@@ -73,9 +73,14 @@ package Static_Stack_Analysis is
    --  passed to the frame, which can be bounded or unbounded), or completely
    --  unknown.
 
-   type Frame_Size is new Natural;
+   No_Value : constant := -1;
+   --  Indicates that the stack requirements are not known
+
+   type Frame_Size is new Integer range No_Value ..  Integer'Last;
    --  This type represents the static part (in bytes) that is reserved in the
-   --  frame.
+   --  frame. -1 represents that the value does not apply.
+
+   function "+" (Left, Right : Frame_Size) return Frame_Size;
 
    type Stack_Usage_Info is record
       Frame_Type  : Stack_Usage;
@@ -91,7 +96,10 @@ package Static_Stack_Analysis is
       --  bound that can be statically determined by the compiler.
 
       Unknown_Usage : Frame_Size;
-      --
+      --  Amount of stack to be attributed to frames without stack information
+
+      Cycle_Usage : Frame_Size;
+      --  Amount of stack to be attributed to call graph cycles
    end record;
    --  Type used to represent the amount of stack needed by a subprogram, or
    --  by a call tree, including the qualifiers for this stack usage (static,
@@ -442,6 +450,17 @@ package Static_Stack_Analysis is
    --  values, and hence their target depend on the values stored in the
    --  pointer.
 
+   ------------------------
+   -- Phases of analysis --
+   ------------------------
+
+   type Phase_Type is (Parse, Accuracy_Analysis, Print_Warnings,
+                       Worst_Case_Analysis, Print_Results);
+   --  Type for Phase variable
+
+   Phase : Phase_Type;
+   --  Variable that indicates the phase of the analysis in which we are
+
 private
 
    Indirect_Call : constant Subprogram_Name := new String'("__indirect_call");
@@ -450,9 +469,10 @@ private
 
    Unknown_Stack_Usage : constant Stack_Usage_Info :=
      (Frame_Type    => Unknown,
-      Static_Usage  => 0,
-      Dynamic_Usage => 0,
-      Unknown_Usage => 0);
+      Static_Usage  => No_Value,
+      Dynamic_Usage => No_Value,
+      Unknown_Usage => No_Value,
+      Cycle_Usage   => No_Value);
 
    Empty_Cycle : constant Cycle_Element :=
      (Id         => 0,

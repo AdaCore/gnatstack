@@ -33,6 +33,7 @@ with Static_Stack_Analysis;
 --           List_Of_Edges
 --           Get_Stack_Usage
 --           Get_Subprogram_Name
+--           Phase
 
 with Call_Graphs;
 --  Used for Extract_Cycles
@@ -390,7 +391,10 @@ package body Display is
 
          --  Print the call chain
 
-         Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
+         if Options.Display_Call_Chains then
+            Static_Stack_Analysis.Paths.Iterate
+              (Path, Print_Node_In_Path'Access);
+         end if;
 
          Ada.Text_IO.New_Line;
       end Print_Longest_Path;
@@ -508,6 +512,11 @@ package body Display is
    end Print_Node;
 
    procedure Print_Node (Node : Static_Stack_Analysis.Node_Class_Access) is
+      Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
+        Static_Stack_Analysis.Get_Stack_Usage (Node.all);
+
+      use type Static_Stack_Analysis.Phase_Type;
+
    begin
       --  Indentation
 
@@ -522,18 +531,30 @@ package body Display is
       if Options.Verbose then
          Ada.Text_IO.Put (" : ");
 
-         Expand_Stack_Usage
-           (Static_Stack_Analysis.Get_Stack_Usage (Node.all));
-      end if;
+         Expand_Stack_Usage (Stack_Info);
 
-      --  Information about cycles
+         --  Information about cycles
 
-      if not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles) then
-         Ada.Text_IO.Put (" (");
+         if
+           not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles)
+         then
+            Ada.Text_IO.Put (" (");
 
-         Node.Cycles.Iterate (Print_Cycle_Id'Access);
+            Node.Cycles.Iterate (Print_Cycle_Id'Access);
 
-         Ada.Text_IO.Put (")");
+            Ada.Text_IO.Put (")");
+         end if;
+
+      elsif Static_Stack_Analysis.Phase = Static_Stack_Analysis.Print_Results
+        and then
+      (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+       or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
+       or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value)
+      then
+         --  In non-verbose mode we just put a mark indicating that the
+         --  resulting value is not accurate when we are printing the paths.
+
+         Ada.Text_IO.Put (" *");
       end if;
 
       Ada.Text_IO.New_Line;
@@ -629,7 +650,8 @@ package body Display is
 
       --  Print the stack usage information
 
-      Ada.Text_IO.Put_Line ("Stack usage information");
+      Ada.Text_IO.Put_Line
+        ("Accumulated stack usage information for entry points");
 
       Ada.Text_IO.New_Line;
 
@@ -706,6 +728,17 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
+      if not Static_Stack_Analysis.Cycles.Is_Empty
+        or else Call_Graphs.Unbounded_Frames
+        or else Call_Graphs.External_Calls
+        or else Call_Graphs.Indirect_Calls
+      then
+         Ada.Text_IO.Put_Line
+           ("Worst case analysis is *not* accurate ; use -W options for " &
+            "details");
+         Ada.Text_IO.New_Line;
+      end if;
+
       --  Information about cycles
 
       if Options.Warnings (Options.Cycle)
@@ -853,43 +886,48 @@ package body Display is
    begin
       Ada.Integer_Text_IO.Put
         (Integer (Stack_Info.Static_Usage + Stack_Info.Dynamic_Usage +
-                  Stack_Info.Unknown_Usage),
+                  Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage),
          0);
 
       Ada.Text_IO.Put (" bytes");
 
       --  Clarify stack usage information when we have something which is not
-      --  static
+      --  static, or we have a cycle.
 
-      if Stack_Info.Frame_Type /= Static_Stack_Analysis.Static then
-         Ada.Text_IO.Put (" (");
+      if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+        or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
+        or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value
+      then
+         if Options.Verbose then
+            Ada.Text_IO.Put (" (");
 
-         if Stack_Info.Static_Usage /= 0 then
-            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Static_Usage), 0);
-            Ada.Text_IO.Put ("s");
-         end if;
-
-         if Stack_Info.Dynamic_Usage /= 0 then
-            if Stack_Info.Static_Usage /= 0 then
-               Ada.Text_IO.Put (",");
+            if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value then
+               Ada.Text_IO.Put ("unbounded");
             end if;
 
-            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Dynamic_Usage), 0);
-            Ada.Text_IO.Put ("u");
-         end if;
+            if Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value then
+               if
+                 Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+               then
+                  Ada.Text_IO.Put (",");
+               end if;
 
-         if Stack_Info.Unknown_Usage /= 0 then
-            if Stack_Info.Static_Usage /= 0
-              or else Stack_Info.Dynamic_Usage /= 0
-            then
-               Ada.Text_IO.Put (",");
+               Ada.Text_IO.Put ("unresolved");
             end if;
 
-            Ada.Integer_Text_IO.Put (Integer (Stack_Info.Unknown_Usage), 0);
-            Ada.Text_IO.Put ("e");
-         end if;
+            if Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value then
+               if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+                 or else
+                   Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
+               then
+                  Ada.Text_IO.Put (",");
+               end if;
 
-         Ada.Text_IO.Put (")");
+               Ada.Text_IO.Put ("cycle");
+            end if;
+
+            Ada.Text_IO.Put (")");
+         end if;
       end if;
    end Expand_Stack_Usage;
 
@@ -925,6 +963,8 @@ package body Display is
 
       Is_Task : Boolean;
 
+      Accumulated_Stack : Static_Stack_Analysis.Stack_Usage_Info;
+
       use type Static_Stack_Analysis.Stack_Usage_Info;
       use type Static_Stack_Analysis.Node_Class_Access;
 
@@ -955,21 +995,37 @@ package body Display is
            Static_Stack_Analysis.List_Of_Nodes.Element
              (Static_Stack_Analysis.Task_Wrapper);
 
-         Expand_Stack_Usage
+         Accumulated_Stack :=
            (Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all) +
             Static_Stack_Analysis.Get_Stack_Usage (Task_Wrapper.all));
 
-         Ada.Text_IO.New_Line;
+      else
+         Accumulated_Stack :=
+           Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all);
+      end if;
 
+      Expand_Stack_Usage (Accumulated_Stack);
+
+      if not Options.Debug
+        and then
+          (Accumulated_Stack.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+             or else
+           Accumulated_Stack.Unknown_Usage /= Static_Stack_Analysis.No_Value
+             or else
+           Accumulated_Stack.Cycle_Usage /= Static_Stack_Analysis.No_Value)
+      then
+         --  In non-verbose mode we just put a mark indicating that the
+         --  resulting value is not accurate.
+
+         Ada.Text_IO.Put (" *");
+      end if;
+
+      Ada.Text_IO.New_Line;
+
+      if Task_Wrapper /= null then
          --  Print the frame for the task wrapper
 
          Print_Node (Task_Wrapper);
-
-      else
-         Expand_Stack_Usage
-           (Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all));
-
-         Ada.Text_IO.New_Line;
       end if;
    end Print_Entry;
 
