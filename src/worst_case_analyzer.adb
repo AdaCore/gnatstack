@@ -19,6 +19,9 @@
 -- Boston, MA 02110-1301, USA.                                              --
 ------------------------------------------------------------------------------
 
+with Global_Data;
+--  Used for Entry_Points
+
 package body Worst_Case_Analyzer is
 
    use type Static_Stack_Analysis.Stack_Usage_Info;
@@ -193,7 +196,7 @@ package body Worst_Case_Analyzer is
       --  Explore every entry point
 
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
-        (Static_Stack_Analysis.Entry_Points, Compute_Worst_Case'Access);
+        (Global_Data.Entry_Points, Compute_Worst_Case'Access);
    end Worst_Case_Analysis;
 
 end Worst_Case_Analyzer;

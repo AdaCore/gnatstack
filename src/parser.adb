@@ -19,12 +19,15 @@
 -- Boston, MA 02110-1301, USA.                                              --
 ------------------------------------------------------------------------------
 
+with Global_Data;
+--  Used for Entry_Points
+--           Is_Task_Entry
+
 with Static_Stack_Analysis;
 --  Used for Get_Node
 --           List_Of_Nodes
 --           List_Of_Edges
 --           List_Of_Locations
---           Entry_Points
 --           Unknown_Stack_Usage
 
 with Options;
@@ -98,6 +101,10 @@ package body Parser is
    procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
+
+   procedure Print_Usage_And_Exit;
+   pragma Inline (Print_Usage_And_Exit);
+   --  Print how to use the tool and exit
 
    procedure Free is new
      Ada.Unchecked_Deallocation (String, GNAT.OS_Lib.String_Access);
@@ -247,19 +254,19 @@ package body Parser is
       --  list of potential entry points.
 
       if Subprogram.all = "main"
-        or else Static_Stack_Analysis.Is_Task_Entry (Subprogram)
+        or else Global_Data.Is_Task_Entry (Subprogram)
       then
-         Static_Stack_Analysis.Entry_Points.Append (Position);
+         Global_Data.Entry_Points.Append (Position);
       end if;
 
       --  Get the task wrapper information in case this data has been
       --  generated.
 
       if not Static_Stack_Analysis.List_Of_Nodes.Has_Element
-               (Static_Stack_Analysis.Task_Wrapper)
+               (Global_Data.Task_Wrapper)
         and then GNAT.Regpat.Match ("stages__task_wrapper$", Subprogram.all)
       then
-         Static_Stack_Analysis.Task_Wrapper := Position;
+         Global_Data.Task_Wrapper := Position;
       end if;
    end Add_Ada_Entry_Points;
 
@@ -277,7 +284,7 @@ package body Parser is
       --  calls.
 
       if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
-         Static_Stack_Analysis.Entry_Points.Append (Position);
+         Global_Data.Entry_Points.Append (Position);
       end if;
    end Add_Local_Entry;
 
@@ -302,7 +309,7 @@ package body Parser is
          Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         Static_Stack_Analysis.Entry_Points.Append (Position);
+         Global_Data.Entry_Points.Append (Position);
       end if;
    end Add_Pattern_Entry;
 
@@ -409,8 +416,7 @@ package body Parser is
                else
                   Ada.Text_IO.Put_Line
                     ("Unknown option: " & GNAT.Command_Line.Full_Switch);
-                  Usage;
-                  GNAT.OS_Lib.OS_Exit (1);
+                  Print_Usage_And_Exit;
                end if;
 
             --  Warnings
@@ -437,8 +443,7 @@ package body Parser is
 
                         when others =>
                            Ada.Text_IO.Put_Line ("Bad warning (-W) option");
-                           Usage;
-                           GNAT.OS_Lib.OS_Exit (1);
+                           Print_Usage_And_Exit;
                      end case;
                   end loop;
                end;
@@ -454,8 +459,7 @@ package body Parser is
                         Options.Order := Options.Stack_Usage;
                   else
                         Ada.Text_IO.Put_Line ("Bad order (-o) option");
-                        Usage;
-                        GNAT.OS_Lib.OS_Exit (1);
+                        Print_Usage_And_Exit;
                   end if;
                end;
 
@@ -506,8 +510,7 @@ package body Parser is
                  new String'(GNAT.Command_Line.Parameter);
 
             when others =>
-               Usage;
-               GNAT.OS_Lib.OS_Exit (1);
+               Print_Usage_And_Exit;
          end case;
       end loop;
 
@@ -516,8 +519,7 @@ package body Parser is
       loop
          declare
             Input_File_Name : constant GNAT.Strings.String_Access :=
-              new String'(GNAT.Command_Line.Get_Argument
-                          (Do_Expansion => True));
+              new String'(GNAT.Command_Line.Get_Argument (True));
          begin
             exit when Input_File_Name'Length = 0
               or else not Is_Stack_Usage_Information_File
@@ -536,9 +538,7 @@ package body Parser is
 
          Ada.Text_IO.New_Line;
 
-         Usage;
-
-         GNAT.OS_Lib.OS_Exit (1);
+         Print_Usage_And_Exit;
 
       else
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
@@ -557,22 +557,20 @@ package body Parser is
          --  Add the entry points matching the pattern
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms,
-            Add_Pattern_Entry'Access);
+           (Global_Data.List_Of_Subprograms, Add_Pattern_Entry'Access);
 
       elsif Options.Explore_All then
          --  Explore every node that contains subprograms defined within the
          --  application.
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms, Add_Local_Entry'Access);
+           (Global_Data.List_Of_Subprograms, Add_Local_Entry'Access);
 
       else
          --  Automatic entry points (main procedure and task entry points)
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Static_Stack_Analysis.List_Of_Subprograms,
-            Add_Ada_Entry_Points'Access);
+           (Global_Data.List_Of_Subprograms, Add_Ada_Entry_Points'Access);
       end if;
 
    exception
@@ -580,17 +578,13 @@ package body Parser is
          Ada.Text_IO.Put_Line
            ("Invalid Switch " & GNAT.Command_Line.Full_Switch);
 
-         Usage;
-
-         GNAT.OS_Lib.OS_Exit (1);
+         Print_Usage_And_Exit;
 
       when GNAT.Command_Line.Invalid_Parameter =>
          Ada.Text_IO.Put_Line
            ("No parameter for " & GNAT.Command_Line.Full_Switch);
 
-         Usage;
-
-         GNAT.OS_Lib.OS_Exit (1);
+         Print_Usage_And_Exit;
    end Parse_Arguments;
 
    ------------------------
@@ -612,7 +606,7 @@ package body Parser is
          if Static_Stack_Analysis.List_Of_Nodes.Has_Element (Found_Id) then
             --  Add the entry point to the list
 
-            Static_Stack_Analysis.Entry_Points.Append (Found_Id);
+            Global_Data.Entry_Points.Append (Found_Id);
 
          else
             --  The entry point does not exist
@@ -765,7 +759,8 @@ package body Parser is
                   Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
-               List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
+               List_Of_Nodes.Insert
+                 (Global_Data.List_Of_Subprograms, Node_Ptr);
             end if;
 
          --  Explicit node
@@ -787,7 +782,8 @@ package body Parser is
                   Analysis_Finished         => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
-               List_Of_Nodes.Insert (List_Of_Subprograms, Node_Ptr);
+               List_Of_Nodes.Insert
+                 (Global_Data.List_Of_Subprograms, Node_Ptr);
 
             else
                --  The node is already in the list. We have to check whether we
@@ -833,7 +829,7 @@ package body Parser is
                     (Get_Location_List (Found_Node.all));
 
                   List_Of_Nodes.Replace_Element
-                       (List_Of_Subprograms, Found_Id, Node_Ptr);
+                       (Global_Data.List_Of_Subprograms, Found_Id, Node_Ptr);
 
                   --  Free the old node ???
 
@@ -1074,7 +1070,8 @@ package body Parser is
                Analysis_Finished       => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
-            List_Of_Subprograms.Insert (Source_Ptr, Source_Id, Inserted);
+            Global_Data.List_Of_Subprograms.Insert
+              (Source_Ptr, Source_Id, Inserted);
 
             pragma Assert (Inserted);
          else
@@ -1097,7 +1094,8 @@ package body Parser is
                Analysis_Finished       => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
-            List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
+            Global_Data.List_Of_Subprograms.Insert
+              (Target_Ptr, Target_Id, Inserted);
 
             --  ??? For the moment we create the same indirect node for all
             --  indirect calls. We should create different ones, but there
@@ -1123,7 +1121,8 @@ package body Parser is
                   Analysis_Finished       => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
-               List_Of_Subprograms.Insert (Target_Ptr, Target_Id, Inserted);
+               Global_Data.List_Of_Subprograms.Insert
+                 (Target_Ptr, Target_Id, Inserted);
 
                pragma Assert (Inserted);
             end if;
@@ -1201,6 +1200,16 @@ package body Parser is
 
       Ada.Text_IO.Close (Descriptor);
    end Parse_Input_File;
+
+   --------------------------
+   -- Print_Usage_And_Exit --
+   --------------------------
+
+   procedure Print_Usage_And_Exit is
+   begin
+      Usage;
+      GNAT.OS_Lib.OS_Exit (1);
+   end Print_Usage_And_Exit;
 
    -----------
    -- Usage --

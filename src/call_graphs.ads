@@ -23,21 +23,6 @@ with Static_Stack_Analysis;
 
 package Call_Graphs is
 
-   Unbounded_Frames : Boolean := False;
-   --  Flag indicating whether there is a subprogram that can be reached from
-   --  any entry point whose stack usage cannot be bounded at compile-time
-   --  because it depends on data arguments passed to the frame.
-
-   External_Calls : Boolean := False;
-   --  Flag indicating whether there is a subprogram that can be reached from
-   --  any entry point for which we have neither stack usage not call graph
-   --  information.
-
-   Indirect_Calls : Boolean := False;
-   --  Flag indicating whether there is a subprogram that can be reached from
-   --  any entry point that represents an indirect (including dispatching)
-   --  call.
-
    procedure Check_Accuracy
      (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
    --  Depending on the selected flags, this procedure will extract all the
