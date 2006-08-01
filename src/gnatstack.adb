@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 --                        STATIC STACK ANALYSIS TOOL                        --
 --                                                                          --
---                                 S S A T                                  --
+--                             G N A T S T A C K                            --
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
@@ -36,7 +36,7 @@ with Global_Data;
 --  Used for Entry_Points
 --           Phase
 
-procedure SSAT is
+procedure Gnatstack is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
 
@@ -62,4 +62,4 @@ begin
 
    Global_Data.Phase := Global_Data.Print_Results;
    Display.Generate_Results;
-end SSAT;
+end Gnatstack;
