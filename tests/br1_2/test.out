@@ -1,0 +1,6 @@
+Accumulated stack usage information for entry points
+
+main : total 60 bytes
+
+fill_string : total 12 bytes
+
