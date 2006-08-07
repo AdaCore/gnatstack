@@ -19,6 +19,12 @@
 -- Boston, MA 02110-1301, USA.                                              --
 ------------------------------------------------------------------------------
 
+with Global_Data;
+--  Used for Unbounded_Frames
+--           External_Calls
+--           Indirect_Calls
+--           Cycles
+
 with Options;
 --  Used for Verbose
 --           Compute_All_Cycles
@@ -233,7 +239,7 @@ package body Call_Graphs is
       --  Compare the detected cycle against the list of already detected
       --  cycles.
 
-      Static_Stack_Analysis.Cycles.Iterate (Check_Cycle'Access);
+      Global_Data.Cycles.Iterate (Check_Cycle'Access);
 
       return Found;
    end Already_Detected_Cycle;
@@ -269,7 +275,7 @@ package body Call_Graphs is
 
             --  Update accuracy of the explored entry point
 
-            if not Unbounded_Frames
+            if not Global_Data.Unbounded_Frames
               and then
                 Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class
               and then
@@ -277,19 +283,19 @@ package body Call_Graphs is
                   (Explored_Node.all).Stack_Info.Frame_Type =
                 Static_Stack_Analysis.Unbounded
             then
-               Unbounded_Frames := True;
+               Global_Data.Unbounded_Frames := True;
 
-            elsif not External_Calls
+            elsif not Global_Data.External_Calls
               and then Explored_Node.all in
                 Static_Stack_Analysis.Unresolved_Node'Class
             then
-               External_Calls := True;
+               Global_Data.External_Calls := True;
 
-            elsif not Indirect_Calls
+            elsif not Global_Data.Indirect_Calls
               and then Explored_Node.all in
                 Static_Stack_Analysis.Fake_Node'Class
             then
-               Indirect_Calls := True;
+               Global_Data.Indirect_Calls := True;
             end if;
 
             --  Explore all the possible target calls.
@@ -382,11 +388,11 @@ package body Call_Graphs is
       else
          --  Add cycle
 
-         Static_Stack_Analysis.Cycles.Append (New_Cycle);
+         Global_Data.Cycles.Append (New_Cycle);
 
          --  Update Id
 
-         New_Cycle.Id := Static_Stack_Analysis.Cycles.Last_Index;
+         New_Cycle.Id := Global_Data.Cycles.Last_Index;
 
          --  Mark the nodes as belonging to this cycle
 

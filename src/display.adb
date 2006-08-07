@@ -26,17 +26,22 @@ with Options;
 --           Order
 --           Warnings
 
+with Global_Data;
+--  Used for List_Of_Subprograms
+--           Entry_Points
+--           Phase
+--           Unbounded_Frames
+--           External_Calls
+--           Indirect_Calls
+--           Cycles
+--           Is_Task_Entry
+
 with Static_Stack_Analysis;
 --  Used for List_Of_Locations
---           List_Of_Subprograms
 --           List_Of_Nodes
 --           List_Of_Edges
 --           Get_Stack_Usage
 --           Get_Subprogram_Name
---           Phase
-
-with Call_Graphs;
---  Used for Extract_Cycles
 
 with Worst_Case_Analyzer;
 --  Used for Get_Longest_Path
@@ -331,7 +336,7 @@ package body Display is
       --  subprograms.
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
-        (Static_Stack_Analysis.List_Of_Subprograms, Get_Biggest_Frame'Access);
+        (Global_Data.List_Of_Subprograms, Get_Biggest_Frame'Access);
 
       --  Print the results
 
@@ -414,13 +419,13 @@ package body Display is
       if Options.Order = Options.Stack_Usage then
          --  Order entry points according to their stack consumption
 
-         Ordered_Entries.Sort (Static_Stack_Analysis.Entry_Points);
+         Ordered_Entries.Sort (Global_Data.Entry_Points);
       end if;
 
       --  Generate the worst case graph for every entry point
 
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
-        (Static_Stack_Analysis.Entry_Points, Print_Longest_Path'Access);
+        (Global_Data.Entry_Points, Print_Longest_Path'Access);
    end Print_Longest_Paths;
 
    ----------------
@@ -515,7 +520,7 @@ package body Display is
       Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
         Static_Stack_Analysis.Get_Stack_Usage (Node.all);
 
-      use type Static_Stack_Analysis.Phase_Type;
+      use type Global_Data.Phase_Type;
 
    begin
       --  Indentation
@@ -545,7 +550,7 @@ package body Display is
             Ada.Text_IO.Put (")");
          end if;
 
-      elsif Static_Stack_Analysis.Phase = Static_Stack_Analysis.Print_Results
+      elsif Global_Data.Phase = Global_Data.Print_Results
         and then
       (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
        or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
@@ -709,7 +714,7 @@ package body Display is
       --  Read information about nodes and edges
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
-        (Static_Stack_Analysis.List_Of_Subprograms, Expand_Node'Access);
+        (Global_Data.List_Of_Subprograms, Expand_Node'Access);
 
       --  End of graph
 
@@ -728,10 +733,10 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
-      if not Static_Stack_Analysis.Cycles.Is_Empty
-        or else Call_Graphs.Unbounded_Frames
-        or else Call_Graphs.External_Calls
-        or else Call_Graphs.Indirect_Calls
+      if not Global_Data.Cycles.Is_Empty
+        or else Global_Data.Unbounded_Frames
+        or else Global_Data.External_Calls
+        or else Global_Data.Indirect_Calls
       then
          Ada.Text_IO.Put_Line
            ("Worst case analysis is *not* accurate ; use -W options for " &
@@ -742,12 +747,12 @@ package body Display is
       --  Information about cycles
 
       if Options.Warnings (Options.Cycle)
-        and then not Static_Stack_Analysis.Cycles.Is_Empty
+        and then not Global_Data.Cycles.Is_Empty
       then
          Ada.Text_IO.Put_Line
            ("List of cycles:");
          Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.Cycles.Iterate (Print_Cycle'Access);
+         Global_Data.Cycles.Iterate (Print_Cycle'Access);
          Ada.Text_IO.New_Line;
       end if;
 
@@ -755,12 +760,12 @@ package body Display is
       --  bounds cannot be statically computed.
 
       if Options.Warnings (Options.Unbounded)
-        and then Call_Graphs.Unbounded_Frames
+        and then Global_Data.Unbounded_Frames
       then
          Ada.Text_IO.Put_Line
            ("List of subprograms with dynamic unbounded frames:");
          Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
+         Global_Data.List_Of_Subprograms.Iterate
            (Print_Unbounded'Access);
          Ada.Text_IO.New_Line;
       end if;
@@ -769,26 +774,24 @@ package body Display is
       --  usage
 
       if Options.Warnings (Options.External)
-        and then Call_Graphs.External_Calls
+        and then Global_Data.External_Calls
       then
          Ada.Text_IO.Put_Line
            ("List of external subprograms:");
          Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_External'Access);
+         Global_Data.List_Of_Subprograms.Iterate (Print_External'Access);
          Ada.Text_IO.New_Line;
       end if;
 
       --  Information about indirect (including dispatching) calls
 
       if Options.Warnings (Options.Indirect)
-        and then Call_Graphs.Indirect_Calls
+        and then Global_Data.Indirect_Calls
       then
          Ada.Text_IO.Put_Line
            ("List of indirect (including dispatching) calls:");
          Ada.Text_IO.New_Line;
-         Static_Stack_Analysis.List_Of_Subprograms.Iterate
-           (Print_Indirect'Access);
+         Global_Data.List_Of_Subprograms.Iterate (Print_Indirect'Access);
          Ada.Text_IO.New_Line;
       end if;
    end Generate_Warnings;
@@ -972,7 +975,7 @@ package body Display is
       --  Print the global information
 
       Is_Task :=
-        Static_Stack_Analysis.Is_Task_Entry
+        Global_Data.Is_Task_Entry
           (Static_Stack_Analysis.Get_Subprogram_Name (Root.all));
 
       if Is_Task then
@@ -989,11 +992,11 @@ package body Display is
 
       if Is_Task and then
         Static_Stack_Analysis.List_Of_Nodes.Has_Element
-          (Static_Stack_Analysis.Task_Wrapper)
+          (Global_Data.Task_Wrapper)
       then
          Task_Wrapper :=
            Static_Stack_Analysis.List_Of_Nodes.Element
-             (Static_Stack_Analysis.Task_Wrapper);
+             (Global_Data.Task_Wrapper);
 
          Accumulated_Stack :=
            (Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all) +

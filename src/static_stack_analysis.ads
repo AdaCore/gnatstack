@@ -162,14 +162,6 @@ package Static_Stack_Analysis is
    --  representing this subprogram (if it already exists). If the subprogram
    --  has not been registered within the list then it returns No_Element.
 
-   List_Of_Subprograms : List_Of_Nodes.Set := List_Of_Nodes.Empty_Set;
-   --  List of all nodes under analysis
-
-   Task_Wrapper : List_Of_Nodes.Cursor := List_Of_Nodes.No_Element;
-   --  When we have a tasking program the task wrapper is the one that calls
-   --  the code belonging to the different tasks so we need to take into
-   --  account this information for computing stack usage for all the tasks.
-
    ------------------------------
    -- Edges (subprogram calls) --
    ------------------------------
@@ -252,21 +244,6 @@ package Static_Stack_Analysis is
 
    package List_Of_Cycles is new Ada.Containers.Vectors (Natural, Cycle);
    --  Package used for identifying collections of call graph cycles
-
-   Cycles : List_Of_Cycles.Vector := List_Of_Cycles.Empty_Vector;
-   --  List of paths corresponding to the different cycles that have been
-   --  detected.
-
-   ------------------
-   -- Entry points --
-   ------------------
-
-   Entry_Points : List_Of_Node_Ids.Vector := List_Of_Node_Ids.Empty_Vector;
-   --  List of nodes to be used as entry points in the partition. They are
-   --  the roots for computing the call graphs.
-
-   function Is_Task_Entry (Name : Subprogram_Name) return Boolean;
-   --  Returns True if the node corresponds to a task entry
 
    -------------------
    -- Abstract node --
@@ -449,17 +426,6 @@ package Static_Stack_Analysis is
    --  Indirect calls are the result of dereferences of access-to-subprogram
    --  values, and hence their target depend on the values stored in the
    --  pointer.
-
-   ------------------------
-   -- Phases of analysis --
-   ------------------------
-
-   type Phase_Type is (Parse, Accuracy_Analysis, Print_Warnings,
-                       Worst_Case_Analysis, Print_Results);
-   --  Type for Phase variable
-
-   Phase : Phase_Type;
-   --  Variable that indicates the phase of the analysis in which we are
 
 private
 
