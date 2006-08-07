@@ -1,0 +1,488 @@
+%----------------------------------------------------------------------
+\chapter{Software top-level architectural design}
+\label{ch:toplevel}
+%----------------------------------------------------------------------
+
+%----------------------------------------------------------------------
+\section{Overall architecture}
+\label{sc:architecture}
+%----------------------------------------------------------------------
+
+\ssat{} provides a framework for computing and analyzing stack usage
+for the different subprograms in the partition and extracting worst case
+prior to execution time. It is made up by the following basic components:
+
+\begin{itemize}
+
+\item Compiler
+
+\item Call graph generator and decorator
+
+\item Worst case analyzer
+
+\item GNAT Programming Studio (GPS)
+
+\end{itemize}
+
+This chapter will focus on describing the capabilities required for these
+components.
+
+%----------------------------------------------------------------------
+\section{Data representation}
+\label{sc:data}
+%----------------------------------------------------------------------
+
+Two things are required for analyzing statically stack usage: the call
+graph information, and the stack requirements for each
+subprogram. Once we have that information, we can traverse the
+decorated call graph to look for the worst case path according to its
+stack requirements.
+
+First we need to define how to represent the call graph corresponding
+to the application. We do that in the form of a directed call graph,
+in which nodes will represent subprograms that are defined or called,
+and directed edges between nodes will represents potential calls. The
+graph needs to be able to store the stack requirements for each
+subprogram, in terms of boundaries and attributes for these
+boundaries.
+
+There are four types of nodes (see figure \ref{fg:node-hierarchy}),
+representing the different types of subprograms that may be called:
+
+\begin{itemize}
+
+\item Explicit node. It corresponds to a subprogram that has been
+  found and analyzed in the set of sources under analysis, and can be
+  unambiguously identified at compile-time.
+
+\item Dispatching node. This is a node representing a dispatching
+  call so we do not know statically the actual subprogram that will
+  be called. It uses the dynamic dispatching capability provided by
+  class-wide type. We use this node that will then point to every
+  known operation to which it can dispatch.
+
+\item Indirect node. It represents a node that is a dereference of
+  access-to-subprogram so we do not know statically the concrete
+  subprogram that will be called.
+
+\item Unresolved node. It corresponds to a subprogram that is
+  referenced from the set of sources being analyzed, but it is not
+  part of these sources (it may be a call to an external library which
+  does not provide the required call graph and stack usage
+  information). Hence, there is no information about its stack usage
+  nor about subprograms that are called from this node.
+
+\end{itemize}
+
+\begin{figure}
+\centerline{\includegraphics*[scale=0.6]{node-hierarchy.eps}}
+\caption{Node class hierarchy}
+\label{fg:node-hierarchy}
+\end{figure}
+
+Dispatching and indirect are considered as \emph{fake} nodes because
+they do not represent real subprograms. They represent calls whose
+target subprogram can only be determined at run time. Representing
+these entities as intermediate fake nodes (pointing to all possible
+target subprograms) is practical for representing and analyzing the
+call graph.
+
+As it was said previously, these nodes need to store the stack
+requirements for the subprogram they represent, and this information
+depends on the node they represent. The information that we need to
+store about explicit nodes is:
+
+\begin{itemize}
+
+\item Subprogram name. This is a \prog{String} that contains the
+  symbol name for the node.
+\item Location list. It is a list of triplets file name, line number,
+ and column number, describing the place where the subprogram body
+ appears. The list of locations will typically contain just one entry,
+ and it will contain a list of more than one location in the case of
+ instantiations of generic units.
+
+\item Stack usage information. It contains stack requirements for the
+  represented subprogram, in terms of boundaries and attributes for
+  these boundaries. Attributes indicate whether the stack usage for
+  the subprogram can be statically known at compile-time, or partially
+  known (there is a dynamic part that depends on data arguments passed
+  to the frame, which can be bounded or unbounded).
+
+\item Accumulated stack usage information. It contains stack
+  requirements for the complete call tree starting in the referred
+  subprogram, with the corresponding attribute.
+
+\item Target nodes. It is the set of possible nodes that can be called
+  from this subprogram, and it is represented as a list of directed
+  edges (see definition bellow) between subprograms. These calls are
+  ordered according to their accumulated stack requirements.
+
+\item Analysis information. This is a \prog{Boolean} variable that
+  indicates whether the subprogram is part of the path being analyzed
+  for obtaining the worst case stack usage. It is very practical for
+  detecting and handling cycles in the call graph.
+
+
+\item Cycle information. A subprogram may be part of different cycles
+  in the call graph, and this field contains the set of cycles to
+  which the referred subprogram belongs.
+
+\end{itemize}
+
+All the rest of nodes contain the same information except that about
+local stack usage because it is meaningless in other contexts.
+
+Directed edges are used for representing \emph{may call}
+relationships between subprograms. For each of these edges we store
+the following information:
+ 
+\begin{itemize}
+
+\item Target node. Pointer to the node that is being called.
+
+\item Location list. It is a list of triplets file name, line number,
+ and column number, describing the place where the call
+ appears. The list of locations will typically contain just one entry,
+ and it will contain a list of more than one location in the case of
+ instantiations of generic units.
+
+\item Feasibility. This flag is placed here for convenience to be able
+  to incorporate information provide by the user about calls that are
+  known not to happen (because of being dead or deactivated code, for
+  example).
+
+\item Analysis information. This is a \prog{Boolean} variable that
+  indicates whether the call is part of the path being analyzed
+  for obtaining the worst case stack usage. It is very practical for
+  detecting and handling cycles in the call graph.
+
+\end{itemize}
+
+The basic data types and subprograms required for static stack
+analysis is represented in the following package spec:
+
+\lgrindfile{static_stack_analysis}
+
+%----------------------------------------------------------------------
+\section{Compiler}
+%----------------------------------------------------------------------
+
+\ssat{} is based on the development of  dedicated compiler extensions
+to produce specialized outputs for stack requirements analysis
+purposes.
+
+One limitation is that a compiler cannot provide information on elements it
+does not process, such as COTS operating system services for which sources are
+not available or very low level routines developed in assembly language.
+
+When worst case bounds are a strong concern, not having the sources of some
+components is rare, however, and the stack usage in assembly routines is
+usually simple enough to be accounted for manually.
+
+The compilation process may also not be able to grasp the interrupt handling
+bits necessary to size the worst case amount of interrupt related stack, be it
+for hardware interrupt or signal handlers.
+
+Interrupt handling always requires very careful design and coding, though, so
+the information could at least also be provided to the framework by the user,
+or accounted for separately.
+
+Leveraging on a compiler's internals has a number of advantages:
+
+\begin {itemize}
+\item {\it Reduced effort for new target architectures}:
+
+A compiler typically knows everything about stack allocations for the code it
+processes.
+
+When already structured to support multiple target architectures, this
+knowledge may be used for each and alleviates the need of an associated
+comprehensive machine instruction parser, potentially difficult and
+error-prone for complex processors.
+
+\item {\it User level guards}:
+
+A compiler can be tailored with options to raise warnings or errors on user
+level constructs known to trigger stack allocation patterns that may cause
+troubles to a stack analysis framework involved later on.
+
+This points directly at the user level construct, and so very early in the
+development process, both being of precious value.
+
+\item {\it Access to high level information}:
+
+A compiler has visibility on semantic information that can help tackle some of
+the challenging issues we have previously identified.
+
+Consider an Ada \verb|Integer| subtype with range \verb|1..5| for
+example.
+
+If a variable of this subtype is used to size a local array, the range
+knowledge may be used to compute a bound on the array size, and so on the
+corresponding stack allocation.
+
+Potential targets of an indirect calls are another example.
+
+Based on subprogram profiles and actual references to subprograms, the
+compiler can provide a limited but exhaustive list of subprograms possibly
+reached by an indirect call.
+
+In both cases, the compiler information at hand is extremely hard, if not
+impossible, to infer from a machine level representation.
+
+\item {\it Scalability}:
+
+Support for stack usage outputs is unlikely to change how a compiler scales up
+against application sizes, so a compiler-based stack analysis component will
+scale up as well as the initial compiler did.
+
+Besides, a compiler has the opportunity to output no more than what is really
+relevant for later analysis purposes, which makes this output easier to digest
+than a huge machine level representation of the code.
+
+\end{itemize}
+
+%----------------------------------------------------------------------
+\subsection{Data generated by the compiler}
+%----------------------------------------------------------------------
+
+The compiler can generate a file per compilation unit (controlled by a
+command line option, \prog{-fcallgraph-info=su}), that contain the
+required information for generating the call graph, and decorating it
+with stack usage information.
+
+The extension \prog{.ci} (call graph information) will be used for the
+compiler-generated files containing this information (one file per
+compiled unit).
+
+%----------------------------------------------------------------------
+\subsubsection{Call graph information}
+\label{compiler-call-graph}
+%----------------------------------------------------------------------
+
+The call graph is made up by nodes and directed edges between
+nodes. The compiler produces this information on a per-unit basis in
+the form of a text file in VCG \refcite{VCG} graph description
+language.
+
+The types of nodes that are generated by the compiler are:
+
+\begin{itemize}
+
+\item \emph{Defined-in} node. It corresponds to a subprogram defined
+  in the unit being compiled.
+
+\item \emph{Referenced-from} node. It identifies a subprogram
+  referenced from the unit being compiled but it is either defined in a
+  different compilation unit or not known at compile time. These nodes
+  can be categorized into:
+
+  \begin{itemize}
+  
+  \item \emph{Proxy} node. It represents a subprogram being called
+  from this unit and known to be defined in a different compilation
+  unit.
+
+  \item \emph{Dummy proxy} node. It corresponds to a subprogram which
+  is called from the unit being compiled but its target not statically
+  known. It corresponds to either an indirect call or a dispatching
+  call.
+
+  \end{itemize}
+
+\end{itemize}
+
+All the nodes, except \emph{dummy proxy} nodes, are represented by:
+
+\begin{itemize}
+
+\item Title. It contains the full name of the subprogram (symbol
+  name).
+
+\item Label. Ada/C name of the subprogram plus a list of locations (file
+ name and line number). The list of locations will typically contain
+ just one entry, and it will contain a list of more than one location
+ in the case of instantiations of generic units.
+
+\end{itemize}
+
+\emph{Dummy proxy} nodes simply contain a mark indicating that they
+are not known at compile time.
+
+Note that the nodes that appear are those for which there is an
+explicit call. Inlined subprograms, for example, will not appear in
+the call graph since no actual call is made.
+
+For every compiled unit, a list of directed edges will be generated
+corresponding to every call appearing in the unit being compiled. They
+materialize a {\em may\_call} relationship, where the source
+subprogram {\em may\_call} the destination subprogram.These edges are
+represented by:
+
+\begin{itemize}
+
+\item Source. This is the title corresponding to the calling
+  subprogram. It can only be a \emph{defined-in} node.
+
+\item Target. Title corresponding to the called subprogram. It can be
+  any type of node.
+
+\end{itemize}
+
+%----------------------------------------------------------------------
+\subsubsection{Stack usage information}
+\label{compiler-stack-usage}
+%----------------------------------------------------------------------
+
+The compiler generates stack usage information for each subprogram
+defined in the compilation unit. The following information will be
+generated for each subprogram, and will later be used for decorating
+the call graph tree:
+
+\begin{itemize}
+
+\item List of locations (file name and line number) where the call
+ appear. The list of locations will typically contain  just one entry,
+ and it will contain a list of more than one location in the case of
+ instantiations of generic units.
+
+\item Ada/C name of the subprogram.
+
+\item Stack requirements. Maximum computable amount of stack the
+  subprogram may ever allocate on the stack. It corresponds only to
+  the amount that  can be statically bounded.
+
+\item Attributes for the stack requirements. It indicates the stack
+  allocation pattern, which may be:
+
+  \begin{itemize}
+
+  \item Static. Only constant allocations are made, so the defined
+    stack requirement.
+
+  \item Dynamic and bounded. Dynamic allocations may occur in addition
+  to constant ones, but the sum of all these allocations is never
+  greater than the defined stack requirement.
+
+  \item Dynamic and unbounded. Dynamic allocations may occur in
+  addition to constant ones, and the sum of all these allocations can
+  be greater than the defined stack requirement to an unknown extent.
+
+  \end{itemize}
+  
+\end{itemize}
+
+%----------------------------------------------------------------------
+\section{Call graph generator and decorator}
+%----------------------------------------------------------------------
+
+This component is in charge of generating the complete call graph for
+every entry point in the partition using the partial call graph
+information previously generated by the compiler. The stack usage
+information corresponding to the subprogram, including the information
+about whether these values are static, dynamic, or bounded, is also
+part of the call graph information.
+
+Some entry points are automatically identified (main entry point, task
+bodies, interrupt handlers). The user can also specify any additional
+entry point that needs to be considered in the analysis. These entry
+points will be stored in a dynamic list.
+
+The compiler cannot always determine the required information for a
+complete analysis. Potential sources for incomplete information to be
+addressed are:
+
+\begin{itemize}
+
+\item Indirect calls. These calls correspond to dereference of
+  access-to-subprogram, so we do not know statically the actual
+  subprogram that will be called because it depends on the data flow.
+
+\item Dispatching calls. These calls use the dynamic dispatching
+  capability provided by class-wide type, so we do not know statically
+  the actual subprogram that will be called because it depends on the
+  actual object used.
+
+\item Dynamic unbounded frames. There is a dynamic part in the stack
+  requirements that depends on data arguments passed to the frame,
+  which cannot be statically bounded.
+
+\item External calls. There is no stack usage information about the
+  target call.
+
+\item Cycles. In presence of control flow cycles involving stack
+  consumption, the worst case bound is a function of the maximum
+  number of cycle iterations.
+
+\end{itemize}
+
+The \emph{graph generator and decorator} can help the user (or an
+external tool) to fill the required information; it will generate a
+file containing the pattern to fill the missing pieces of
+information. The user will then be able to provide more precise
+information about potential target addresses and stack usage in what
+is called \emph{user-defined call graph and stack usage files}
+(\prog{.ciu}).
+
+The format of the compiler generated file has been defined in section
+\ref{compiler-call-graph}. The format of the \emph{user-defined
+  call graph and stack usage files} will be a simplified version of
+the data generated by the compiler in order to simplify the design of
+the of parser.
+
+The \emph{call graph generator and decorator} will parse both
+compiler-generated and user defined files and will create a call graph
+tree made up by a list of nodes and edges as described in \ref{sc:data}.
+
+%----------------------------------------------------------------------
+\section{Worst case analyzer}
+%----------------------------------------------------------------------
+
+Once we have the annotated call tree we need to look for the longest
+paths in terms of stack usage. We will start on every entry point and
+fill the accumulated stack usage, together with the pointer to the
+longest path, in a recursive way. The pseudocode for this recursive
+function is the following:
+\begin{alltt}
+   function Get_Accumulated_Stack_Usage (Node) return Stack_Usage is
+     Tmp_Accumulated  := null;
+     New_Accumulated  := null;
+     Tmp_Longest_Path := null;
+   begin
+
+     if not Cycle_Detected and then Node.Accumulated_Stack_Usage = null then
+       --  Compute the information only if it is not yet available
+
+       for Target_Node in List_Of_Target_Nodes loop
+         New_Accumulated :=
+           Get_Accumulated_Stack_Usage (Target_Node);
+
+         if New_Accumulated > Tmp_Accumulated then
+           Tmp_Accumulated  := New_Accumulated;
+           Tmp_Longest_Path := Target_Node;
+         end if;
+       end loop;
+
+       Node.Accumulated_Stack_Usage := Tmp_Accumulated;
+       Node.Longest_Path := Tmp_Longest_Path;
+     end if;
+
+     return Node.Accumulated_Stack_Usage;
+
+   end Get_Accumulated_Stack_Usage;
+
+
+   for Node in List_Of_Entry_Points loop
+     Node.Accumulated_Stack_Usage := Get_Accumulated_Stack_Usage (Node);
+   end loop; 
+\end{alltt}
+
+% Note that the existence of a node with a unknown or dynamic node make
+% it the longest path.
+
+%----------------------------------------------------------------------
+\section{GNAT Programming Studio (GPS)}
+%----------------------------------------------------------------------
+
+TBD

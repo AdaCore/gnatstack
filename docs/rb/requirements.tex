@@ -1,0 +1,344 @@
+\chapter{Specific requirements}\label{ch:requirements}
+%======================================================================
+
+\section{Scope and conventions}
+
+This chapter defines specific requirements of the \ssat{} that are
+conditions for the validation against the requirements baseline.
+
+All the requirements are to be considered as ``essential'' unless
+otherwise stated.
+
+Baseline, or customer requirements identified in this document are
+referenced as \textbf{BR\#} (Baseline Requirement).
+
+%----------------------------------------------------------------------
+\section{System functional requirements}\label{sc:functional}
+%----------------------------------------------------------------------
+
+\begin{requirement}{Ada and C support}
+  The tool will accept source code written in Ada or C.
+\end{requirement}
+
+\begin{rationale}
+  The GNAT Pro development environment supports these two programming
+  languages.
+\end{rationale}
+
+\begin{requirement}{Per subprogram stack usage information}
+  \ssat{} will be able to extract the maximum stack usage information
+  for each individual subprogram. This number will be qualified by an
+  attribute indicating whether the maximum for this subprogram is a
+  fixed number that has been statically determined or there is an
+  additional amount that can only be determined at run time.
+\end{requirement}
+
+\begin{rationale}
+  This information is very valuable for understanding which are
+  the subprograms that are consuming more stack, or those whose stack
+  requirements cannot be statically determined.
+\end{rationale}
+
+\begin{requirement}{Per subprogram call chain information}
+  \ssat{} will generate, for each subprogram, the list of subprograms
+  that it may call.
+\end{requirement}
+
+\begin{rationale}
+  This information is needed for building the complete call graph
+  containing all the possible call paths that the application can
+  follow.
+\end{rationale}
+
+\begin{requirement}{Call graph information}
+  \ssat{} will be able to traverse all possible call paths and sort
+  them according to their global stack usage.
+\end{requirement}
+
+\begin{rationale}
+  The longest call path, in terms of stack usage, is the parameter
+  that we need for dimensioning the stack. In addition, having access
+  to the rest of the call paths is useful because the most stack
+  consuming path may not be feasible (because of run-time constraints
+  known by the user).
+\end{rationale}
+
+\begin{requirement}{Support for multiple entry points}
+  \ssat{} will be able to use any number of entry points from which
+  different call graphs are computed. Tasks will be automatically used
+  by \ssat{} as entry points, and users may add any number of entry
+  points.
+\end{requirement}
+
+\begin{rationale}
+  Tasks have their own stack, and hence per task stack usage is needed
+  for dimensioning each individual stack. The ability to compute stack
+  requirements for user defined entry points is also useful for
+  documenting the stack requirements of any piece of code.
+\end{rationale}
+
+\begin{requirement}{Detect targets for indirect calls}
+  Indirect calls are those whose target address can only be determined
+  at run time, including dispatching calls and dereferences of
+  access-to-subprogram values. \ssat{} will generate a list of
+  candidate target nodes for each indirect call.
+\end{requirement}
+
+\begin{rationale}
+  A list of every potential target address for indirect calls is of
+  great value for obtaining safe worst case values.
+  % \ssat{} will use the list of access, address, and overloaded
+  % values and compare them agaisnt the expected signature. This way
+  % some pessimism is removed from the stack usage computation
+\end{rationale}
+
+\begin{requirement}{Bound the size of dynamic frames}
+  Dynamic frames are those whose stack usage cannot be determined
+  statically because it depends on run-time information. Users will be
+  able to define the maximum expected bounds to these variable-size
+  frames.
+\end{requirement}
+
+\begin{rationale}
+  When \ssat{} is not able to statically determine the stack
+  requirements for a certain frame then the safest approach is to
+  allow the user to determine a maximum expected bound.
+\end{rationale}
+
+\begin{requirement}{Support for generics}
+  \ssat{} will extract stack requirements for any instantiation of a
+  generic package.
+\end{requirement}
+
+\begin{rationale}
+  Generic packages are widely used and a very valuable feature of the
+  Ada language.
+\end{rationale}
+
+\begin{requirement}{Support for exceptions}
+  \ssat{} will compute stack requirements for exception handlers and
+  will use these values for generating the different call paths.
+\end{requirement}
+
+\begin{rationale}
+  Potential stack consumption made by exception handlers must always
+  be taken into account for achieving accurate stack analysis. 
+\end{rationale}
+
+\begin{requirement}{Support for interrupts}
+  \ssat{} will compute stack requirements for interrupt handlers
+  (protected procedure handlers).
+\end{requirement}
+
+\begin{rationale}
+  Potential stack consumption made by interrupt handlers must always
+  be taken into account for achieving accurate stack
+  analysis. This information is needed for dimensioning the interrupt
+  stacks (if they use separate stacks) or the different task stacks.
+\end{rationale}
+
+\begin{requirement}{Define manually stack requirements for subprograms}
+  \ssat{} will allow users to specify maximum stack requirements for
+  any individual subprogram. This value will be used for computing
+  global stack requirements.
+\end{requirement}
+
+\begin{rationale}
+  This feature is very useful when we have third party object
+  libraries for which we cannot use \ssat{} for obtaining their stack
+  information.
+\end{rationale}
+
+\begin{requirement}{Modify manually the list of targets for indirect calls}
+  \ssat{} will allow users to modify, for any indirect call, the list of
+  possible subprograms that may be called. This information will be added to
+  the list of target subprograms that is automatically computed by \ssat{}. 
+\end{requirement}
+
+\begin{rationale}
+  The list of possible target subprograms that is automatically
+  computed by \ssat{} is based on static information, and hence it may
+  be very pessimistic. The user will be allowed to restrict the list
+  possible subprograms that may be called from a certain indirect
+  call.
+\end{rationale}
+
+\begin{requirement}{Bound cycles in the call graph}
+  A cycle in the call graph refers to a call sequence that may reach a
+  node already belonging to the call sequence. The user will be able
+  to specify the maximum number of cycle iterations so that the stack
+  analysis tool can generate a safe maximum for the stack usage.
+\end{requirement}
+
+\begin{rationale}
+  In presence of control flow cycles involving stack consumption, the
+  worst-case stack usage is a function of the maximum number of cycle
+  iterations.
+\end{rationale}
+
+\begin{requirement}{Manual exclusion of subprograms from the analysis}
+  Users will be able to define a set of subprograms that will not be
+  analyzed by \ssat{}. 
+\end{requirement}
+
+\begin{rationale}
+  There may be cases that \ssat{} provides very pessimistic results
+  and users may prefer to take advantage of run-time limitations that
+  are not known by \ssat{}.
+\end{rationale}
+
+%----------------------------------------------------------------------
+\section{System interface requirements}\label{sc:interfaces}
+%----------------------------------------------------------------------
+
+\subsection{System level interfaces}\label{sc:system-interfaces}
+
+\begin{requirement}{Development platforms}
+  The \ssat{} will run on any development platform supported by AdaCore.
+\end{requirement}
+
+\begin{rationale}
+  The tool will be tightly tied to the compiler itself.
+\end{rationale}
+
+\begin{requirement}{Integrate with GNAT's Project Manager}
+  GNAT's Project Manager is a facility that allows you to manage
+  complex builds involving a number of source files, directories, and
+  compilation options for different system configurations.  
+ \ssat{} will be usable on projects configured using the GNAT's
+  Project Manager.
+\end{requirement}
+
+\begin{rationale}
+  GNAT's Project Manager is the natural way of handling complex
+  systems when using the GNAT Pro tools.
+\end{rationale}
+
+\begin{requirement}{Textual report}
+  \ssat{} will generate textual files containing per subprogram
+  information (stack requirements and call chain information), as well
+  as call graph information containing global stack usage.
+\end{requirement}
+
+\begin{rationale}
+  Textual are very useful for being parsed by external analysis
+  scripts and for being added to any generated documentation.
+\end{rationale}
+
+\begin{requirement}{Graphic interface}
+  A graphic interface based on current GPS technology will be used on
+  the development platform to access the compilation and the debugging
+  tools.
+\end{requirement}
+
+\begin{rationale}
+  GPS is the graphical IDE supported by AdaCore and it will allow a
+  simple and efficient interaction between the source code and the
+  results of the \ssat{}.
+\end{rationale}
+
+%----------------------------------------------------------------------
+\subsection{System level data interfaces}\label{sc:data-interfaces}
+%----------------------------------------------------------------------
+
+\begin{requirement}{Source files}
+  Ada and C source programs will be represented in standard text files,
+  using Latin-1 coding \refcite{GNATUG}. Each file will contain a single
+  Ada or C compilation unit, including any pragmas associated with the
+  unit.
+  % The default file name  determined by the name of the unit that the
+  % file contains. The name is formed by taking the full expanded name
+  % of the unit and replacing the separating dots with hyphens and using
+  % lowercase for all letters.
+\end{requirement}
+
+\begin{rationale}
+  Latin-1 is an 8-bit code that includes the familiar 7-bit ASCII set,
+  plus additional characters used for representing foreign languages.
+  % The default file extensions will be `.ads' for a spec and `.adb' for
+  % a body. However, arbitrary file names may also be used.
+\end{rationale}
+
+\begin{requirement}{Generated textual report files}
+  \ssat{} will generate standard text files, using Latin-1 coding
+  \refcite{GNATUG}.
+\end{requirement}
+
+\begin{rationale}
+  Latin-1 is an 8-bit code that includes the familiar 7-bit ASCII set,
+  plus additional characters used for representing foreign languages.
+\end{rationale}
+
+\begin{requirement}{Generated graphical output}
+  \ssat{} will generate an annotated call graph containing the
+  different subprograms (nodes), their stack requirements
+  (annotations), and possible call chains (edges).
+  The VCG \refcite{VCG} graph description language, already used in
+  GCC for other graph outputs, will be used for this purpose.
+\end{requirement}
+
+\begin{rationale}
+  This standalone graph will be very useful both for understanding the
+  program and for documentation purposes.
+\end{rationale}
+
+%----------------------------------------------------------------------
+\section{Software configuration management}\label{sc:configuration}
+%----------------------------------------------------------------------
+
+\begin{requirement}{Identification of reference versions}
+  All such reference versions will be identified by a specific, unique
+  identifier.
+\end{requirement}
+
+\begin{rationale}
+  AdaCore implements a configuration management policy (currently
+  based on CVS), and identifies with tags key points in the software
+  development process. Examples of reference versions include all GNAT
+  Pro official releases.
+\end{rationale}
+
+\begin{requirement}{Reconstruction of past states of the software}
+  It will be possible to reconstruct any reference version of the
+  software.
+\end{requirement}
+
+\begin{rationale}
+  Should the need of reconstructing a reference version of the
+  compiler arise, the following procedure would fulfil that need:
+  \begin{itemize}
+    \item Get the tag corresponding to the reference version
+    \item Get the sources corresponding to this tag
+    \item Get the software construction tools corresponding to this
+      tag
+    \item Build the sources using the tools
+  \end{itemize}
+  AdaCore has standard procedures to carry out all these tests and uses
+  them on a day-to-day basis.
+\end{rationale}
+
+\begin{requirement}{Tracking changes between two different states of
+  the software}
+  It will be possible to analyze differences between two different
+  arbitrary versions of the software.
+\end{requirement}
+
+\begin{rationale}
+  AdaCore also has standard procedures for doing so. CVS has a
+  low-level interface that enables comparison between different
+  versions of any file.
+  However this mechanism is limited, because it is difficult to have a
+  global view of all the changes related to a single technical
+  change. For instance, implementing one feature may require changes
+  in many files.
+  To workaround this, AdaCore's company policy is to assign a tracking
+  number to every feature to be included, or bug to be fixed. This
+  tracking number must be included in the CVS revision history of any
+  software change. A set of custom scripts files these revision
+  histories to a per-tracking number, easily-accessible file, that can
+  be consulted when needed. It is therefore possible to see at a
+  glance all the changes related to the corresponding tracking number.
+\end{rationale}
+
+% LocalWords:  AdaCore GNAT's GPS IDE GNATUG pragmas VCG GCC standalone CVS
+% LocalWords:  AdaCore's

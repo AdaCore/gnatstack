@@ -1,0 +1,103 @@
+\chapter{General description}\label{ch:description}
+%----------------------------------------------------------------------
+% This chapter describes the general factors that affect the product
+% and its requirements. The chapter  does not state specific
+% requirements but makes those requirements easier to understand.
+
+%----------------------------------------------------------------------
+\section{Product perspective}
+%----------------------------------------------------------------------
+% This section puts the product into perspective with other related
+% systems. If the product is to replace and existing system, the
+% system should be described and referenced Ancestors of the product
+% that are no longer in use might be mentioned. If the product is 
+% ``stand alone'', it should be stated here.
+
+The \ssat{} product will be based on the following existing free
+software products:
+
+\begin{itemize}
+\item \emph{GNAT Pro}, a commercial Ada compilation system and product
+  support.
+\item \emph{GPS}, the GNAT Programming Studio.
+\item \emph{GCC}, the GNU Compiler Collection.
+\end{itemize}
+
+The resulting product will be part of the GNAT Pro family, which
+includes Ada compilation systems and related tools for a large set of
+host and target platforms.
+
+%----------------------------------------------------------------------
+\section{General Capabilities}
+%----------------------------------------------------------------------
+% This section should describe the main capabilities and why they are
+% needed. This section should describe the process to be supported by
+% the software, indicating those parts of the process where its is used.
+
+The \ssat{} to be developed is a commercially supported product that
+will anticipate the stack space requirements of applications and allow
+safe prevention of overflow conditions.
+
+The Static Stack Analysis Tool will analyze the application stack
+space consumption patterns and compute worst-case bounds prior to
+execution time. It will be done by performing local stack consumption
+analysis combined with control-flow graph traversals.
+
+%----------------------------------------------------------------------
+\section{General Constraints}
+%----------------------------------------------------------------------
+% This section should describe any item that will limit the developer's
+% options for building the software.  This section should not be used to
+% impose specific requirements or specific design constraints, but
+% should state the reasons why certain requirements or constraints exist.
+
+The tool will use the compiler for extracting per-function stack usage
+and per-unit call graph information. In addition, stack requirements
+may vary among different compiler versions and depending on the
+compilation options used. Hence, \ssat{} will only be able to
+analyse stack consumption on units that can be compiled (it excludes
+third-party libraries not providing the required information), and the
+results will only be valid for the final application compiled with the
+same compiler (and the same compilation options used when computing
+stack requirements).
+
+%----------------------------------------------------------------------
+\section{User characteristics}
+%----------------------------------------------------------------------
+% This section should describe those general characteristics of the
+% users affecting the specific requirements.  Many people may interact
+% with the software during the operations and maintenance phase.  Some
+% of these people are users, operators and maintenance
+% personnel. Certain characteristics of these people, such as
+% educational level, language, experience and technical expertise impose
+% important constraints on the software.  Software may be frequently
+% used, but individuals may use it only occasionally. Frequent users
+% will become experts whereas infrequent users may remain relative
+% novices. It is important to classify the users and estimate the likely
+% numbers in each category.
+
+The expected users of the \ssat{} are software engineers working on Ada
+and/or C projects. The users should have working knowledge of the
+English language and technical expertise in software development in
+Ada and/or C.
+
+%----------------------------------------------------------------------
+\section{Operational environment}
+%----------------------------------------------------------------------
+% This section should describe the real world the software is to operate
+% in. Context diagrams may support this narrative description, to
+% summarise external interfaces and system block diagrams, to show how
+% the activity fits within the larger system. The nature of the
+% exchanges with external systems should be specified.  If a System
+% Specification defines a product that is a component of a parent system
+% or project, then this section should outline the activities that will
+% be supported by external systems References to the Interface Control
+% Documents that define the external interfaces with the other systems
+% will be provided. The computer infrastructure to be used will be also
+% described.
+
+The \ssat{} will operate on any system on which the \emph{GNAT Pro}
+compiler is supported, including both native and cross compilers. The
+particular versions of the operating systems on which the software is
+to be validated will be defined within software requirements analysis
+process.
