@@ -102,6 +102,9 @@ package body Parser is
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
 
+   procedure Get_Stack_Usage_Files (From_File : String);
+   --  Get the list of .ci files that are listed in the specified text file
+
    procedure Print_Usage_And_Exit;
    pragma Inline (Print_Usage_And_Exit);
    --  Print how to use the tool and exit
@@ -366,6 +369,28 @@ package body Parser is
                  and then Left.all = Right.all);
    end Equal;
 
+   ---------------------------
+   -- Get_Stack_Usage_Files --
+   ---------------------------
+
+   procedure Get_Stack_Usage_Files (From_File : String) is
+      Descriptor : Ada.Text_IO.File_Type;
+      File_Name  : GNAT.Strings.String_Access;
+
+   begin
+      Ada.Text_IO.Open (Descriptor, Ada.Text_IO.In_File, From_File);
+
+      --  Parse information line by line
+
+      while not Ada.Text_IO.End_Of_File (Descriptor) loop
+         File_Name := new String'(Ada.Text_IO.Get_Line (Descriptor));
+         List_Of_Files.Append (Input_Files, File_Name);
+      end loop;
+
+      Ada.Text_IO.Close (Descriptor);
+
+   end Get_Stack_Usage_Files;
+
    -------------------------------------
    -- Is_Stack_Usage_Information_File --
    -------------------------------------
@@ -391,7 +416,7 @@ package body Parser is
       loop
          case
            GNAT.Command_Line.Getopt
-             ("h g v l: ca W! o= a u: d: p e: r: f: aO:")
+             ("h g v l: ca W! o= a u: d: p e: r: f: aO: files=")
          is
             when ASCII.NUL =>
                exit;
@@ -463,11 +488,12 @@ package body Parser is
                   end if;
                end;
 
-            --  Consider all subprograms as potential entry points
             when 'a' =>
+               --  Consider all subprograms as potential entry points
                if GNAT.Command_Line.Full_Switch = "a" then
                   Options.Explore_All := True;
 
+               --  Directory containing the .ci files
                elsif GNAT.Command_Line.Full_Switch = "aO" then
                   declare
                      Directory : constant String :=
@@ -503,11 +529,17 @@ package body Parser is
                Options.Entry_Point_Pattern :=
                  new String'(GNAT.Command_Line.Parameter);
 
-            --  Output graph file
             when 'f' =>
-               Free (Options.Output_VCG);
-               Options.Output_VCG :=
-                 new String'(GNAT.Command_Line.Parameter);
+               --  Output graph file
+               if GNAT.Command_Line.Full_Switch = "f" then
+                  Free (Options.Output_VCG);
+                  Options.Output_VCG :=
+                    new String'(GNAT.Command_Line.Parameter);
+
+               --  File containing a list of .ci files
+               elsif GNAT.Command_Line.Full_Switch = "files" then
+                  Get_Stack_Usage_Files (GNAT.Command_Line.Parameter);
+               end if;
 
             when others =>
                Print_Usage_And_Exit;
@@ -1218,7 +1250,7 @@ package body Parser is
    procedure Usage is
       use Ada.Text_IO;
    begin
-      Put_Line ("Usage: ssat [args ...] [<.ci files>]");
+      Put_Line ("Usage: gnatstack [args ...] [<.ci files>]");
       New_Line;
       Put_Line ("where possible arguments are:");
       New_Line;
@@ -1259,6 +1291,8 @@ package body Parser is
       Put_Line ("  -f file      output graph file");
       New_Line;
       Put_Line ("  -aO dir      search for .ci files in dir");
+      New_Line;
+      Put_Line ("  -files=file  file containing the list of .ci files");
       New_Line;
       Put_Line ("  <files>      list of .ci files (c1.ci c2.ci ...)");
       New_Line;
