@@ -65,6 +65,7 @@ with GNAT.Strings;
 
 with GNAT.OS_Lib;
 --  Used for OS_Exit
+--           Is_Regular_File
 
 with Ada.Unchecked_Deallocation;
 
@@ -384,7 +385,10 @@ package body Parser is
 
       while not Ada.Text_IO.End_Of_File (Descriptor) loop
          File_Name := new String'(Ada.Text_IO.Get_Line (Descriptor));
-         List_Of_Files.Append (Input_Files, File_Name);
+
+         if Is_Stack_Usage_Information_File (File_Name.all) then
+            List_Of_Files.Append (Input_Files, File_Name);
+         end if;
       end loop;
 
       Ada.Text_IO.Close (Descriptor);
