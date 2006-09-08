@@ -557,11 +557,13 @@ package body Parser is
             Input_File_Name : constant GNAT.Strings.String_Access :=
               new String'(GNAT.Command_Line.Get_Argument (True));
          begin
-            exit when Input_File_Name'Length = 0
-              or else not Is_Stack_Usage_Information_File
-                (Input_File_Name.all);
+            exit when Input_File_Name'Length = 0;
 
-            List_Of_Files.Append (Input_Files, Input_File_Name);
+            --  Skip the file if it does not exist
+
+            if Is_Stack_Usage_Information_File (Input_File_Name.all) then
+               List_Of_Files.Append (Input_Files, Input_File_Name);
+            end if;
          end;
       end loop;
 
