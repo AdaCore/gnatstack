@@ -1,0 +1,103 @@
+#!/bin/sh
+
+. ./install.common
+prefix=`get_gnat_dir`
+machine=`$prefix/bin/gcc -dumpmachine`
+gnatstack="gnatstack"
+
+clear
+cat << EOF
+
+
+  This script is provided to simplify the installation of the $machine
+  binary distribution of the $gnatstack static analysis tool. This
+  includes the $gnatstack binary as well as the corresponding documentation
+  and examples.
+
+  For more information about the commercial support of $gnatstack, please
+  contact sales@adacore.com.
+
+  This script will ask a few questions regarding the $gnatstack installation.
+
+  Running this configuration script will not modify anything anywhere
+  else in your system.  You can break out of it or run it multiple times
+  before doing the actual installation.
+
+  Hit RETURN to continue.
+EOF
+
+read x
+
+# --------------------- Select installation option --------------------
+clear
+cat << EOF
+
+
+  There are 2 options for installation:
+
+  1) Install $gnatstack in the standard GNAT Pro location.
+
+  2) Install $gnatstack in non-standard locations that you will
+     specify.
+
+  Option 1 provides simplest use of $gnatstack.
+
+EOF
+
+while [ true ]; do
+  echo Type 1, or 2 "(then RETURN)" to choose an option:
+  read answer
+  case $answer in
+
+  # ------------------ Custom  installation ---------------------------
+  2)
+    clear
+    cat << EOF
+
+
+    To install the documentation is a non-standard location you need to
+    specify a base directory.  All the files will be installed in
+    subdirectories that are created under this directory.
+
+    Important Note: You should not use ~ or ~username wildcards
+    when specifying this directory name.
+                                                                                
+    Specify the base directory you want to use for installation:
+
+EOF
+    read basedir
+    while [ true ]; do 
+      if [ "X" = "X`echo $basedir|sed -n -e 's%^/.*%/%p'`" ]; then
+	basedir=`pwd`/$basedir
+      fi
+      echo "    " The base directory is $basedir
+      echo "    " To accept this choice enter RETURN.
+      echo "    " Otherwise type a new name.
+      read answer
+      if [ "X$answer" = "X" ]; then
+	break
+      fi
+      basedir = $answer
+    done
+    clear
+    installdir=$basedir/share/doc/gnat
+    break
+    ;;
+
+  # ------------------ Regular installation ---------------------------
+  1)
+    installdir=$prefix
+    break
+    ;;
+ esac
+done
+
+# --------------------- Actual Installation of Gnatstack --------------
+tar cf - bin share | (cd $installdir && tar xf -)
+
+# --------------------------- End of the script -----------------------
+clear
+echo " "
+echo "$gnatstack has have been installed in $installdir"
+echo "Thank you for using $gnatstack !"
+echo " "
