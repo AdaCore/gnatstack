@@ -67,6 +67,9 @@ with GNAT.Strings;
 with GNAT.Regpat;
 --  Used for Match
 
+with Demangle;
+--  Used for Ada_Decode
+
 package body Display is
 
    use type Static_Stack_Analysis.List_Of_Locations.Set;
@@ -575,58 +578,22 @@ package body Display is
       Name : constant Static_Stack_Analysis.Subprogram_Name :=
         Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
 
-      Location_List : constant Static_Stack_Analysis.List_Of_Locations.Set :=
-        Static_Stack_Analysis.Get_Location_List (Node.all);
+      Matches : GNAT.Regpat.Match_Array (0 .. 1);
 
-      Location_Index : Static_Stack_Analysis.List_Of_Locations.Cursor :=
-        Location_List.First;
-
-      Location : Static_Stack_Analysis.Location :=
-        Static_Stack_Analysis.Null_Location;
-
-      Found : Boolean := False;
+      use type GNAT.Regpat.Match_Location;
 
    begin
-      --  Print demangled names if possible
+      --  Print the symbol name (demangled), removing path information
 
-      while
-        Static_Stack_Analysis.List_Of_Locations.Has_Element (Location_Index)
-      loop
-         Location :=
-           Static_Stack_Analysis.List_Of_Locations.Element (Location_Index);
+      GNAT.Regpat.Match ("(:)", Name.all, Matches);
 
-         if Location.Demangled /= null then
-            if Found then
-               --  Separator between demangled names
+      if Matches (0) /= GNAT.Regpat.No_Match then
+         Ada.Text_IO.Put
+           (Demangle.Ada_Decode
+              (Name.all (Matches (1).Last + 1 .. Name.all'Last)));
 
-               Ada.Text_IO.Put (",");
-            end if;
-
-            Ada.Text_IO.Put (Location.Demangled.all);
-            Found := True;
-         end if;
-
-         Static_Stack_Analysis.List_Of_Locations.Next (Location_Index);
-      end loop;
-
-      if not Found then
-         --  Print the symbol name, removing path information
-         declare
-            Matches : GNAT.Regpat.Match_Array (0 .. 3);
-
-            use type GNAT.Regpat.Match_Location;
-
-         begin
-            GNAT.Regpat.Match ("^(.+)??(:)??(.+)$", Name.all, Matches);
-
-            if Matches (0) /= GNAT.Regpat.No_Match then
-               Ada.Text_IO.Put
-                 (Name.all (Matches (3).First .. Matches (3).Last));
-
-            else
-               Ada.Text_IO.Put (Name.all);
-            end if;
-         end;
+      else
+         Ada.Text_IO.Put (Demangle.Ada_Decode (Name.all));
       end if;
    end Print_Ada_Name;
 
