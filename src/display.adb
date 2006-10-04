@@ -436,6 +436,9 @@ package body Display is
    ----------------
 
    procedure Print_Name (Node : Static_Stack_Analysis.Node_Class_Access) is
+      Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
+        Static_Stack_Analysis.Get_Location_List (Node.all);
+
    begin
       --  Print subprogram name
 
@@ -449,13 +452,12 @@ package body Display is
             ") ");
       end if;
 
-      if Options.Verbose then
+      if Options.Verbose and then not Locations.Is_Empty then
          --  Location list
          Ada.Text_IO.Put (" at ");
 
          Static_Stack_Analysis.List_Of_Locations.Iterate
-           (Static_Stack_Analysis.Get_Location_List (Node.all),
-            Expand_Location'Access);
+           (Locations, Expand_Location'Access);
       end if;
    end Print_Name;
 
@@ -1064,8 +1066,11 @@ package body Display is
       if Node.Analysis_Finished
         and then Node.all in Static_Stack_Analysis.Unresolved_Node'Class
       then
-         Ada.Text_IO.Put_Line
-           ("  " & Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+         Ada.Text_IO.Put ("  ");
+
+         Print_Name (Node);
+
+         Ada.Text_IO.New_Line;
       end if;
    end Print_External;
 
