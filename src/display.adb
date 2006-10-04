@@ -437,23 +437,25 @@ package body Display is
 
    procedure Print_Name (Node : Static_Stack_Analysis.Node_Class_Access) is
    begin
-      if Options.Verbose then
-         --  Symbol name
+      --  Print subprogram name
 
+      Print_Ada_Name (Node);
+
+      --  Print symbol name in debug mode
+      if Options.Debug then
          Ada.Text_IO.Put
-           (Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all);
+           (" (" &
+            Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all &
+            ") ");
+      end if;
 
+      if Options.Verbose then
          --  Location list
          Ada.Text_IO.Put (" at ");
 
          Static_Stack_Analysis.List_Of_Locations.Iterate
            (Static_Stack_Analysis.Get_Location_List (Node.all),
             Expand_Location'Access);
-
-      else
-         --  Print subprogram name
-
-         Print_Ada_Name (Node);
       end if;
    end Print_Name;
 
