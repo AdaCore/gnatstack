@@ -1,0 +1,14 @@
+with "prj1/prj1.gpr";
+
+project Prj is
+   for Main use ("main_unit.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-fcallgraph-info=su");
+   end Compiler;
+
+   package Stack is
+      for Switches use ("-Wa", "-p");
+   end Stack;
+end Prj;
+

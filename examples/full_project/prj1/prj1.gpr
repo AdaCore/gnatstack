@@ -1,0 +1,6 @@
+project Prj1 is
+   package Compiler is
+      for Default_Switches ("Ada") use ("-fcallgraph-info=su");
+   end Compiler;
+end Prj1;
+
