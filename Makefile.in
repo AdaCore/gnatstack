@@ -1,0 +1,42 @@
+prefix=@prefix@
+EXEEXT=@EXEEXT@
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL} -s
+INSTALL_SCRIPT = ${INSTALL}
+INSTALL_DATA = ${INSTALL} -m 644
+
+MAYBE_DOC=@maybe_doc@
+
+bin/gnatstack$(EXEEXT):
+	gnatmake -Pssat.gpr
+
+all: bin/gnatstack$(EXEEXT) $(MAYBE_DOC)
+
+doc: docs/ug/gnatstack_ug.html docs/ug/gnatstack_ug.pdf
+
+docs/ug/gnatstack_ug.html: docs/ug/gnatstack_ug.texi
+	(cd docs/ug && texi2html  gnatstack_ug.texi)
+docs/ug/gnatstack_ug.pdf: docs/ug/gnatstack_ug.texi
+	(cd docs/ug && texi2pdf gnatstack_ug.texi)
+
+install: all
+	echo $(EXEXT)
+	if [ ! -d $(prefix) ]; then mkdir $(prefix); fi
+	if [ ! -d $(prefix)/bin ]; then mkdir $(prefix)/bin; fi
+	$(INSTALL_PROGRAM) bin/gnatstack$(EXEEXT) $(prefix)/bin
+	if [ -d $(prefix)/share/examples/gnatstack ]; then \
+	   rm -rf $(prefix)/share/examples/gnatstack; \
+	fi
+	mkdir -p $(prefix)/share/examples/gnatstack
+	cp -r examples/* $(prefix)/share/examples/gnatstack
+	if [ ! -d $(prefix)/share/doc/gnatstack ]; then \
+           mkdir -p $(prefix)/share/doc/gnatstack; \
+        fi
+	if [ -f docs/ug/gnatstack_ug.html ]; then \
+  	   $(INSTALL_DATA) docs/ug/gnatstack_ug.html $(prefix)/share/doc/gnatstack; \
+	fi
+	if [ -f docs/ug/gnatstack_ug.pdf ]; then \
+	   $(INSTALL_DATA) docs/ug/gnatstack_ug.pdf $(prefix)/share/doc/gnatstack; \
+	fi
+
+
