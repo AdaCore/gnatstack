@@ -1,6 +1,16 @@
 #!/bin/sh
 
-. ./install.common
+get_gnat_dir () {
+   ggd_prefix=$1
+   if [ "x$ggd_prefix" = "x" ]; then
+      ggd_prog="gnatmake"
+   else
+      ggd_prog="$ggd_prefix-gnatmake"
+   fi
+   echo `type $ggd_prog | cut -d' ' -f3 | sed 's%/bin.*$%%'`
+
+}
+
 prefix=`get_gnat_dir`
 machine=`$prefix/bin/gcc -dumpmachine`
 gnatstack="gnatstack"
@@ -55,7 +65,7 @@ while [ true ]; do
     cat << EOF
 
 
-    To install the documentation is a non-standard location you need to
+    To install $gnatstack in a non-standard location you need to
     specify a base directory.  All the files will be installed in
     subdirectories that are created under this directory.
 
@@ -80,7 +90,7 @@ EOF
       basedir = $answer
     done
     clear
-    installdir=$basedir/share/doc/gnat
+    installdir=$basedir
     break
     ;;
 
