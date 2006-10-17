@@ -103,6 +103,11 @@ EOF
 done
 
 # --------------------- Actual Installation of Gnatstack --------------
+
+if [ ! -d $installdir ]; then
+    mkdir -p $installdir
+fi
+
 tar cf - bin share | (cd $installdir && tar xf -)
 
 # --------------------------- End of the script -----------------------
