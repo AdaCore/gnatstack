@@ -41,6 +41,9 @@ with Options;
 --           Order
 --           Display_Call_Chains
 
+with Version;
+--  Used for Version_String;
+
 with Ada.Containers.Vectors;
 with Ada.Directories;
 
@@ -429,6 +432,11 @@ package body Parser is
             when 'v' =>
                Options.Verbose := True;
 
+               Ada.Text_IO.Put      ("GNATstack Pro ");
+               Ada.Text_IO.Put_Line (Version.Version_String);
+               Ada.Text_IO.Put_Line ("Copyright 2005-2006, AdaCore");
+               Ada.Text_IO.New_Line;
+
             --  Debug
             when 'g' =>
                Options.Debug := True;
@@ -563,6 +571,9 @@ package body Parser is
 
             if Is_Stack_Usage_Information_File (Input_File_Name.all) then
                List_Of_Files.Append (Input_Files, Input_File_Name);
+            else
+               Ada.Text_IO.Put_Line
+                 ("File """ & Input_File_Name.all & """ not found");
             end if;
          end;
       end loop;
