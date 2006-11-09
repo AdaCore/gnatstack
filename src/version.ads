@@ -20,6 +20,6 @@
 ------------------------------------------------------------------------------
 
 package Version is
-   Version_String : constant String := "GNATSTACK_VERSION";
+   Version_String : constant String := "1.0.0";
    --  Static string identifying this version
 end Version;
