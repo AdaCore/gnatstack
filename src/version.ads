@@ -20,6 +20,6 @@
 ------------------------------------------------------------------------------
 
 package Version is
-   Version_String : constant String := "1.0.0";
+   Version_String : constant String := "1.0.1w";
    --  Static string identifying this version
 end Version;
