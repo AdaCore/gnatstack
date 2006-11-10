@@ -1,6 +1,6 @@
 all:
-	$(PREFIX)gnatmake -P prj
-	gnat stack -P prj -U
+	$(PREFIX)gnatmake $(RUNTIME) -P prj
+	$(PREFIX)gnat stack -P prj -U
 
 clean:
 	$(PREFIX)gnatclean -r -P prj

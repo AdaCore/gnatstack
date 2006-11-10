@@ -1,15 +1,16 @@
-with Ada.Calendar;
+with Aux;
+--  Aux is compiled without stack usage information
 
 procedure P is
+   Set_Alignment : access procedure (Minimum : Integer) :=
+     Aux.Set_Alignment'Access;
+   --  Indirect call
 
    procedure R;
 
    procedure Q is
-      Size : Integer := Ada.Calendar.Year (Ada.Calendar.Clock);
-
-      Data : array (1 .. Size) of Integer;
+      Data : array (1 .. Aux.Get_Size (10)) of Character;
       --  Dynamically sized local objects
-
    begin
       R;
    end Q;
@@ -19,5 +20,9 @@ procedure P is
       Q;
    end R;
 begin
+   --  Set minimum alignment (via indirect call)
+   Set_Alignment.all (Integer'Alignment);
+
+   --  Recursion: Q -> R -> Q
    Q;
 end P;
