@@ -30,7 +30,7 @@
 
 @set gnatstack GNATstack
 
-@set gnatstack_version 1.0.0
+@set gnatstack_version 1.0.1w
 
 @settitle @value{gnatstack} User's Guide
 @setchapternewpage odd
@@ -125,6 +125,11 @@ to execution time.
 supported, including both native and cross compilers. It requires GNAT
 5.04a or later.
 
+Support in the Project Manager for @value{gnatstack} (see @ref{Use of
+Project Files}) was finished on September 8th 2006, so only compiler
+wavefronts issued subsequent to the date above, as well as future
+releases, incorporate this capability.
+
 @c *********************************
 @node The GNATstack Tool
 @chapter The GNATstack Tool
@@ -208,7 +213,7 @@ format.
 @cindex @code{-fcallgraph-info=su}
 
 @smallexample
-$ gnatmake main_unit -cargs -fcallgraph-info=su
+$ gnatmake main_unit.adb -cargs -fcallgraph-info=su
 @end smallexample
 
 @noindent
@@ -223,7 +228,7 @@ look for the longest paths in terms of stack usage.
 $ gnatstack *.ci
 Accumulated stack usage information for entry points
 
-main : total 384 bytes
+main : total 376 bytes
 @end smallexample
 
 @noindent
@@ -631,11 +636,9 @@ project file:
 $ gnat make -P prj.gpr
 [...]
 $ gnat stack -P prj.gpr
-Worst case analysis is *not* accurate ; use -W options for details
-
 Accumulated stack usage information for entry points
 
-main : total 192 bytes
+main : total 376 bytes
  +-> main
  +-> main_unit
  +-> main_unit.inverse
@@ -647,83 +650,63 @@ application. The @command{gnat} driver computes automatically this
 list. In addition, the main entry point has also been automatically
 detected by @command{gnatstack}.
 
-The execution of the tool shows two basic things. First it tells that
-the longest path (in terms of stack consumption) is that made up by
-@code{main} (the program entry point) -> @code{main_unit} (the main
-Ada program) -> @code{main_unit.inverse}. The maximum stack
-consumption following this path is 192 bytes, and this bound can be
-trusted. The second important thing is that the worst case analysis is
-not accurate. As indicated in the warning message, we can check which
-is the origin of this inaccuracy using the @option{^-W^/WARNINGS=^}
-option. If we proceed as suggested:
+The execution of the tool tells that the longest path (in terms of
+stack consumption) is that made up by @code{main} (the program entry
+point) -> @code{main_unit} (the main Ada program) ->
+@code{main_unit.inverse}. The maximum stack
+consumption following this path is 376 bytes, and this bound can be
+trusted.
 
-@smallexample
-$ gnat stack -P prj.gpr -Wa
-Worst case analysis is *not* accurate ; use -W options for details
-
-List of external subprograms:
-
-  __gnat_break_start
-  __gnat_finalize
-  __gnat_initialize
-  __gnat_install_handler
-  memset
-  system.exception_table._elabb
-  system.secondary_stack._elabb
-  system.soft_links._elabb
-  system.standard_library.adafinal
-
-Accumulated stack usage information for entry points
-
-main : total 192 bytes
- +-> main
- +-> main_unit
- +-> main_unit.inverse
-@end smallexample
-
-@noindent
-We can see tha the result is not accurate because there are symbols
-(invoked during the initialization phase) for which there is no stack
-usage information.
-
-Additional information can be extracted increasing the verbosity
-level. Adding the @option{^-v^/VERBOSE^} option will also print
-detailed information about the location of the different subprograms
-and per-subprogram stack requirements:
-
-@smallexample
-$ gnat stack -v -P prj.gpr
-Worst case analysis is *not* accurate ; use -W options for details
-
-Accumulated stack usage information for entry points
-
-main : total 192 bytes
- +-> main at main:b~main_unit.ads:33:13 : 48 bytes
- +-> main_unit at ada_main_program:b~main_unit.adb:125:17,
-     Main_Unit:main_unit.adb:1:11 : 64 bytes
- +-> main_unit.inverse at Inverse:main_unit.adb:4:13 : 80 bytes
-@end smallexample
-
-@noindent
 Focussing on the capability of detecting problems related to the
 computation of stack requirements we can use the following example:
 
 @smallexample @c ada
 @group
-with Ada.Calendar;
+package Aux is
+   procedure Set_Alignment (Minimum : Integer);
+   function Get_Size (Value : Integer) return Integer;
+end Aux;
+
+package body Aux is
+   Threshold : Integer;
+
+   procedure Set_Alignment (Minimum : Integer) is
+   begin
+      Threshold := Minimum;
+   end Set_Alignment;
+
+   function Get_Size (Value : Integer) return Integer is
+   begin
+      return (((Value - 1) / Threshold) + 1) * Threshold;
+   end Get_Size;
+end Aux;
+
+with Aux;
+--  Aux is compiled without stack usage information
 
 procedure P is
+   Set_Alignment : access procedure (Minimum : Integer) :=
+     Aux.Set_Alignment'Access;
+   --  Indirect call
+
+   procedure R;
 
    procedure Q is
-      Size : Integer := Ada.Calendar.Year (Ada.Calendar.Clock);
-
-      Data : array (1 .. Size) of Integer;
+      Data : array (1 .. Aux.Get_Size (10)) of Character;
       --  Dynamically sized local objects
-
    begin
-      P;
+      R;
    end Q;
+
+   procedure R is
+   begin
+      Q;
+   end R;
 begin
+   --  Set minimum alignment (via indirect call)
+   Set_Alignment.all (Integer'Alignment);
+
+   --  Recursion: Q -> R -> Q
    Q;
 end P;
 @end group
@@ -733,73 +716,74 @@ end P;
 To compile and analyze this program we do:
 
 @smallexample
-$ gnatmake p -cargs -fcallgraph-info=su
+$ gcc -c aux.adb
+$ gnatmake p.adb -cargs -fcallgraph-info=su
 [...]
 $ gnatstack *.ci
 Worst case analysis is *not* accurate ; use -W options for details
 
 Accumulated stack usage information for entry points
 
-main : total 128 bytes *
+main : total 472 bytes *
 @end smallexample
 
 @noindent
-The result of the analysis is not accurate, and we can add different
-options to better understand what is happening. For example, we can
-request the path, warnings, and verbose information doing:
+The result of the analysis is not accurate. As indicated in the warning
+message, we can check which is the origin of this inaccuracy using the
+@option{-W} option. Additional information can be extracted increasing
+the verbosity level. Adding the @option{-v} option will also print
+detailed information about the location of the different subprograms
+and per-subprogram stack requirements:
 
 @smallexample
-$ gnatstack -p -Wa -v *.ci
+$ gnatstack -Wa -v -p *.ci
 Worst case analysis is *not* accurate ; use -W options for details
 
 List of cycles:
 
 <c0> p.q
- +-> p.q at Q:p.adb:7:14 : 48 bytes (unbounded,cycle) (<c0>)
- +-> p.r at R:p.adb:5:14 : 16 bytes (cycle) (<c0>)
- +-> p.q at Q:p.adb:7:14 : 48 bytes (unbounded,cycle) (<c0>)
+ +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
+ +-> p.r at R:p.adb:9:14 : 104 bytes (cycle) (<c0>)
+ +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
 
 
 List of subprograms with dynamic unbounded frames:
 
-  p.q at Q:p.adb:7:14
+  p.q at Q:p.adb:11:14
 
 List of external subprograms:
 
-  __gnat_break_start at break_start:b~p.ads:30:14
-  __gnat_finalize at finalize:b~p.adb:126:17
-  __gnat_initialize
-  __gnat_install_handler at install_handler:b~p.adb:51:17
-  ada.calendar._elabb at e42b:b~p.adb:108:19
-  ada.calendar._elabs at e40b:b~p.adb:107:19
-  ada.calendar.clock
-  ada.calendar.year
-  memset
-  system.exception_table._elabb at e38b:b~p.adb:105:29
-  system.secondary_stack._elabb at e36b:b~p.adb:103:29
-  system.soft_links._elabb at e34b:b~p.adb:101:24
-  system.standard_library.adafinal
+  aux.get_size
+
+List of indirect (including dispatching) calls:
+
+  1 indirect calls in: p at P:p.adb:4:11
 
 Accumulated stack usage information for entry points
 
-main : total 128 bytes (unbounded,cycle) *
- +-> main at main:b~p.ads:33:13 : 48 bytes
- +-> p at ada_main_program:b~p.adb:129:17,P:p.adb:3:11 : 16 bytes
- +-> p.q at Q:p.adb:7:14 : 48 bytes (unbounded,cycle) (<c0>)
- +-> p.r at R:p.adb:5:14 : 16 bytes (cycle) (<c0>)
+main : total 472 bytes (unbounded,cycle) *
+ +-> main at main:b~p.ads:24:14 : 112 bytes
+ +-> p at P:p.adb:4:11 : 112 bytes
+ +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
+ +-> p.r at R:p.adb:9:14 : 104 bytes (cycle) (<c0>)
 @end smallexample
 
 @noindent
+We can see tha the result is not accurate because there is recursion,
+dynamic frames are symbols for which there is no stack
+usage information.
+
 @value{gnatstack} has detected one cycle in the call graph (@code{Q}
 calling @code{R} which in turn calls @code{Q}). The cycle has been
 tagged as @code{<c0>} for later references. The following section of the
-report indicates that the use of a dynamically sized local object (its
-size depends on an input argument) derives into a dynamic unbounded
-frame. We then have the list of subprograms for which there is no
-stack usage information.
+report indicates that the use of a dynamically sized local object
+derives into a dynamic unbounded frame. We then have the list of
+subprograms for which there is no stack usage information (package
+@codee{Aux} has been compiled without the required flags). Finally,
+there is a list of locations where there is an indirect call.
 
 Looking at the information about entry points we can see that the
-computed stack requirements for the @code{main} entry point is 128
+computed stack requirements for the @code{main} entry point is 472
 bytes. However, this result is not accurate (as indicated by the mark
 @code{*}), and we see that the two problems that have been found is
 the existence of cycles and unbounded frames.

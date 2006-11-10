@@ -1,0 +1,86 @@
+                G N A T S T A C K  E X A M P L E S
+                ==================================
+
+This directory contains various examples that demonstrate how to use GNATstack.
+Each subdirectory contains a small example illustrating a particular point of
+the technology.
+
+In this README file, the '$' sign denotes the system prompt.
+
+Important notice: if you are on a multiuser machine and get the present example
+directory from a shared gnat installation, you may not be able to compile
+directly in this directory.
+In this situation, you will need to copy this directory
+to another directory where you have the write permission. For instance,
+on many Unix sustems, you will do:
+
+  $ cp -r <prefix>/examples <another directory>
+
+You can compile and run all the examples by simply running:
+
+  $ make
+
+If you are on a  Windows system and use the Cygwin environment, in order to
+use  the Makefiles from the cygwin shell you need to type:
+
+  $ make CYGWIN=true
+
+If you are using a cross compiler you need to type:
+
+  $ make TARGET=<target name>
+
+where target is the prefix of your GNAT commands. For instance, if you are
+using a cross compiler for PowerPC with VxWorks you need to type:
+
+  $ make TARGET=powerpc-wrs-vxworks
+
+If you want to change the default location of the run-time library you need to
+type:
+
+  $ make RTS=<rts>
+
+where rts is eather a path (relative or absolute) to the run-time library or
+the name of a GNAT predefined run time (such as zfp for the Zero FootPrint run
+time).
+
+You can also compile and run the examples located in a given directory by
+typing:
+
+  $ make <directory>
+
+in this directory, or by doing:
+
+  $ cd <directory>
+  $ make
+
+You can also type
+
+  $ make clean
+
+anywhere to remove the files produced at compilation time.
+
+Here's a list of the various subdirectories:
+
+simple:
+
+    This directory contains a very simple example that shows how to compile and
+    analyze the stack requirements of an application.
+
+simple_project:
+
+    This directory is an introduction to the use of the GNAT Project Manager
+    with GNATstack.
+
+full_project:
+
+    This directory is a follow-up to the previous one. It demonstrates how to
+    use some advanced features of the GNAT Project Manager, such as project
+    hierarchies.
+
+problem_detection:
+
+    This directory shows some useful GNATstack options to perform additional
+    analysis, such as detection of indirect calls, recursion, missing stack
+    information, and dynamic frames.
+
+           Thank you for using GNATstack, and happy training !

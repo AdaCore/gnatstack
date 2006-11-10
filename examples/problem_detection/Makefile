@@ -1,6 +1,7 @@
 all:
-	$(PREFIX)gnatmake p -cargs -fcallgraph-info=su
-	gnatstack -p -Wa -v *.ci
+	$(PREFIX)gcc -c -gnatp $(RUNTIME) aux.adb
+	$(PREFIX)gnatmake -gnatp -gnat05 $(RUNTIME) p -cargs -fcallgraph-info=su
+	$(PREFIX)gnatstack -p -Wa -v *.ci
 
 clean:
 	rm -f *.o *.ali b~* *.ci p$(EXE) undefined.ciu graph.vcg
