@@ -779,7 +779,7 @@ tagged as @code{<c0>} for later references. The following section of the
 report indicates that the use of a dynamically sized local object
 derives into a dynamic unbounded frame. We then have the list of
 subprograms for which there is no stack usage information (package
-@codee{Aux} has been compiled without the required flags). Finally,
+@code{Aux} has been compiled without the required flags). Finally,
 there is a list of locations where there is an indirect call.
 
 Looking at the information about entry points we can see that the
