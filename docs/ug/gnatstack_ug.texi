@@ -60,7 +60,7 @@ this manual provided the copyright notice and this permission notice
 are preserved on all copies.
 @end titlepage
 
-@ifinfo
+@ifnottex
 @c ******************* N O D E *******************
 @node Top, About This Guide, (dir), (dir)
 @top @value{gnatstack} User's Guide
@@ -69,7 +69,14 @@ are preserved on all copies.
 @value{gnatstack} User's Guide
 
 @noindent
-@copyright{} Copyright 2006, AdaCore
+The Static Stack Analysis Tool
+
+@noindent
+@value{gnatstack} Version @value{gnatstack_version}
+
+@noindent
+AdaCore@*
+Copyright @copyright{} 2006, AdaCore
 
 @noindent
 Permission is granted to make and distribute verbatim copies of
@@ -104,7 +111,7 @@ Examples
 
 Index
 @end menu
-@end ifinfo
+@end ifnottex
 
 @c *********************************
 @node About This Guide
@@ -123,7 +130,7 @@ to execution time.
 @noindent
 @value{gnatstack} operates on any system on which the GNAT compiler is
 supported, including both native and cross compilers. It requires GNAT
-5.04a or later.
+Pro 5.04a or later.
 
 Support in the Project Manager for @value{gnatstack} (see @ref{Use of
 Project Files}) was finished on September 8th 2006, so only compiler
