@@ -1270,49 +1270,33 @@ package body Parser is
       Put_Line ("Usage: gnatstack [args ...] [<.ci files>]");
       New_Line;
       Put_Line ("where possible arguments are:");
-      New_Line;
       Put_Line ("  -h           display help message");
-      New_Line;
       Put_Line ("  -g           debug information");
-      New_Line;
       Put_Line ("  -v           verbose");
-      New_Line;
       Put_Line ("  -l n         print the n subprograms requiring the " &
                                "biggest local stack usage");
-      New_Line;
       Put_Line ("  -ca          extract all cycles");
-      New_Line;
       Put_Line ("  -Wxx         enable warnings, xx = list of parameters:");
       Put_Line ("    a          turn on all optional warnings");
       Put_Line ("    c          turn on warnings for cycles");
       Put_Line ("    u          turn on warnings for unbounded frames");
       Put_Line ("    e          turn on warnings for external calls");
       Put_Line ("    i          turn on warnings for indirect calls");
-      New_Line;
       Put_Line ("  -o={a,s}     order for displaying call graphs");
       Put_Line ("  -o=a         alphabetical");
       Put_Line ("  -o=s         stack usage (default)");
-      New_Line;
       Put_Line ("  -u size      default for unknown (external) calls");
-      New_Line;
       Put_Line ("  -d size      default for unbounded (dynamic) calls");
-      New_Line;
       Put_Line ("  -p           display the worst-case path for entry points");
-      New_Line;
       Put_Line ("  -a           use all  subprograms as entry points");
       Put_Line ("  -e <list>    use specific list of subprograms as entry " &
                                "points (e1,e2,...)");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
-      New_Line;
       Put_Line ("  -f file      output graph file");
-      New_Line;
       Put_Line ("  -aO dir      search for .ci files in dir");
-      New_Line;
       Put_Line ("  -files=file  file containing the list of .ci files");
-      New_Line;
       Put_Line ("  <files>      list of .ci files (c1.ci c2.ci ...)");
-      New_Line;
    end Usage;
 
 end Parser;
