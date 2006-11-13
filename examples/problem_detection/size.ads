@@ -1,1 +1,0 @@
-function Size return Integer;
