@@ -669,12 +669,12 @@ computation of stack requirements we can use the following example:
 
 @smallexample @c ada
 @group
-package Aux is
+package Ext is
    procedure Set_Alignment (Minimum : Integer);
    function Get_Size (Value : Integer) return Integer;
-end Aux;
+end Ext;
 
-package body Aux is
+package body Ext is
    Threshold : Integer;
 
    procedure Set_Alignment (Minimum : Integer) is
@@ -686,20 +686,20 @@ package body Aux is
    begin
       return (((Value - 1) / Threshold) + 1) * Threshold;
    end Get_Size;
-end Aux;
+end Ext;
 
-with Aux;
---  Aux is compiled without stack usage information
+with Ext;
+--  Ext is compiled without stack usage information
 
 procedure P is
    Set_Alignment : access procedure (Minimum : Integer) :=
-     Aux.Set_Alignment'Access;
+     Ext.Set_Alignment'Access;
    --  Indirect call
 
    procedure R;
 
    procedure Q is
-      Data : array (1 .. Aux.Get_Size (10)) of Character;
+      Data : array (1 .. Ext.Get_Size (10)) of Character;
       --  Dynamically sized local objects
    begin
       R;
@@ -723,7 +723,7 @@ end P;
 To compile and analyze this program we do:
 
 @smallexample
-$ gcc -c aux.adb
+$ gcc -c ext.adb
 $ gnatmake p.adb -cargs -fcallgraph-info=su
 [...]
 $ gnatstack *.ci
@@ -760,7 +760,7 @@ List of subprograms with dynamic unbounded frames:
 
 List of external subprograms:
 
-  aux.get_size
+  ext.get_size
 
 List of indirect (including dispatching) calls:
 
@@ -786,7 +786,7 @@ tagged as @code{<c0>} for later references. The following section of the
 report indicates that the use of a dynamically sized local object
 derives into a dynamic unbounded frame. We then have the list of
 subprograms for which there is no stack usage information (package
-@code{Aux} has been compiled without the required flags). Finally,
+@code{Ext} has been compiled without the required flags). Finally,
 there is a list of locations where there is an indirect call.
 
 Looking at the information about entry points we can see that the

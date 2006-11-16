@@ -1,4 +1,4 @@
-package body Aux is
+package body Ext is
    Threshold : Integer;
 
    procedure Set_Alignment (Minimum : Integer) is
@@ -10,4 +10,4 @@ package body Aux is
    begin
       return (((Value - 1) / Threshold) + 1) * Threshold;
    end Get_Size;
-end Aux;
+end Ext;

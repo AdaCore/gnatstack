@@ -1,5 +1,5 @@
 all:
-	$(PREFIX)gcc -c -gnatp $(RUNTIME) aux.adb
+	$(PREFIX)gcc -c -gnatp $(RUNTIME) ext.adb
 	$(PREFIX)gnatmake -gnatp -gnat05 $(RUNTIME) p -cargs -fcallgraph-info=su
 	$(PREFIX)gnatstack -p -Wa -v *.ci
 
