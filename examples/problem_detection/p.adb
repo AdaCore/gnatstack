@@ -1,15 +1,15 @@
-with Aux;
---  Aux is compiled without stack usage information
+with Ext;
+--  Ext is compiled without stack usage information
 
 procedure P is
    Set_Alignment : access procedure (Minimum : Integer) :=
-     Aux.Set_Alignment'Access;
+     Ext.Set_Alignment'Access;
    --  Indirect call
 
    procedure R;
 
    procedure Q is
-      Data : array (1 .. Aux.Get_Size (10)) of Character;
+      Data : array (1 .. Ext.Get_Size (10)) of Character;
       --  Dynamically sized local objects
    begin
       R;
