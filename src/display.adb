@@ -150,7 +150,7 @@ package body Display is
    --  by this subprogram.
 
    procedure Print_Node
-     (Subprogram_Name          : String;
+     (Subprogram_Name         : String;
       Local_Stack_Usage       : in Static_Stack_Analysis.Stack_Usage_Info;
       Accumulated_Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info;
       Locations               : in Static_Stack_Analysis.List_Of_Locations.Set;
