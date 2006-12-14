@@ -168,6 +168,12 @@ the tasks, including the environment task) or can be specified by the
 user (a list of entry points or all the subprograms matching a  
 certain regular expression).
 
+Note that if the linker performs a partial link (this is the case of
+VxWorks targets, excluding RTP mode in VxWorks 6) then the main entry
+point will need to be specified using the @option{-e} option (see
+@ref{Options for GNATstack}).
+@cindex @option{-e}
+
 @value{gnatstack} can also perform four additional types of analysis:
 
 @itemize @bullet
@@ -240,7 +246,7 @@ main : total 376 bytes
 
 @noindent
 @menu
-* Options for @value{gnatstack}:: 
+* Options for GNATstack:: 
 * Use of Project Files::
 @end menu
 
