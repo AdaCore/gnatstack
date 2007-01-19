@@ -29,7 +29,7 @@ package body Global_Data is
    -------------------
 
    function Is_Task_Entry
-     (Name : Static_Stack_Analysis.Subprogram_Name) return Boolean is
+     (Name : Static_Stack_Analysis.Name) return Boolean is
    begin
       --  ??? This pattern matching is not accurate. It will notify as task
       --  entry points subprograms that are not.

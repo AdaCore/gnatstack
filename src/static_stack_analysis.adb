@@ -165,6 +165,30 @@ package body Static_Stack_Analysis is
       return Target.Accumulated_Stack_Usage;
    end Get_Accumulated_Stack_Usage;
 
+   -------------------------
+   -- Get_Dynamic_Objects --
+   -------------------------
+
+   function Get_Dynamic_Objects
+     (Target : Explicit_Node) return List_Of_Locations.Set is
+   begin
+      return Target.Dynamic_Objects;
+   end Get_Dynamic_Objects;
+
+   function Get_Dynamic_Objects
+     (Target : Unresolved_Node) return List_Of_Locations.Set is
+      pragma Unreferenced (Target);
+   begin
+      return List_Of_Locations.Empty_Set;
+   end Get_Dynamic_Objects;
+
+   function Get_Dynamic_Objects
+     (Target : Fake_Node) return List_Of_Locations.Set is
+      pragma Unreferenced (Target);
+   begin
+      return List_Of_Locations.Empty_Set;
+   end Get_Dynamic_Objects;
+
    -----------------------
    -- Get_Location_List --
    -----------------------
@@ -246,13 +270,13 @@ package body Static_Stack_Analysis is
    -------------------------
 
    function Get_Subprogram_Name
-     (Target : Real_Node) return Subprogram_Name is
+     (Target : Real_Node) return Name is
    begin
       return Target.Subprogram;
    end Get_Subprogram_Name;
 
    function Get_Subprogram_Name
-     (Target : Fake_Node) return Subprogram_Name is
+     (Target : Fake_Node) return Name is
       pragma Unreferenced (Target);
    begin
       return Indirect_Call;

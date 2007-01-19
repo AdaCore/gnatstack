@@ -166,16 +166,22 @@ package body Parser is
 
    Label_Regexp : constant String :=
      "^([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
-     "( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??$";
+     "( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??" &
+     "(\\n[0-9]+ dynamic objects(\\n (.+)*)??)??$";
    --  Pattern: (([^\\:]+)??(\\n)??(([^\\]+)??(\\n)??([0-9]+ bytes
-   --           ( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??$
+   --           ( \(static\)| \(dynamic\)| \(dynamic,bounded\))??
+   --           (\\n[0-9]+ dynamic objects(\n (.+)*)??)??$
 
    No_Location_Regexp : constant String := "^<no location>$";
    --  Pattern : ^<no location>$
 
-   Location_Regexp : constant String :=
+   Subprogram_Location_Regexp : constant String :=
      "^([^:,]+):([0-9]+):*([0-9]+)*,*(.+)*$";
    --  Pattern: ^([^:,]+):([0-9]+):*([0-9]+)*,*(.+)*$
+
+   Data_Location_Regexp : constant String :=
+     "^\\n ([^ ]+) ([^:]+):([0-9]+)(.+)*$";
+   --  Pattern: ^\\n ([^ ]+) ([^:]+):([0-9]+)(.+)*$
 
    Stack_Regexp : constant String :=
      "^([0-9]+)+ bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))??$";
@@ -205,23 +211,25 @@ package body Parser is
    --  ^node: { title: "symbol_name" label: "LABEL"[ shape : ellipse] }
 
    procedure Parse_Title
-     (Input : in String; Symbol : out Static_Stack_Analysis.Subprogram_Name);
+     (Input : in String; Symbol : out Static_Stack_Analysis.Name);
    --  The input String should contain the symbol name
 
    procedure Parse_Label
-     (Input     : in String;
-      Demangled : out Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Set;
-      Stack     : out Static_Stack_Analysis.Stack_Usage_Info);
+     (Input           : in String;
+      Demangled       : out Static_Stack_Analysis.Name;
+      Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
+      Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
+      Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  The label contain information about the demangled symbol name,
    --  locations in source files, and stack requirements extracted by the
    --  compiler.
    --  The format of the input String is:
    --  [demangled_name\n][LOC[,LOC]\n][N bytes[ (static|dynamic[,bounded])]]
+   --  [M dynamic objects[\n DLOC[\n DLOC]]]
 
    procedure Parse_Locations
      (Input     : in String;
-      Demangled : in Static_Stack_Analysis.Subprogram_Name;
+      Demangled : in Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of locations in source files.
    --  Format: [filename:line:[column][,filename:line:[column]]
@@ -240,6 +248,12 @@ package body Parser is
    --  Get caller and callee in a subprogram call.
    --  Format : ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
 
+   procedure Parse_Dynamic_Objects
+     (Input           : in String;
+      Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set);
+   --  Extract the list of data locations in source files.
+   --  Format: [\n name filename:line[\n name filename:line]]
+
    --------------------------
    -- Add_Ada_Entry_Points --
    --------------------------
@@ -250,7 +264,7 @@ package body Parser is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
-      Subprogram : constant Static_Stack_Analysis.Subprogram_Name :=
+      Subprogram : constant Static_Stack_Analysis.Name :=
         Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
 
       use type Static_Stack_Analysis.Node_Id;
@@ -636,6 +650,49 @@ package body Parser is
          Print_Usage_And_Exit;
    end Parse_Arguments;
 
+   ---------------------------
+   -- Parse_Dynamic_Objects --
+   ---------------------------
+
+   procedure Parse_Dynamic_Objects
+     (Input           : in String;
+      Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
+   is
+      Matches : GNAT.Regpat.Match_Array (0 .. 4);
+
+      Tmp_Location  : Static_Stack_Analysis.Location;
+   begin
+      GNAT.Regpat.Match (Data_Location_Regexp, Input, Matches);
+
+      if Matches (0) /= GNAT.Regpat.No_Match then
+
+         Tmp_Location.Demangled :=
+           new String'(Input (Matches (1).First .. Matches (1).Last));
+
+         Tmp_Location.File :=
+           new String'(Input (Matches (2).First .. Matches (2).Last));
+
+         Tmp_Location.Line_Number :=
+           Integer'Value (Input (Matches (3).First .. Matches (3).Last));
+
+         Tmp_Location.Column_Number := 0;
+
+         --  Parse additional locations, if any
+
+         if Matches (4) /= GNAT.Regpat.No_Match then
+            Parse_Dynamic_Objects
+              (Input (Matches (4).First .. Matches (4).Last), Dynamic_Objects);
+         end if;
+
+         --  Include the parsed location if it is not already in the list
+
+         Dynamic_Objects.Include (Tmp_Location);
+
+      else
+         raise Parser_Error;
+      end if;
+   end Parse_Dynamic_Objects;
+
    ------------------------
    -- Parse_Entry_Points --
    ------------------------
@@ -704,8 +761,8 @@ package body Parser is
    procedure Parse_Node (Input : String) is
       use Static_Stack_Analysis;
 
-      Symbol_Name     : Subprogram_Name := null;
-      Demangled_Name  : Subprogram_Name := null;
+      Symbol_Name     : Name := null;
+      Demangled_Name  : Name := null;
       Stack_Info      : Stack_Usage_Info := Unknown_Stack_Usage;
       Locally_Defined : Boolean := False;
 
@@ -715,6 +772,8 @@ package body Parser is
 
       Locations_Set   : List_Of_Locations.Set := List_Of_Locations.Empty_Set;
 
+      Dynamic_Objects : List_Of_Locations.Set := List_Of_Locations.Empty_Set;
+
    begin
       --  The pattern of the input line is:
       --  node: { title: "symbol_name" label: "LABEL"[ shape : ellipse] }
@@ -723,10 +782,14 @@ package body Parser is
       --  different nodes.
       --
       --  The format of the String under LABEL is:
-      --  "[demangled_name][\nLOC[,LOC]][\nN bytes (static|dynamic[,bounded])]"
+      --  "[demangled_name][\nLOC[,LOC]][\nN bytes (static|dynamic[,bounded])]
+      --   [M dynamic objects[\n DLOC[\n DLOC]]]"
       --  where:
       --  LOC = file:line:column
       --  N = Natural representing the number of bytes
+      --  M = Natural representing the number of dynamic objects defined in
+      --      the subprogram
+      --  DLOC = object file:line
       --
       --  The shape : ellipse indicates that the node is used but not defined,
       --  which means that it is an unresolved call.
@@ -759,7 +822,8 @@ package body Parser is
               (Input (Matches (2).First .. Matches (2).Last),
                Demangled_Name,
                Locations_Set,
-               Stack_Info);
+               Stack_Info,
+               Dynamic_Objects);
 
             --  Get information from the shape
 
@@ -805,7 +869,7 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Under_Analysis          => False,
-                  Analysis_Finished         => False,
+                  Analysis_Finished       => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert
@@ -826,9 +890,10 @@ package body Parser is
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
+                  Dynamic_Objects         => Dynamic_Objects,
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
-                  Analysis_Finished         => False,
+                  Analysis_Finished       => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert
@@ -852,6 +917,11 @@ package body Parser is
                   Explicit_Node (Found_Node.all).Location_List.Union
                     (Locations_Set);
 
+                  --  Merge the list of dynamic objects
+
+                  Explicit_Node (Found_Node.all).Dynamic_Objects.Union
+                    (Dynamic_Objects);
+
                   --  Check information about stack usage and update if
                   --  necessary.
 
@@ -867,15 +937,21 @@ package body Parser is
                      Accumulated_Stack_Usage => Unknown_Stack_Usage,
                      Location_List           => Locations_Set,
                      Subprogram              => Symbol_Name,
+                     Dynamic_Objects         => Dynamic_Objects,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
-                     Analysis_Finished => False,
+                     Analysis_Finished       => False,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
 
                   Explicit_Node (Node_Ptr.all).Location_List.Union
                     (Get_Location_List (Found_Node.all));
+
+                  --  Merge the list of dynamic objects
+
+                  Explicit_Node (Node_Ptr.all).Dynamic_Objects.Union
+                    (Dynamic_Objects);
 
                   List_Of_Nodes.Replace_Element
                        (Global_Data.List_Of_Subprograms, Found_Id, Node_Ptr);
@@ -893,7 +969,7 @@ package body Parser is
    -----------------
 
    procedure Parse_Title
-     (Input : in String; Symbol : out Static_Stack_Analysis.Subprogram_Name)
+     (Input : in String; Symbol : out Static_Stack_Analysis.Name)
    is
    begin
       if Input'Length /= 0 then
@@ -908,12 +984,13 @@ package body Parser is
    -----------------
 
    procedure Parse_Label
-     (Input     : in String;
-      Demangled : out Static_Stack_Analysis.Subprogram_Name;
-      Locations : out Static_Stack_Analysis.List_Of_Locations.Set;
-      Stack     : out Static_Stack_Analysis.Stack_Usage_Info)
+     (Input           : in String;
+      Demangled       : out Static_Stack_Analysis.Name;
+      Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
+      Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
+      Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 6);
+      Matches : GNAT.Regpat.Match_Array (0 .. 8);
 
    begin
       GNAT.Regpat.Match (Label_Regexp, Input, Matches);
@@ -924,12 +1001,16 @@ package body Parser is
       else
          --  The following are optional fields
 
+         --  Demangled name
+
          if Matches (1) /= GNAT.Regpat.No_Match then
             Demangled :=
               new String'(Input (Matches (1).First .. Matches (1).Last));
          else
             Demangled := null;
          end if;
+
+         --  Subprogram location
 
          if Matches (3) /= GNAT.Regpat.No_Match then
             Parse_Locations
@@ -940,6 +1021,8 @@ package body Parser is
             Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
          end if;
 
+         --  Stack usage
+
          if Matches (5) /= GNAT.Regpat.No_Match then
             Parse_Stack_Usage
               (Input (Matches (5).First .. Matches (5).Last), Stack);
@@ -947,6 +1030,16 @@ package body Parser is
             Stack := Static_Stack_Analysis.Unknown_Stack_Usage;
             Stack.Unknown_Usage :=
               Static_Stack_Analysis.Frame_Size (Options.Default_Unknown);
+         end if;
+
+         --  Dynamic objects
+
+         if Matches (8) /= GNAT.Regpat.No_Match then
+            Parse_Dynamic_Objects
+              (Input (Matches (8).First .. Matches (8).Last), Dynamic_Objects);
+         else
+            Dynamic_Objects :=
+              Static_Stack_Analysis.List_Of_Locations.Empty_Set;
          end if;
       end if;
    end Parse_Label;
@@ -957,7 +1050,7 @@ package body Parser is
 
    procedure Parse_Locations
      (Input     : in String;
-      Demangled : in Static_Stack_Analysis.Subprogram_Name;
+      Demangled : in Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 4);
@@ -973,7 +1066,7 @@ package body Parser is
          Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
 
       else
-         GNAT.Regpat.Match (Location_Regexp, Input, Matches);
+         GNAT.Regpat.Match (Subprogram_Location_Regexp, Input, Matches);
 
          if Matches (0) /= GNAT.Regpat.No_Match then
 

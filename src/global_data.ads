@@ -59,7 +59,7 @@ package Global_Data is
    --  List of all nodes under analysis
 
    function Is_Task_Entry
-     (Name : Static_Stack_Analysis.Subprogram_Name) return Boolean;
+     (Name : Static_Stack_Analysis.Name) return Boolean;
    --  Returns True if the node corresponds to a task entry
 
    Task_Wrapper : Static_Stack_Analysis.List_Of_Nodes.Cursor :=

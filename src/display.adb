@@ -73,7 +73,7 @@ with Demangle;
 package body Display is
 
    use type Static_Stack_Analysis.List_Of_Locations.Set;
-   use type Static_Stack_Analysis.Subprogram_Name;
+   use type Static_Stack_Analysis.Name;
    use type Static_Stack_Analysis.Frame_Size;
 
    --------------------------
@@ -126,7 +126,7 @@ package body Display is
    --  names for task entries.
 
    procedure Expand_Location
-        (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
    --  Print the location using the format: demangled(:|\n)file:line:column
 
    procedure Expand_Stack_Usage
@@ -138,8 +138,8 @@ package body Display is
    --  (and accumulated stack usage), and subprograms that are called.
 
    procedure Print_Unbounded (Position : in Static_Stack_Analysis.Node_Id);
-   --  Print the subprogram name if the position corresponds to a node with a
-   --  dynamic and unbounded stack usage.
+   --  Print the list of dynamic objects if the position corresponds to a node
+   --  with a dynamic and unbounded stack usage.
 
    procedure Print_External (Position : in Static_Stack_Analysis.Node_Id);
    --  Print the subprogram name if the position corresponds to a node with
@@ -190,6 +190,11 @@ package body Display is
    procedure Print_Biggest_Frames (Frames : Natural);
    --  Print the indicated number of subprograms corresponding to those
    --  requiring the biggest local stack usage.
+
+   procedure Print_Dynamic_Objects
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
+   --  Print the location of a list of dynamically sized local objects using
+   --  the format: name file:line
 
    ---------------------
    -- Expand_Location --
@@ -346,6 +351,38 @@ package body Display is
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
         (Big_Frames, Print_Node'Access);
    end Print_Biggest_Frames;
+
+   ---------------------------
+   -- Print_Dynamic_Objects --
+   ---------------------------
+
+   procedure Print_Dynamic_Objects
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+   is
+      Location : constant Static_Stack_Analysis.Location :=
+        Static_Stack_Analysis.List_Of_Locations.Element (Position);
+
+      use type Ada.Text_IO.File_Access;
+
+   begin
+      --  Tabulation
+
+      Ada.Text_IO.Put ("    ");
+
+      --  Object name
+
+      Ada.Text_IO.Put (Location.Demangled.all);
+
+      --  File location
+
+      Ada.Text_IO.Put (" at ");
+
+      Ada.Text_IO.Put (Location.File.all & ":");
+      Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+
+      Ada.Text_IO.New_Line;
+
+   end Print_Dynamic_Objects;
 
    ----------------
    -- Print_Edge --
@@ -579,7 +616,7 @@ package body Display is
    procedure Print_Ada_Name
      (Node : Static_Stack_Analysis.Node_Class_Access)
    is
-      Name : constant Static_Stack_Analysis.Subprogram_Name :=
+      Name : constant Static_Stack_Analysis.Name :=
         Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
 
       Matches : GNAT.Regpat.Match_Array (0 .. 1);
@@ -727,8 +764,8 @@ package body Display is
          Ada.Text_IO.New_Line;
       end if;
 
-      --  Print the list of subprograms with dynamic frames whose maximum
-      --  bounds cannot be statically computed.
+      --  Print the list of dynamic objects whose maximum stack requirements
+      --  cannot be statically computed.
 
       if Options.Warnings (Options.Unbounded)
         and then Global_Data.Unbounded_Frames
@@ -1141,11 +1178,15 @@ package body Display is
           Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
           Static_Stack_Analysis.Unbounded
       then
-         Ada.Text_IO.Put ("  ");
+         Ada.Text_IO.Put ("  In ");
 
          Print_Name (Node);
 
          Ada.Text_IO.New_Line;
+
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Static_Stack_Analysis.Explicit_Node (Node.all).Dynamic_Objects,
+            Print_Dynamic_Objects'Access);
       end if;
    end Print_Unbounded;
 

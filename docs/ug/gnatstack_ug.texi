@@ -137,6 +137,10 @@ Project Files}) was finished on September 8th 2006, so only compiler
 wavefronts issued subsequent to the date above, as well as future
 releases, incorporate this capability.
 
+Detailed information about dynamically allocated local objects (using
+the @code{-fcallgraph-info=su,da} compiler switch) requires GNAT Pro
+6.0.1 or later.
+
 @c *********************************
 @node The GNATstack Tool
 @chapter The GNATstack Tool
@@ -233,7 +237,14 @@ $ gnatmake main_unit.adb -cargs -fcallgraph-info=su
 The use of this compiler switch generates a @file{.ci} file for every
 compilation unit.
 
-The @value{gnatstack} can then parse these files to generate the
+The compiler can also generate information about dynamically allocated
+objects adding the @code{da} marker to the @code{-fcallgraph-info}
+compiler switch (@code{-fcallgraph-info=su,da}). This option helps
+locating the objects that introduce potentially unbounded stack
+requirements.
+@cindex @code{-fcallgraph-info=su,da}
+
+@value{gnatstack} can then parse these files to generate the
 complete call graph decorated with stack usage information, so it can
 look for the longest paths in terms of stack usage.
 
@@ -730,7 +741,7 @@ To compile and analyze this program we do:
 
 @smallexample
 $ gcc -c ext.adb
-$ gnatmake p.adb -cargs -fcallgraph-info=su
+$ gnatmake p.adb -cargs -fcallgraph-info=su,da
 [...]
 $ gnatstack *.ci
 Worst case analysis is *not* accurate ; use -W options for details
@@ -763,6 +774,7 @@ List of cycles:
 List of subprograms with dynamic unbounded frames:
 
   p.q at Q:p.adb:11:14
+    Data at p.adb:12
 
 List of external subprograms:
 
@@ -790,10 +802,11 @@ usage information.
 calling @code{R} which in turn calls @code{Q}). The cycle has been
 tagged as @code{<c0>} for later references. The following section of the
 report indicates that the use of a dynamically sized local object
-derives into a dynamic unbounded frame. We then have the list of
-subprograms for which there is no stack usage information (package
-@code{Ext} has been compiled without the required flags). Finally,
-there is a list of locations where there is an indirect call.
+(@code{Data}) derives into a dynamic unbounded frame (subprogram
+@code{Q}). We then have the list of subprograms for which there is no
+stack usage information (package @code{Ext} has been compiled without
+the required flags). Finally, there is a list of locations where there
+is an indirect call.
 
 Looking at the information about entry points we can see that the
 computed stack requirements for the @code{main} entry point is 472

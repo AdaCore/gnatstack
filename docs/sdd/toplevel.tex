@@ -123,6 +123,8 @@ store about explicit nodes is:
   for obtaining the worst case stack usage. It is very practical for
   detecting and handling cycles in the call graph.
 
+\item Dynamic objects. It contains the set of dynamically sized local
+  objects defined in the subprogram.
 
 \item Cycle information. A subprogram may be part of different cycles
   in the call graph, and this field contains the set of cycles to
@@ -250,7 +252,11 @@ than a huge machine level representation of the code.
 The compiler can generate a file per compilation unit (controlled by a
 command line option, \prog{-fcallgraph-info=su}), that contain the
 required information for generating the call graph, and decorating it
-with stack usage information.
+with stack usage information. The compiler can also generate
+information about dynamically allocated objects adding the \prog{da}
+marker to the \prog{-fcallgraph-info} compiler switch. This option
+helps locating the objects that introduce potentially unbounded stack
+requirements.
 
 The extension \prog{.ci} (call graph information) will be used for the
 compiler-generated files containing this information (one file per
@@ -303,7 +309,8 @@ All the nodes, except \emph{dummy proxy} nodes, are represented by:
 \item Label. Ada/C name of the subprogram plus a list of locations (file
  name and line number). The list of locations will typically contain
  just one entry, and it will contain a list of more than one location
- in the case of instantiations of generic units.
+ in the case of instantiations of generic units. Dynamically sized
+ local objects are also described here.
 
 \end{itemize}
 

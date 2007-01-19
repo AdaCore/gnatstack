@@ -1,6 +1,6 @@
 all:
 	$(PREFIX)gcc -c -gnatp $(RUNTIME) ext.adb
-	$(PREFIX)gnatmake -gnatp -gnat05 $(RUNTIME) p -cargs -fcallgraph-info=su
+	$(PREFIX)gnatmake -gnatp -gnat05 $(RUNTIME) p -cargs -fcallgraph-info=su,da
 	$(PREFIX)gnatstack -p -Wa -v *.ci
 
 clean:
