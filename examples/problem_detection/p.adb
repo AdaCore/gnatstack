@@ -11,8 +11,6 @@ procedure P is
    procedure Q is
       Data : array (1 .. Ext.Get_Size (10)) of Character;
       --  Dynamically sized local objects
-
-      Data2 : array (1 .. Ext.Get_Size (10)) of Character;
    begin
       R;
    end Q;
