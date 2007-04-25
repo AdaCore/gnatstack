@@ -7,8 +7,13 @@ get_gnat_dir () {
    else
       ggd_prog="$ggd_prefix-gnatmake"
    fi
-   echo `type $ggd_prog | cut -d' ' -f3 | sed 's%/bin.*$%%'`
-
+   if [ `type $ggd_prog 2>&1` -ne 0 ]; then
+      # GNAT Pro installation not found
+      echo ""
+   else
+      # Return the location of the GNAT Pro installation
+      echo `type $ggd_prog | cut -d' ' -f3 | sed 's%/bin.*$%%'`
+   fi
 }
 
 prefix=`get_gnat_dir`
@@ -96,8 +101,21 @@ EOF
 
   # ------------------ Regular installation ---------------------------
   1)
-    installdir=$prefix
-    break
+    if [ "X$prefix" = "X" ]; then
+       cat << EOF
+
+
+   No GNAT Pro installation found on your PATH. Please add the
+   directory were GNAT Pro can be found on your PATH or contact
+   your system administrator to have it installed in a standard
+   location.
+
+EOF
+       exit 1
+    else
+       installdir=$prefix
+       break
+    fi
     ;;
  esac
 done
