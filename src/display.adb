@@ -5,18 +5,18 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2006, AdaCore                     --
+--                     Copyright (C) 2005-2007, AdaCore                     --
 --                                                                          --
--- SSAT is free software;  you can  redistribute it  and/or modify it under --
--- terms of the  GNU General Public License as published  by the Free Soft- --
--- ware  Foundation;  either version 2,  or (at your option) any later ver- --
--- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
--- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
--- for  more details.  You should have  received  a copy of the GNU General --
--- Public License  distributed with GNAT;  see file COPYING.  If not, write --
--- to  the  Free Software Foundation,  51  Franklin  Street,  Fifth  Floor, --
--- Boston, MA 02110-1301, USA.                                              --
+-- GNATStack  is free  software;  you can redistribute  it and/or modify it --
+-- under terms of the  GNU General Public License as published  by the Free --
+-- Software  Foundation;  either version 2,  or (at your option)  any later --
+-- version.  GNATstack is distributed  in the hope that it will be  useful, --
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANT- --
+-- ABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public --
+-- License for  more details.  You should have  received  a copy of the GNU --
+-- General Public License distributed with GNATStack;  see file COPYING. If --
+-- not, write to the  Free Software Foundation,  51 Franklin Street,  Fifth --
+-- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
 with Options;
@@ -25,6 +25,7 @@ with Options;
 --           Verbose
 --           Order
 --           Warnings
+--           Generate_XML_Output
 
 with Global_Data;
 --  Used for List_Of_Subprograms
@@ -58,6 +59,9 @@ with Ada.Containers;
 with Ada.Integer_Text_IO;
 --  Used for Put
 
+with Ada.Strings.Fixed;
+--  Used for "*"
+
 with GNAT.OS_Lib;
 --  Used for Delete_File
 
@@ -71,6 +75,8 @@ with Demangle;
 --  Used for Ada_Decode
 
 package body Display is
+
+   use Ada.Strings.Fixed;
 
    use type Static_Stack_Analysis.List_Of_Locations.Set;
    use type Static_Stack_Analysis.Name;
@@ -90,12 +96,20 @@ package body Display is
    -- Local data --
    ----------------
 
-   VCG_Descriptor : Ada.Text_IO.File_Type;
+   VCG_Descriptor       : Ada.Text_IO.File_Type;
    --  File where the VCG callgraph is stored
+
+   XML_Descriptor       : Ada.Text_IO.File_Type;
+   --  File where the XML output is stored
 
    Undefined_Descriptor : Ada.Text_IO.File_Type;
    --  File containing undefined information (unknown stack usage, indirect
    --  calls, etc.).
+
+   XML_Indentation : Natural := 0;
+   --  Global variable that contains the required indentation in the XML file
+
+   Indent_String : constant String := "  ";
 
    -----------------------
    -- Local subprograms --
@@ -120,7 +134,8 @@ package body Display is
    --  the symbol name and its location.
 
    procedure Print_Ada_Name
-     (Node : Static_Stack_Analysis.Node_Class_Access);
+     (Node : Static_Stack_Analysis.Node_Class_Access;
+      File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output);
    --  Print the subprogram name associated to the node. It will use the
    --  demangled Ada name, if possible, remove path information, and use task
    --  names for task entries.
@@ -163,7 +178,8 @@ package body Display is
    --  the user (or any external tool). Otherwise the output is sent to the
    --  file containing the VCG call graph being generated.
 
-   procedure Print_Edge (Source : in String; Target : in String);
+   procedure Print_Edge
+     (Source : in String; Target : in String; File : Ada.Text_IO.File_Type);
    --  Print the information about this concrete call-to-subprogram with the
    --  format used by the compiler when generating call graph and stack usage
    --  information.
@@ -195,6 +211,89 @@ package body Display is
      (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
    --  Print the location of a list of dynamically sized local objects using
    --  the format: name file:line
+
+   procedure Print_XML_Edge (Position : in Static_Stack_Analysis.Edge_Id);
+   --  Print the information about this call to subprogram using the format:
+   --   <subprogram>
+   --     <prefixname type="strings">
+   --       <value>A.B.C</value>
+   --     </prefixname>
+   --     <locationset>
+   --       ...
+   --     </locationset>
+
+   procedure Print_XML_Location
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
+   --  Print the location using the format:
+   --   <location>
+   --     <subprogramname type="strings">
+   --       <value>C</value>
+   --     </subprogramname>
+   --     <file type="strings">
+   --       <value>a-b.adb</value>
+   --     </file>
+   --     <line type="integers">
+   --       <value>1</value>
+   --     </line>
+   --     <column type="integers">
+   --       <value>1</value>
+   --     </column>
+   --   </location>
+
+   procedure Print_XML_Stack_Usage
+     (Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info);
+   --  Print the stack usage using the format:
+   --   <size type="integers">
+   --     <value>102</value>
+   --   </size>
+   --   <qualifier>
+   --     <value>STATIC</value>
+   --   </qualifier>
+
+   procedure Open_Tag (Tag_Name : String);
+   procedure Close_Tag (Tag_Name : String);
+   --  Puts into XML file string <Tag_Name> or </Tag_Name>. The indentation is
+   --  automatically handled by the level of open tags.
+
+   procedure Report_XML (Message : String; New_Line : Boolean := True);
+   --  Sends the message into the XML output file. The message is appended with
+   --  platform-specific EOL if New_Line is True. Does nothing if
+   --  Generate_XML_Output is set False.
+
+   ------------------------
+   -- Close_Output_Files --
+   ------------------------
+
+   procedure Close_Output_Files is
+   begin
+      --  End of graph
+
+      Ada.Text_IO.Put_Line (VCG_Descriptor, "}");
+
+      --  Close all files and set the standard output
+
+      Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
+
+      if Options.Generate_XML_Output then
+         Ada.Text_IO.Close (XML_Descriptor);
+      end if;
+
+      Ada.Text_IO.Close (Undefined_Descriptor);
+
+      Ada.Text_IO.Close (VCG_Descriptor);
+   end Close_Output_Files;
+
+   ---------------
+   -- Close_Tag --
+   ---------------
+
+   procedure Close_Tag (Tag_Name : String) is
+   begin
+      --  Decrease indentation
+      XML_Indentation := XML_Indentation - 1;
+
+      Report_XML ("</" & Tag_Name & '>');
+   end Close_Tag;
 
    ---------------------
    -- Expand_Location --
@@ -239,6 +338,92 @@ package body Display is
          Ada.Text_IO.Put (",");
       end if;
    end Expand_Location;
+
+   -----------------------
+   -- Open_Output_Files --
+   -----------------------
+
+   procedure Open_Output_Files is
+      use type GNAT.Strings.String_Access;
+
+      Success : Boolean;
+   begin
+      --  If no file has been specified as call graph output use the default
+      --  graph.vcg.
+
+      if Options.Output_VCG = null then
+         Options.Output_VCG := new String'("graph.vcg");
+      end if;
+
+      if GNAT.OS_Lib.Is_Regular_File (Options.Output_VCG.all) then
+         GNAT.OS_Lib.Delete_File (Options.Output_VCG.all, Success);
+         pragma Assert (Success);
+      end if;
+
+      Ada.Text_IO.Create
+        (VCG_Descriptor, Ada.Text_IO.Out_File, Options.Output_VCG.all);
+
+      --  If no file has been specified as output for undefined information
+      --  use the default undefined.ciu.
+
+      if Options.Output_Undefined = null then
+         Options.Output_Undefined := new String'("undefined.ciu");
+      end if;
+
+      if GNAT.OS_Lib.Is_Regular_File (Options.Output_Undefined.all) then
+         GNAT.OS_Lib.Delete_File (Options.Output_Undefined.all, Success);
+         pragma Assert (Success);
+      end if;
+
+      Ada.Text_IO.Create
+        (Undefined_Descriptor,
+         Ada.Text_IO.Out_File,
+         Options.Output_Undefined.all);
+
+      --  Create the file containing the XML output, if needed
+
+      if Options.Generate_XML_Output then
+         --  If no file has been specified as XML output use the default
+         --  stack_usage.xml.
+
+         if Options.Output_XML = null then
+            Options.Output_XML := new String'("stack_usage.xml");
+         end if;
+
+         if GNAT.OS_Lib.Is_Regular_File (Options.Output_XML.all) then
+            GNAT.OS_Lib.Delete_File (Options.Output_XML.all, Success);
+            pragma Assert (Success);
+         end if;
+
+         Ada.Text_IO.Create
+           (XML_Descriptor, Ada.Text_IO.Out_File, Options.Output_XML.all);
+      end if;
+
+      --  Generate file headers
+
+      --  Graph header
+
+      Ada.Text_IO.Put_Line
+        (VCG_Descriptor, "graph: { title: ""Callgraph information:""");
+
+      --  XML header
+
+      if Options.Generate_XML_Output then
+         Ada.Text_IO.Put_Line (XML_Descriptor, "<?xml version=""1.0""?>");
+      end if;
+   end Open_Output_Files;
+
+   --------------
+   -- Open_Tag --
+   --------------
+
+   procedure Open_Tag (Tag_Name : String) is
+   begin
+      Report_XML ('<' & Tag_Name & '>');
+
+      --  Increase indentation
+      XML_Indentation := XML_Indentation + 1;
+   end Open_Tag;
 
    --------------------------
    -- Print_Biggest_Frames --
@@ -325,6 +510,8 @@ package body Display is
            Static_Stack_Analysis.List_Of_Nodes.Element
              (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
 
+         Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
+           Static_Stack_Analysis.Get_Stack_Usage (Node.all);
       begin
          --  Subprogram name
 
@@ -334,7 +521,15 @@ package body Display is
 
          --  Local stack usage
 
-         Expand_Stack_Usage (Static_Stack_Analysis.Get_Stack_Usage (Node.all));
+         Expand_Stack_Usage (Stack_Info);
+
+         --  Send stack information to the XML file if needed
+
+         if Options.Generate_XML_Output then
+            Open_Tag ("localstackusage");
+            Print_XML_Stack_Usage (Stack_Info);
+            Close_Tag ("localstackusage");
+         end if;
 
          Ada.Text_IO.New_Line;
       end Print_Node;
@@ -382,27 +577,56 @@ package body Display is
 
       Ada.Text_IO.New_Line;
 
+      --  Print information about unbounded frames in the XML file
+
+      if Options.Generate_XML_Output then
+         Open_Tag ("unboundedobject");
+
+         Open_Tag ("object type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.Demangled.all & "</value>");
+         Close_Tag ("object");
+
+         Open_Tag ("file type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.File.all & "</value>");
+         Close_Tag ("file");
+
+         Open_Tag ("line type=""integers""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Integer_Text_IO.Put
+           (XML_Descriptor, Location.Line_Number, 0);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("line");
+
+         Close_Tag ("unboundedobject");
+      end if;
    end Print_Dynamic_Objects;
 
    ----------------
    -- Print_Edge --
    ----------------
 
-   procedure Print_Edge (Source : in String; Target : in String) is
+   procedure Print_Edge
+     (Source : in String; Target : in String; File : Ada.Text_IO.File_Type)
+   is
    begin
       --  Caller
 
-      Ada.Text_IO.Put ("edge: { sourcename: """);
-      Ada.Text_IO.Put (Source);
+      Ada.Text_IO.Put (File, "edge: { sourcename: """);
+      Ada.Text_IO.Put (File, Source);
 
       --  Callee
 
-      Ada.Text_IO.Put (""" targetname: """);
-      Ada.Text_IO.Put (Target);
+      Ada.Text_IO.Put (File, """ targetname: """);
+      Ada.Text_IO.Put (File, Target);
 
       --  Type of line
 
-      Ada.Text_IO.Put_Line (""" priority: 100 linestyle: solid }");
+      Ada.Text_IO.Put_Line (File, """ priority: 100 linestyle: solid }");
    end Print_Edge;
 
    -------------------------
@@ -430,6 +654,8 @@ package body Display is
 
          Worst_Case_Analyzer.Get_Longest_Path (Path, Position);
 
+         Open_Tag ("entry");
+
          --  Print a summary of the worst-case stack usage
 
          Print_Entry (Static_Stack_Analysis.List_Of_Nodes.Element (Position));
@@ -440,6 +666,12 @@ package body Display is
             Static_Stack_Analysis.Paths.Iterate
               (Path, Print_Node_In_Path'Access);
          end if;
+
+         --  Note that this Tag is open in Print_Entry
+
+         Close_Tag ("callchain");
+
+         Close_Tag ("entry");
 
          Ada.Text_IO.New_Line;
       end Print_Longest_Path;
@@ -464,8 +696,12 @@ package body Display is
 
       --  Generate the worst case graph for every entry point
 
+      Open_Tag ("entryset");
+
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
         (Global_Data.Entry_Points, Print_Longest_Path'Access);
+
+      Close_Tag ("entryset");
    end Print_Longest_Paths;
 
    ----------------
@@ -495,6 +731,22 @@ package body Display is
 
          Static_Stack_Analysis.List_Of_Locations.Iterate
            (Locations, Expand_Location'Access);
+      end if;
+
+      --  Send subprogram name and locations to the XML file
+
+      if Options.Generate_XML_Output then
+         Open_Tag ("prefixname type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Print_Ada_Name (Node, XML_Descriptor);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("prefixname");
+
+         Open_Tag ("locationset");
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Locations, Print_XML_Location'Access);
+         Close_Tag ("locationset");
       end if;
    end Print_Name;
 
@@ -614,7 +866,8 @@ package body Display is
    --------------------
 
    procedure Print_Ada_Name
-     (Node : Static_Stack_Analysis.Node_Class_Access)
+     (Node : Static_Stack_Analysis.Node_Class_Access;
+      File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output)
    is
       Name : constant Static_Stack_Analysis.Name :=
         Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
@@ -630,11 +883,13 @@ package body Display is
 
       if Matches (0) /= GNAT.Regpat.No_Match then
          Ada.Text_IO.Put
-           (Demangle.Ada_Decode
+           (File,
+            Demangle.Ada_Decode
               (Name.all (Matches (1).Last + 1 .. Name.all'Last)));
 
       else
-         Ada.Text_IO.Put (Demangle.Ada_Decode (Name.all));
+         Ada.Text_IO.Put
+           (File, Demangle.Ada_Decode (Name.all));
       end if;
    end Print_Ada_Name;
 
@@ -651,7 +906,11 @@ package body Display is
 
          Ada.Text_IO.New_Line;
 
+         Open_Tag ("bigframeset");
+
          Print_Biggest_Frames (Options.Number_Of_Biggest_Frames);
+
+         Close_Tag ("bigframeset");
 
          Ada.Text_IO.New_Line;
       end if;
@@ -676,63 +935,15 @@ package body Display is
    ---------------------------
 
    procedure Generate_Output_Files is
-      use type GNAT.Strings.String_Access;
-
-      Success : Boolean;
-
    begin
-      --  If no file has been specified as call graph output use the default
-      --  graph.vcg.
-
-      if Options.Output_VCG = null then
-         Options.Output_VCG := new String'("graph.vcg");
-      end if;
-
-      if GNAT.OS_Lib.Is_Regular_File (Options.Output_VCG.all) then
-         GNAT.OS_Lib.Delete_File (Options.Output_VCG.all, Success);
-         pragma Assert (Success);
-      end if;
-
-      Ada.Text_IO.Create
-        (VCG_Descriptor, Ada.Text_IO.Out_File, Options.Output_VCG.all);
-
-      Ada.Text_IO.Set_Output (VCG_Descriptor);
-
-      --  If no file has been specified as output for undefined information
-      --  use the default undefined.ciu.
-
-      if Options.Output_Undefined = null then
-         Options.Output_Undefined := new String'("undefined.ciu");
-      end if;
-
-      if GNAT.OS_Lib.Is_Regular_File (Options.Output_Undefined.all) then
-         GNAT.OS_Lib.Delete_File (Options.Output_Undefined.all, Success);
-         pragma Assert (Success);
-      end if;
-
-      Ada.Text_IO.Create
-        (Undefined_Descriptor,
-         Ada.Text_IO.Out_File,
-         Options.Output_Undefined.all);
-
-      --  Graph header
-
-      Ada.Text_IO.Put_Line ("graph: { title: ""Callgraph information:""");
-
       --  Read information about nodes and edges
+
+      Open_Tag ("subprogramset");
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
         (Global_Data.List_Of_Subprograms, Expand_Node'Access);
 
-      --  End of graph
-
-      Ada.Text_IO.Put_Line ("}");
-
-      Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
-
-      Ada.Text_IO.Close (Undefined_Descriptor);
-
-      Ada.Text_IO.Close (VCG_Descriptor);
+      Close_Tag ("subprogramset");
    end Generate_Output_Files;
 
    -----------------------
@@ -741,18 +952,40 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
+      --  XML section describing global application properties
+
+      Open_Tag ("global");
+
+      --  Analyze accuracy
+
+      Open_Tag ("accurate type=""booleans""");
+
       if not Global_Data.Cycles.Is_Empty
         or else Global_Data.Unbounded_Frames
         or else Global_Data.External_Calls
         or else Global_Data.Indirect_Calls
       then
+         --  Screen output
+
          Ada.Text_IO.Put_Line
            ("Worst case analysis is *not* accurate ; use -W options for " &
             "details");
          Ada.Text_IO.New_Line;
+
+         --  XML output
+
+         Report_XML ("<value>FALSE</value>");
+      else
+         --  XML output
+
+         Report_XML ("<value>TRUE</value>");
       end if;
 
+      Close_Tag ("accurate");
+
       --  Information about cycles
+
+      Open_Tag ("cycleset");
 
       if Options.Warnings (Options.Cycle)
         and then not Global_Data.Cycles.Is_Empty
@@ -764,8 +997,12 @@ package body Display is
          Ada.Text_IO.New_Line;
       end if;
 
+      Close_Tag ("cycleset");
+
       --  Print the list of dynamic objects whose maximum stack requirements
       --  cannot be statically computed.
+
+      Open_Tag ("unboundedset");
 
       if Options.Warnings (Options.Unbounded)
         and then Global_Data.Unbounded_Frames
@@ -778,8 +1015,12 @@ package body Display is
          Ada.Text_IO.New_Line;
       end if;
 
+      Close_Tag ("unboundedset");
+
       --  Information about subprograms for which we do not have any stack
       --  usage
+
+      Open_Tag ("externalset");
 
       if Options.Warnings (Options.External)
         and then Global_Data.External_Calls
@@ -791,7 +1032,11 @@ package body Display is
          Ada.Text_IO.New_Line;
       end if;
 
+      Close_Tag ("externalset");
+
       --  Information about indirect (including dispatching) calls
+
+      Open_Tag ("indirectset");
 
       if Options.Warnings (Options.Indirect)
         and then Global_Data.Indirect_Calls
@@ -802,6 +1047,10 @@ package body Display is
          Global_Data.List_Of_Subprograms.Iterate (Print_Indirect'Access);
          Ada.Text_IO.New_Line;
       end if;
+
+      Close_Tag ("indirectset");
+
+      Close_Tag ("global");
    end Generate_Warnings;
 
    -----------------
@@ -839,14 +1088,14 @@ package body Display is
          --  Print both to the VCG file containing the call graph and to the
          --  file that will be later filled by the user.
 
-         Ada.Text_IO.Set_Output (VCG_Descriptor);
-
-         Print_Edge (Source => Caller, Target => Callee);
+         Print_Edge
+           (Source => Caller, Target => Callee, File => VCG_Descriptor);
 
          if Target.all in Static_Stack_Analysis.Fake_Node'Class then
-            Ada.Text_IO.Set_Output (Undefined_Descriptor);
-
-            Print_Edge (Source => Caller, Target => "XXX");
+            Print_Edge
+              (Source => Caller,
+               Target => "XXX",
+               File => Undefined_Descriptor);
          end if;
 
       end Expand_Edge;
@@ -883,6 +1132,40 @@ package body Display is
       Static_Stack_Analysis.List_Of_Edges.Iterate
         (Node.Target_Calls, Expand_Edge'Access);
 
+      Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
+
+      --  Send subprogram information to the XML file
+
+      if Options.Generate_XML_Output then
+         Open_Tag ("subprogram");
+
+         Open_Tag ("prefixname type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Print_Ada_Name (Node, XML_Descriptor);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("prefixname");
+
+         Open_Tag ("locationset");
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Locations, Print_XML_Location'Access);
+         Close_Tag ("locationset");
+
+         Open_Tag ("globalstackusage");
+         Print_XML_Stack_Usage (Node.Accumulated_Stack_Usage);
+         Close_Tag ("globalstackusage");
+
+         Open_Tag ("localstackusage");
+         Print_XML_Stack_Usage (Stack);
+         Close_Tag ("localstackusage");
+
+         Open_Tag ("subprogramcalledset");
+         Static_Stack_Analysis.List_Of_Edges.Iterate
+           (Node.Target_Calls, Print_XML_Edge'Access);
+         Close_Tag ("subprogramcalledset");
+
+         Close_Tag ("subprogram");
+      end if;
    end Expand_Node;
 
    ------------------------
@@ -1033,10 +1316,36 @@ package body Display is
 
       Ada.Text_IO.New_Line;
 
+      --  Print entry point information to the XML file
+
+      if Options.Generate_XML_Output then
+         Open_Tag ("prefixname type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Print_Ada_Name (Root, XML_Descriptor);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("prefixname");
+
+         Open_Tag ("locationset");
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Static_Stack_Analysis.Get_Location_List (Root.all),
+            Print_XML_Location'Access);
+         Close_Tag ("locationset");
+
+         Open_Tag ("localstackusage");
+         Print_XML_Stack_Usage (Accumulated_Stack);
+         Close_Tag ("localstackusage");
+      end if;
+
+      --  Note that this Tag is closed in Print_Longest_Path
+
+      Open_Tag ("callchain");
+
       if Task_Wrapper /= null then
          --  Print the frame for the task wrapper
-
+         Open_Tag ("subprogram");
          Print_Node (Task_Wrapper);
+         Close_Tag ("subprogram");
       end if;
    end Print_Entry;
 
@@ -1054,6 +1363,8 @@ package body Display is
         Static_Stack_Analysis.Paths.First (Path);
 
    begin
+      Open_Tag ("cycle");
+
       Print_Cycle_Id (Cycle);
 
       Ada.Text_IO.Put (" ");
@@ -1074,6 +1385,7 @@ package body Display is
 
       Ada.Text_IO.New_Line;
 
+      Close_Tag ("cycle");
    end Print_Cycle;
 
    --------------------
@@ -1105,7 +1417,11 @@ package body Display is
       then
          Ada.Text_IO.Put ("  ");
 
+         Open_Tag ("external");
+
          Print_Name (Node);
+
+         Close_Tag ("external");
 
          Ada.Text_IO.New_Line;
       end if;
@@ -1155,7 +1471,11 @@ package body Display is
 
             Ada.Text_IO.Put (" indirect calls in: ");
 
+            Open_Tag ("indirect");
+
             Print_Name (Node);
+
+            Close_Tag ("indirect");
 
             Ada.Text_IO.New_Line;
          end if;
@@ -1180,14 +1500,137 @@ package body Display is
       then
          Ada.Text_IO.Put ("  In ");
 
+         Open_Tag ("unbounded");
+
          Print_Name (Node);
 
          Ada.Text_IO.New_Line;
 
+         Open_Tag ("unboundedobjectset");
+
          Static_Stack_Analysis.List_Of_Locations.Iterate
            (Static_Stack_Analysis.Explicit_Node (Node.all).Dynamic_Objects,
             Print_Dynamic_Objects'Access);
+
+         Close_Tag ("unboundedobjectset");
+
+         Close_Tag ("unbounded");
       end if;
    end Print_Unbounded;
 
+   --------------------
+   -- Print_XML_Edge --
+   --------------------
+
+   procedure Print_XML_Edge (Position : in Static_Stack_Analysis.Edge_Id) is
+      Target : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element
+          (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
+
+      Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
+           Static_Stack_Analysis.Get_Location_List (Target.all);
+
+   begin
+      Open_Tag ("subprogram");
+
+      Open_Tag ("prefixname type=""strings""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Print_Ada_Name (Target, XML_Descriptor);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, "</value>");
+      Close_Tag ("prefixname");
+
+      Open_Tag ("locationset");
+      Static_Stack_Analysis.List_Of_Locations.Iterate
+        (Locations, Print_XML_Location'Access);
+      Close_Tag ("locationset");
+
+      Close_Tag ("subprogram");
+   end Print_XML_Edge;
+
+   ------------------------
+   -- Print_XML_Location --
+   ------------------------
+
+   procedure Print_XML_Location
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+   is
+      Location : constant Static_Stack_Analysis.Location :=
+        Static_Stack_Analysis.List_Of_Locations.Element (Position);
+
+   begin
+      Open_Tag ("location");
+
+      Open_Tag ("subprogramname type=""strings""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, Location.Demangled.all & "</value>");
+      Close_Tag ("subprogramname");
+
+      Open_Tag ("file type=""strings""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, Location.File.all & "</value>");
+      Close_Tag ("file");
+
+      Open_Tag ("line type=""integers""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Integer_Text_IO.Put
+        (XML_Descriptor, Location.Line_Number, 0);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, "</value>");
+      Close_Tag ("line");
+
+      Open_Tag ("column type=""integers""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Integer_Text_IO.Put
+        (XML_Descriptor, Location.Column_Number, 0);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, "</value>");
+      Close_Tag ("column");
+
+      Close_Tag ("location");
+   end Print_XML_Location;
+
+   ---------------------------
+   -- Print_XML_Stack_Usage --
+   ---------------------------
+
+   procedure Print_XML_Stack_Usage
+     (Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info)
+   is
+   begin
+      Open_Tag ("size type=""integers""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Integer_Text_IO.Put
+        (XML_Descriptor, Integer (Stack_Usage.Static_Usage), 0);
+      Ada.Text_IO.Put_Line
+        (XML_Descriptor, "</value>");
+      Close_Tag ("size");
+
+      Open_Tag ("qualifier");
+      Report_XML
+        ("<value>" &
+         Static_Stack_Analysis.Stack_Usage'Image (Stack_Usage.Frame_Type) &
+         "</value>");
+      Close_Tag ("qualifier");
+   end Print_XML_Stack_Usage;
+
+   ----------------
+   -- Report_XML --
+   ----------------
+
+   procedure Report_XML (Message : String; New_Line : Boolean := True) is
+   begin
+
+      if Options.Generate_XML_Output then
+         Ada.Text_IO.Put
+           (XML_Descriptor, XML_Indentation * Indent_String & Message);
+
+         if New_Line then
+            Ada.Text_IO.New_Line (XML_Descriptor);
+         end if;
+      end if;
+
+   end Report_XML;
 end Display;

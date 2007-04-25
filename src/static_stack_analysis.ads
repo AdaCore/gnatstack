@@ -5,18 +5,18 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2006, AdaCore                     --
+--                     Copyright (C) 2005-2007, AdaCore                     --
 --                                                                          --
--- SSAT is free software;  you can  redistribute it  and/or modify it under --
--- terms of the  GNU General Public License as published  by the Free Soft- --
--- ware  Foundation;  either version 2,  or (at your option) any later ver- --
--- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
--- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
--- for  more details.  You should have  received  a copy of the GNU General --
--- Public License  distributed with GNAT;  see file COPYING.  If not, write --
--- to  the  Free Software Foundation,  51  Franklin  Street,  Fifth  Floor, --
--- Boston, MA 02110-1301, USA.                                              --
+-- GNATStack  is free  software;  you can redistribute  it and/or modify it --
+-- under terms of the  GNU General Public License as published  by the Free --
+-- Software  Foundation;  either version 2,  or (at your option)  any later --
+-- version.  GNATstack is distributed  in the hope that it will be  useful, --
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANT- --
+-- ABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public --
+-- License for  more details.  You should have  received  a copy of the GNU --
+-- General Public License distributed with GNATStack;  see file COPYING. If --
+-- not, write to the  Free Software Foundation,  51 Franklin Street,  Fifth --
+-- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
 with Ada.Containers.Vectors;
@@ -336,13 +336,13 @@ package Static_Stack_Analysis is
 
    type Real_Node is abstract new Node with
       record
-         Location_List   : List_Of_Locations.Set;
+         Location_List : List_Of_Locations.Set;
          --  List of places where the subprogram appears. This list of
          --  locations will typically contain just one entry, and it will
          --  contain a list of more than one location in the case of
          --  instantiations of generic units.
 
-         Subprogram      : Name;
+         Subprogram    : Name;
          --  Name of the symbol representing this subprogram
       end record;
    --  Node representing  real nodes (explicit and unresolved). We need to

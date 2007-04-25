@@ -5,18 +5,18 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2006, AdaCore                     --
+--                     Copyright (C) 2005-2007, AdaCore                     --
 --                                                                          --
--- SSAT is free software;  you can  redistribute it  and/or modify it under --
--- terms of the  GNU General Public License as published  by the Free Soft- --
--- ware  Foundation;  either version 2,  or (at your option) any later ver- --
--- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
--- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
--- or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License --
--- for  more details.  You should have  received  a copy of the GNU General --
--- Public License  distributed with GNAT;  see file COPYING.  If not, write --
--- to  the  Free Software Foundation,  51  Franklin  Street,  Fifth  Floor, --
--- Boston, MA 02110-1301, USA.                                              --
+-- GNATStack  is free  software;  you can redistribute  it and/or modify it --
+-- under terms of the  GNU General Public License as published  by the Free --
+-- Software  Foundation;  either version 2,  or (at your option)  any later --
+-- version.  GNATstack is distributed  in the hope that it will be  useful, --
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANT- --
+-- ABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public --
+-- License for  more details.  You should have  received  a copy of the GNU --
+-- General Public License distributed with GNATStack;  see file COPYING. If --
+-- not, write to the  Free Software Foundation,  51 Franklin Street,  Fifth --
+-- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
 with Global_Data;
@@ -437,7 +437,7 @@ package body Parser is
       loop
          case
            GNAT.Command_Line.Getopt
-             ("h g v l: ca W! o= a u: d: p e: r: f: aO: files=")
+             ("a aO: ca d: e: f: files= g h l: o= p r: u: v W! x")
          is
             when ASCII.NUL =>
                exit;
@@ -448,7 +448,7 @@ package body Parser is
 
                Ada.Text_IO.Put      ("GNATstack Pro ");
                Ada.Text_IO.Put_Line (Version.Version_String);
-               Ada.Text_IO.Put_Line ("Copyright 2005-2006, AdaCore");
+               Ada.Text_IO.Put_Line ("Copyright 2005-2007, AdaCore");
                Ada.Text_IO.New_Line;
 
             --  Debug
@@ -566,6 +566,10 @@ package body Parser is
                elsif GNAT.Command_Line.Full_Switch = "files" then
                   Get_Stack_Usage_Files (GNAT.Command_Line.Parameter);
                end if;
+
+            --  XML output
+            when 'x' =>
+               Options.Generate_XML_Output := True;
 
             when others =>
                Print_Usage_And_Exit;
@@ -1363,32 +1367,34 @@ package body Parser is
       Put_Line ("Usage: gnatstack [args ...] [<.ci files>]");
       New_Line;
       Put_Line ("where possible arguments are:");
-      Put_Line ("  -h           display help message");
+      Put_Line ("  -a           use all  subprograms as entry points");
+      Put_Line ("  -aO dir      search for .ci files in dir");
+      Put_Line ("  -ca          extract all cycles");
+      Put_Line ("  -d size      default for unbounded (dynamic) calls");
+      Put_Line ("  -e <list>    use specific list of subprograms as entry " &
+                               "points (e1,e2,...)");
+      Put_Line ("  -f file      output graph file");
+      Put_Line ("  -files=file  file containing the list of .ci files");
       Put_Line ("  -g           debug information");
-      Put_Line ("  -v           verbose");
+      Put_Line ("  -h           display help message");
       Put_Line ("  -l n         print the n subprograms requiring the " &
                                "biggest local stack usage");
-      Put_Line ("  -ca          extract all cycles");
+      Put_Line ("  -o={a,s}     order for displaying call graphs");
+      Put_Line ("      a        alphabetical");
+      Put_Line ("      s        stack usage (default)");
+      Put_Line ("  -p           display the worst-case path for entry points");
+      Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
+                               "entry points");
+      Put_Line ("  -u size      default for unknown (external) calls");
+      Put_Line ("  -v           verbose");
       Put_Line ("  -Wxx         enable warnings, xx = list of parameters:");
       Put_Line ("    a          turn on all optional warnings");
       Put_Line ("    c          turn on warnings for cycles");
       Put_Line ("    u          turn on warnings for unbounded frames");
       Put_Line ("    e          turn on warnings for external calls");
       Put_Line ("    i          turn on warnings for indirect calls");
-      Put_Line ("  -o={a,s}     order for displaying call graphs");
-      Put_Line ("  -o=a         alphabetical");
-      Put_Line ("  -o=s         stack usage (default)");
-      Put_Line ("  -u size      default for unknown (external) calls");
-      Put_Line ("  -d size      default for unbounded (dynamic) calls");
-      Put_Line ("  -p           display the worst-case path for entry points");
-      Put_Line ("  -a           use all  subprograms as entry points");
-      Put_Line ("  -e <list>    use specific list of subprograms as entry " &
-                               "points (e1,e2,...)");
-      Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
-                               "entry points");
-      Put_Line ("  -f file      output graph file");
-      Put_Line ("  -aO dir      search for .ci files in dir");
-      Put_Line ("  -files=file  file containing the list of .ci files");
+      Put_Line ("  -x           generate the XML output");
+      New_Line;
       Put_Line ("  <files>      list of .ci files (c1.ci c2.ci ...)");
    end Usage;
 
