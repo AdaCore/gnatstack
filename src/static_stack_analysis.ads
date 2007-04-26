@@ -330,6 +330,11 @@ package Static_Stack_Analysis is
    --  column) where dynamic objects are defined (if any) within the
    --  subprogram represented.
 
+   function Get_Indirect_Calls
+     (Target : Node) return List_Of_Locations.Set is abstract;
+   --  This function returns the list of locations (file, line, column) where
+   --  indirect calls are made within the subprogram represented.
+
    ---------------
    -- Real_Node --
    ---------------
@@ -388,6 +393,11 @@ package Static_Stack_Analysis is
    --  column) where dynamic objects are defined (if any) for an explicit
    --  node.
 
+   overriding function Get_Indirect_Calls
+     (Target : Explicit_Node) return List_Of_Locations.Set;
+   --  This function returns the list of locations (file, line, column) where
+   --  indirect calls are made for an explicit node.
+
    not overriding procedure Update_Stack_Usage
      (Target : in out Explicit_Node; Stack_Usage : Stack_Usage_Info);
    --  Incorporate the stack usage information for an explicit node
@@ -410,6 +420,11 @@ package Static_Stack_Analysis is
    --  This function returns the list of locations (file, demangled, line,
    --  column) where dynamic objects are defined (if any) for an unresolved
    --  node.
+
+   overriding function Get_Indirect_Calls
+     (Target : Unresolved_Node) return List_Of_Locations.Set;
+   --  This function returns the list of locations (file, line, column) where
+   --  indirect calls are made for an unresolved node.
 
    ---------------
    -- Fake_Node --
@@ -438,6 +453,11 @@ package Static_Stack_Analysis is
      (Target : Fake_Node) return List_Of_Locations.Set;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where dynamic objects are defined (if any) for a fake node.
+
+   overriding function Get_Indirect_Calls
+     (Target : Fake_Node) return List_Of_Locations.Set;
+   --  This function returns the list of locations (file, line, column) where
+   --  indirect calls are made for a fake node.
 
    ----------------------
    -- Dispatching_Node --

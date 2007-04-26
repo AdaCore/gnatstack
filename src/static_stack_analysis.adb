@@ -124,23 +124,37 @@ package body Static_Stack_Analysis is
 
    function Alphabetical_Order (Left, Right : Location) return Boolean is
    begin
-      return Left.File.all < Right.File.all
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all < Right.Demangled.all)
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all = Right.Demangled.all
-                   and then Left.Line_Number < Right.Line_Number)
-        or else (Left.File.all = Right.File.all
-                   and then Left.Demangled.all = Right.Demangled.all
-                   and then Left.Line_Number = Right.Line_Number
-                   and then Left.Column_Number < Right.Column_Number);
+      --  Compare first the file name, then the subprogram name, and finally
+      --  the line number.
+
+      if Left.File = null then
+         return True;
+      elsif Right.File = null then
+         return False;
+      elsif Left.File.all /= Right.File.all then
+         return Left.File.all < Right.File.all;
+      elsif Left.Demangled = null then
+         return True;
+      elsif Right.Demangled = null then
+         return False;
+      elsif Left.Demangled.all /= Right.Demangled.all then
+         return Left.Demangled.all < Right.Demangled.all;
+      else
+         return Left.Line_Number < Right.Line_Number;
+      end if;
    end Alphabetical_Order;
 
    function Alphabetical_Order
      (Left, Right : Node_Class_Access) return Boolean is
    begin
-      return Get_Subprogram_Name (Left.all).all <
-        Get_Subprogram_Name (Right.all).all;
+      if Left = null then
+         return True;
+      elsif Right = null then
+         return False;
+      else
+         return Get_Subprogram_Name (Left.all).all <
+           Get_Subprogram_Name (Right.all).all;
+      end if;
    end Alphabetical_Order;
 
    -----------
@@ -188,6 +202,48 @@ package body Static_Stack_Analysis is
    begin
       return List_Of_Locations.Empty_Set;
    end Get_Dynamic_Objects;
+
+   ------------------------
+   -- Get_Indirect_Calls --
+   ------------------------
+
+   function Get_Indirect_Calls
+     (Target : Explicit_Node) return List_Of_Locations.Set
+   is
+      List_Of_Indirect_Calls : List_Of_Locations.Set :=
+        List_Of_Locations.Empty_Set;
+
+      procedure Extract_Indirect_Calls (Position : in Edge_Id);
+      --  If the referenced call is an indirect call then insert its location
+      --  within the set to be returned.
+
+      procedure Extract_Indirect_Calls (Position : in Edge_Id) is
+         Call : constant Edge := List_Of_Edges.Element (Position);
+
+      begin
+         if List_Of_Nodes.Element (Call.Target).all in Fake_Node'Class then
+            List_Of_Indirect_Calls.Union (Call.Point_Of_Call);
+         end if;
+      end Extract_Indirect_Calls;
+
+   begin
+      Target.Target_Calls.Iterate (Extract_Indirect_Calls'Access);
+      return List_Of_Indirect_Calls;
+   end Get_Indirect_Calls;
+
+   function Get_Indirect_Calls
+     (Target : Unresolved_Node) return List_Of_Locations.Set is
+      pragma Unreferenced (Target);
+   begin
+      return List_Of_Locations.Empty_Set;
+   end Get_Indirect_Calls;
+
+   function Get_Indirect_Calls
+     (Target : Fake_Node) return List_Of_Locations.Set is
+      pragma Unreferenced (Target);
+   begin
+      return List_Of_Locations.Empty_Set;
+   end Get_Indirect_Calls;
 
    -----------------------
    -- Get_Location_List --

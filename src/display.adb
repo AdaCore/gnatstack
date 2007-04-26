@@ -513,6 +513,8 @@ package body Display is
          Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
            Static_Stack_Analysis.Get_Stack_Usage (Node.all);
       begin
+         Open_Tag ("frame");
+
          --  Subprogram name
 
          Print_Name (Node);
@@ -530,6 +532,8 @@ package body Display is
             Print_XML_Stack_Usage (Stack_Info);
             Close_Tag ("localstackusage");
          end if;
+
+         Close_Tag ("frame");
 
          Ada.Text_IO.New_Line;
       end Print_Node;
@@ -819,6 +823,8 @@ package body Display is
       use type Global_Data.Phase_Type;
 
    begin
+      Open_Tag ("subprogram");
+
       --  Indentation
 
       Ada.Text_IO.Put (" +-> ");
@@ -857,6 +863,8 @@ package body Display is
 
          Ada.Text_IO.Put (" *");
       end if;
+
+      Close_Tag ("subprogram");
 
       Ada.Text_IO.New_Line;
    end Print_Node;
@@ -1435,50 +1443,73 @@ package body Display is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
-      Counter : Natural := 0;
-      --  Number of indirect calls made by the node under analysis
+      Indirect_Calls : constant Static_Stack_Analysis.List_Of_Locations.Set :=
+        Static_Stack_Analysis.Get_Indirect_Calls (Node.all);
+      --  Set of locations where there is an indirect call within the
+      --  subprogram being analyzed.
 
-      procedure Is_Indirect (Position : in Static_Stack_Analysis.Edge_Id);
-      --  If the referenced call is an indirect call Counter is incremented
+      procedure Print_Location
+        (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
+      --  Print the location using the format: file:line
 
-      procedure Is_Indirect (Position : in Static_Stack_Analysis.Edge_Id) is
-
-         procedure Is_Indirect
-           (Target : Static_Stack_Analysis.Node_Class_Access);
-
-         procedure Is_Indirect
-           (Target : Static_Stack_Analysis.Node_Class_Access) is
-         begin
-            if Target.all in Static_Stack_Analysis.Fake_Node'Class then
-               Counter := Counter + 1;
-            end if;
-         end Is_Indirect;
+      procedure Print_Location
+        (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+      is
+         Location : constant Static_Stack_Analysis.Location :=
+           Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
       begin
-         Static_Stack_Analysis.List_Of_Nodes.Query_Element
-           (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target,
-            Is_Indirect'Access);
-      end Is_Indirect;
+         --  File location
+
+         Ada.Text_IO.Put ("    at " & Location.File.all & ":");
+         Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+         Ada.Text_IO.New_Line;
+
+         --  Print location to the XML file
+
+         if Options.Generate_XML_Output then
+            Open_Tag ("indirectcall");
+
+            Open_Tag ("file type=""strings""");
+            Report_XML (Message => "<value>", New_Line => False);
+            Ada.Text_IO.Put_Line
+              (XML_Descriptor, Location.File.all & "</value>");
+            Close_Tag ("file");
+
+            Open_Tag ("line type=""integers""");
+            Report_XML (Message => "<value>", New_Line => False);
+            Ada.Integer_Text_IO.Put
+              (XML_Descriptor, Location.Line_Number, 0);
+            Ada.Text_IO.Put_Line
+              (XML_Descriptor, "</value>");
+            Close_Tag ("line");
+
+            Close_Tag ("indirectcall");
+         end if;
+      end Print_Location;
 
    begin
-      if Node.Analysis_Finished then
-         Node.Target_Calls.Iterate (Is_Indirect'Access);
+      if not Indirect_Calls.Is_Empty then
+         Ada.Text_IO.Put ("  ");
 
-         if Counter > 0 then
-            Ada.Text_IO.Put ("  ");
+         Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
 
-            Ada.Integer_Text_IO.Put (Counter, 0);
+         Ada.Text_IO.Put (" indirect calls in: ");
 
-            Ada.Text_IO.Put (" indirect calls in: ");
+         Open_Tag ("indirect");
 
-            Open_Tag ("indirect");
+         Print_Name (Node);
 
-            Print_Name (Node);
+         Ada.Text_IO.New_Line;
 
-            Close_Tag ("indirect");
+         Open_Tag ("indirectcallset");
 
-            Ada.Text_IO.New_Line;
-         end if;
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Indirect_Calls, Print_Location'Access);
+
+         Close_Tag ("indirectcallset");
+
+         Close_Tag ("indirect");
       end if;
    end Print_Indirect;
 

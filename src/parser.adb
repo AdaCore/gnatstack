@@ -161,8 +161,10 @@ package body Parser is
 
    Edge_Regexp : constant String :=
      "^edge: { sourcename: " & '"' & "([^" & '"' & "]+)" & '"' &
-     " targetname: " & '"' & "([^" & '"' & "]+)" & '"';
+     " targetname: " & '"' & "([^" & '"' & "]+)" & '"' & "(" &
+     " label: " & '"' & "([^:]+):([0-9]+)" & '"' & ")??" & " }";
    --  Pattern: ^edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
+   --           ( label: "([^:]+):([0-9]+)")?? }
 
    Label_Regexp : constant String :=
      "^([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
@@ -245,8 +247,10 @@ package body Parser is
    --  Format :  shape : ellipse
 
    procedure Parse_Edge (Input : String);
-   --  Get caller and callee in a subprogram call.
-   --  Format : ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
+   --  Get caller and callee in a subprogram call. It may also contain the
+   --  location of the call. Format :
+   --  ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
+   --  [label: "location" ] }
 
    procedure Parse_Dynamic_Objects
      (Input           : in String;
@@ -1181,19 +1185,23 @@ package body Parser is
    procedure Parse_Edge (Input : String) is
       use Static_Stack_Analysis;
 
-      Matches    : GNAT.Regpat.Match_Array (0 .. 2);
+      Matches      : GNAT.Regpat.Match_Array (0 .. 5);
 
-      Source_Id  : Static_Stack_Analysis.Node_Id;
-      Target_Id  : Static_Stack_Analysis.Node_Id;
+      Source_Id    : Static_Stack_Analysis.Node_Id;
+      Target_Id    : Static_Stack_Analysis.Node_Id;
 
-      Source_Ptr : Static_Stack_Analysis.Node_Class_Access;
-      Target_Ptr : Static_Stack_Analysis.Node_Class_Access;
+      Source_Ptr   : Static_Stack_Analysis.Node_Class_Access;
+      Target_Ptr   : Static_Stack_Analysis.Node_Class_Access;
 
-      Inserted   : Boolean;
+      Tmp_Location : Static_Stack_Analysis.Location :=
+        Static_Stack_Analysis.Null_Location;
+
+      Inserted     : Boolean;
 
    begin
       --  The pattern of the input line is:
-      --  edge: { sourcename: "([^"]+)" targetname: "([^"]+)" }
+      --  edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
+      --  ( label: "([^:]+):([0-9]+)")?? }
 
       --  Get source and target
 
@@ -1274,6 +1282,16 @@ package body Parser is
             end if;
          end if;
 
+         --  Get the location of this call
+
+         if Matches (3) /= GNAT.Regpat.No_Match then
+            Tmp_Location.File :=
+              new String'(Input (Matches (4).First .. Matches (4).Last));
+
+            Tmp_Location.Line_Number :=
+              Integer'Value (Input (Matches (5).First .. Matches (5).Last));
+         end if;
+
          --  Now we need to check whether there is already an edge joining
          --  these two subprograms. We add the new location if the node exists,
          --  or create a new edge otherwise. For indirect calls we keep the
@@ -1301,7 +1319,13 @@ package body Parser is
                Call := Static_Stack_Analysis.List_Of_Edges.Element (Index);
 
                if Static_Stack_Analysis."=" (Call.Target, Target_Id) then
-                  --  Add new location. We do not have yet the information ???
+                  --  Add new location.
+
+                  if Tmp_Location /= Static_Stack_Analysis.Null_Location then
+                     Call.Point_Of_Call.Include (Tmp_Location);
+                  end if;
+
+                  --  We found the edge so that we leave
 
                   exit;
 
@@ -1318,7 +1342,7 @@ package body Parser is
                  (Source_Ptr.Target_Calls,
                   new Static_Stack_Analysis.Edge_Element'(
                     Target         => Target_Id,
-                    Point_Of_Call  => List_Of_Locations.Empty_Set,
+                    Point_Of_Call  => List_Of_Locations.To_Set (Tmp_Location),
                     Feasible_Call  => True,
                     Under_Analysis => False));
             end if;
