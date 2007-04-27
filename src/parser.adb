@@ -182,8 +182,8 @@ package body Parser is
    --  Pattern: ^([^:,]+):([0-9]+):*([0-9]+)*,*(.+)*$
 
    Data_Location_Regexp : constant String :=
-     "^\\n ([^ ]+) ([^:]+):([0-9]+)(.+)*$";
-   --  Pattern: ^\\n ([^ ]+) ([^:]+):([0-9]+)(.+)*$
+     "^\\n ([^ ]+) (.+?):([0-9]+)(\\n .+)*$";
+   --  Pattern: ^\\n ([^ ]+) (.+?):([0-9]+)(\\n .+)*$
 
    Stack_Regexp : constant String :=
      "^([0-9]+)+ bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))??$";
