@@ -275,6 +275,7 @@ package body Display is
       Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
 
       if Options.Generate_XML_Output then
+         Close_Tag ("GNATstack_Information");
          Ada.Text_IO.Close (XML_Descriptor);
       end if;
 
@@ -314,13 +315,12 @@ package body Display is
 
       --  Separator between the Ada name and the file location
 
-      if Ada.Text_IO.Is_Open (VCG_Descriptor) then
+      if Ada.Text_IO.Current_Output = Ada.Text_IO.Standard_Output then
+         Ada.Text_IO.Put (":");
+      else
          --  Separator for the VCG file
 
          Ada.Text_IO.Put ("\n");
-
-      else
-         Ada.Text_IO.Put (":");
       end if;
 
       --  File location
@@ -410,6 +410,7 @@ package body Display is
 
       if Options.Generate_XML_Output then
          Ada.Text_IO.Put_Line (XML_Descriptor, "<?xml version=""1.0""?>");
+         Open_Tag ("GNATstack_Information");
       end if;
    end Open_Output_Files;
 
