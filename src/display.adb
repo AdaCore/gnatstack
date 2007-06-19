@@ -315,11 +315,14 @@ package body Display is
 
       --  Separator between the Ada name and the file location
 
-      if Ada.Text_IO.Current_Output = Ada.Text_IO.Standard_Output then
+      if Ada.Text_IO.Name (Ada.Text_IO.Current_Output) =
+        Ada.Text_IO.Name (Ada.Text_IO.Standard_Output)
+      then
+         --  Separator for the regular output
          Ada.Text_IO.Put (":");
-      else
-         --  Separator for the VCG file
 
+      else
+         --  Separator for the VCG files
          Ada.Text_IO.Put ("\n");
       end if;
 
@@ -412,6 +415,8 @@ package body Display is
          Ada.Text_IO.Put_Line (XML_Descriptor, "<?xml version=""1.0""?>");
          Open_Tag ("GNATstack_Information");
       end if;
+
+      Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
    end Open_Output_Files;
 
    --------------
@@ -479,8 +484,6 @@ package body Display is
 
          if Node.all in Static_Stack_Analysis.Explicit_Node'Class
            and then
-             Node.Analysis_Finished
-           and then
              (Static_Stack_Analysis.List_Of_Node_Ids.Length (Big_Frames) <
               Ada.Containers.Count_Type (Frames)
                 or else
@@ -525,6 +528,13 @@ package body Display is
          --  Local stack usage
 
          Expand_Stack_Usage (Stack_Info);
+
+         --  If the code is not reachable from any of the specified entry
+         --  points we mark the subprogram as unreachable.
+
+         if not Node.Analysis_Finished then
+            Ada.Text_IO.Put (" (unreachable)");
+         end if;
 
          --  Send stack information to the XML file if needed
 
@@ -1421,9 +1431,7 @@ package body Display is
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
    begin
-      if Node.Analysis_Finished
-        and then Node.all in Static_Stack_Analysis.Unresolved_Node'Class
-      then
+      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class then
          Ada.Text_IO.Put ("  ");
 
          Open_Tag ("external");
@@ -1431,6 +1439,13 @@ package body Display is
          Print_Name (Node);
 
          Close_Tag ("external");
+
+         --  If the code is not reachable from any of the specified entry
+         --  points we mark the subprogram as unreachable.
+
+         if not Node.Analysis_Finished then
+            Ada.Text_IO.Put (" (unreachable)");
+         end if;
 
          Ada.Text_IO.New_Line;
       end if;
@@ -1525,16 +1540,21 @@ package body Display is
       use type Static_Stack_Analysis.Stack_Usage;
 
    begin
-      if Node.Analysis_Finished
-        and then
-          Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
-          Static_Stack_Analysis.Unbounded
+      if Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
+         Static_Stack_Analysis.Unbounded
       then
          Ada.Text_IO.Put ("  In ");
 
          Open_Tag ("unbounded");
 
          Print_Name (Node);
+
+         --  If the code is not reachable from any of the specified entry
+         --  points we mark the subprogram as unreachable.
+
+         if not Node.Analysis_Finished then
+            Ada.Text_IO.Put (" (unreachable)");
+         end if;
 
          Ada.Text_IO.New_Line;
 
