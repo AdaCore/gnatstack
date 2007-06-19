@@ -1516,6 +1516,13 @@ package body Display is
 
          Print_Name (Node);
 
+         --  If the code is not reachable from any of the specified entry
+         --  points we mark the subprogram as unreachable.
+
+         if not Node.Analysis_Finished then
+            Ada.Text_IO.Put (" (unreachable)");
+         end if;
+
          Ada.Text_IO.New_Line;
 
          Open_Tag ("indirectcallset");
