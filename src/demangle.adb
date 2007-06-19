@@ -76,7 +76,7 @@ package body Demangle is
       --  Check for encoded indirect calls
 
       if Symbol_Name = Static_Stack_Analysis.Indirect_Call.all then
-         return "<indirect call>";
+         return "*indirect call";
       end if;
 
       Buffer (1 .. Length) := Symbol_Name;
