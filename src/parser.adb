@@ -162,9 +162,9 @@ package body Parser is
    Edge_Regexp : constant String :=
      "^edge: { sourcename: " & '"' & "([^" & '"' & "]+)" & '"' &
      " targetname: " & '"' & "([^" & '"' & "]+)" & '"' & "(" &
-     " label: " & '"' & "([^:]+):([0-9]+)" & '"' & ")??" & " }";
+     " label: " & '"' & "(.+):([0-9]+)" & '"' & ")??" & " }";
    --  Pattern: ^edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
-   --           ( label: "([^:]+):([0-9]+)")?? }
+   --           ( label: "(.+):([0-9]+)")?? }
 
    Allowed_Lines_Regexp : constant String :=
      "^(\s*)((})|(graph: { title:)|(--)|$)";
