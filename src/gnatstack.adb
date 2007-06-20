@@ -36,6 +36,9 @@ with Global_Data;
 --  Used for Entry_Points
 --           Phase
 
+with Ada.Text_IO;
+--  Used for Put_Line
+
 procedure Gnatstack is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
@@ -70,4 +73,8 @@ begin
    --  Close output files
 
    Display.Close_Output_Files;
+
+exception
+   when others =>
+      Ada.Text_IO.Put_Line ("GNATstack: analysis abandoned");
 end Gnatstack;
