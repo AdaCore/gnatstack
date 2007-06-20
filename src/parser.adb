@@ -166,6 +166,10 @@ package body Parser is
    --  Pattern: ^edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
    --           ( label: "([^:]+):([0-9]+)")?? }
 
+   Allowed_Lines_Regexp : constant String :=
+     "^(\s*)((})|(graph: { title:)|(--)|$)";
+   --  Pattern: ^(\s*)((})|(graph: { title:)|(--)|$)
+
    Label_Regexp : constant String :=
      "^([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
      "( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??" &
@@ -438,22 +442,26 @@ package body Parser is
    begin
       --  Get options
 
-      loop
-         case
-           GNAT.Command_Line.Getopt
-             ("a aO: ca d: e: f: files= g h l: o= p r: u: v W! x")
-         is
+      declare
+      begin
+         loop
+            case
+              GNAT.Command_Line.Getopt
+                ("a aO: ca d: e: f: files= g h l: o= p r: u: v W! x")
+            is
             when ASCII.NUL =>
                exit;
 
             --  Verbose
             when 'v' =>
-               Options.Verbose := True;
+               if not Options.Verbose then
+                  Options.Verbose := True;
 
-               Ada.Text_IO.Put      ("GNATstack Pro ");
-               Ada.Text_IO.Put_Line (Version.Version_String);
-               Ada.Text_IO.Put_Line ("Copyright 2005-2007, AdaCore");
-               Ada.Text_IO.New_Line;
+                  Ada.Text_IO.Put      ("GNATstack Pro ");
+                  Ada.Text_IO.Put_Line (Version.Version_String);
+                  Ada.Text_IO.Put_Line ("Copyright 2005-2007, AdaCore");
+                  Ada.Text_IO.New_Line;
+               end if;
 
             --  Debug
             when 'g' =>
@@ -461,17 +469,24 @@ package body Parser is
 
             --  Biggest local stack usage
             when 'l' =>
-               Options.Number_Of_Biggest_Frames :=
-                 Natural'Value (GNAT.Command_Line.Parameter);
+               declare
+               begin
+                  Options.Number_Of_Biggest_Frames :=
+                    Natural'Value (GNAT.Command_Line.Parameter);
+               exception
+                  when Constraint_Error =>
+                     raise GNAT.Command_Line.Invalid_Parameter;
+               end;
 
             --  All cycles
             when 'c' =>
+               --  -ca option
                if GNAT.Command_Line.Full_Switch = "ca" then
                   Options.Compute_All_Cycles := True;
+
+               --  Wrong option
                else
-                  Ada.Text_IO.Put_Line
-                    ("Unknown option: " & GNAT.Command_Line.Full_Switch);
-                  Print_Usage_And_Exit;
+                  raise GNAT.Command_Line.Invalid_Parameter;
                end if;
 
             --  Warnings
@@ -481,24 +496,29 @@ package body Parser is
                begin
                   for Index in Parameter'Range loop
                      case Parameter (Index) is
+                        --  -Wa
                         when 'a' =>
                            Options.Warnings := (others => True);
 
+                        --  -Wc
                         when 'c' =>
                            Options.Warnings (Options.Cycle) := True;
 
+                        --  -Wu
                         when 'u' =>
                            Options.Warnings (Options.Unbounded) := True;
 
+                        --  -We
                         when 'e' =>
                            Options.Warnings (Options.External) := True;
 
+                        --  -Wi
                         when 'i' =>
                            Options.Warnings (Options.Indirect) := True;
 
+                        --  Wrong warning option
                         when others =>
-                           Ada.Text_IO.Put_Line ("Bad warning (-W) option");
-                           Print_Usage_And_Exit;
+                           raise GNAT.Command_Line.Invalid_Parameter;
                      end case;
                   end loop;
                end;
@@ -508,13 +528,17 @@ package body Parser is
                declare
                   Parameter : constant String := GNAT.Command_Line.Parameter;
                begin
+                  --  -oa
                   if Parameter = "a" then
-                        Options.Order := Options.Alphabetical;
+                     Options.Order := Options.Alphabetical;
+
+                  --  -os
                   elsif Parameter = "s" then
-                        Options.Order := Options.Stack_Usage;
+                     Options.Order := Options.Stack_Usage;
+
+                  --  Wrong option
                   else
-                        Ada.Text_IO.Put_Line ("Bad order (-o) option");
-                        Print_Usage_And_Exit;
+                     raise GNAT.Command_Line.Invalid_Parameter;
                   end if;
                end;
 
@@ -527,21 +551,37 @@ package body Parser is
                elsif GNAT.Command_Line.Full_Switch = "aO" then
                   declare
                      Directory : constant String :=
-                                   GNAT.Command_Line.Parameter;
+                       GNAT.Command_Line.Parameter;
                   begin
                      Append_Files_From_Directory (Input_Files, Directory);
                   end;
+
+               --  Wrong option
+               else
+                  raise GNAT.Command_Line.Invalid_Switch;
                end if;
 
             --  Default stack requirements for unknown (external) calls
             when 'u' =>
-               Options.Default_Unknown :=
-                 Natural'Value (GNAT.Command_Line.Parameter);
+               declare
+               begin
+                  Options.Default_Unknown :=
+                    Natural'Value (GNAT.Command_Line.Parameter);
+               exception
+                  when Constraint_Error =>
+                     raise GNAT.Command_Line.Invalid_Parameter;
+               end;
 
             --  Default stack requirements for unbounded (dynamic) calls
             when 'd' =>
-               Options.Default_Unbounded :=
-                 Natural'Value (GNAT.Command_Line.Parameter);
+               declare
+               begin
+                  Options.Default_Unbounded :=
+                    Natural'Value (GNAT.Command_Line.Parameter);
+               exception
+                  when Constraint_Error =>
+                     raise GNAT.Command_Line.Invalid_Parameter;
+               end;
 
             --  Display call chain (paths) for the entry points
             when 'p' =>
@@ -569,6 +609,10 @@ package body Parser is
                --  File containing a list of .ci files
                elsif GNAT.Command_Line.Full_Switch = "files" then
                   Get_Stack_Usage_Files (GNAT.Command_Line.Parameter);
+
+               --  Wrong option
+               else
+                  raise GNAT.Command_Line.Invalid_Parameter;
                end if;
 
             --  XML output
@@ -576,29 +620,56 @@ package body Parser is
                Options.Generate_XML_Output := True;
 
             when others =>
+               raise GNAT.Command_Line.Invalid_Switch;
+            end case;
+         end loop;
+
+         --  Get list of input files
+
+         loop
+            declare
+               Input_File_Name : constant GNAT.Strings.String_Access :=
+                 new String'(GNAT.Command_Line.Get_Argument (True));
+            begin
+               exit when Input_File_Name'Length = 0;
+
+               --  Skip the file if it does not exist
+
+               if Is_Stack_Usage_Information_File (Input_File_Name.all) then
+                  List_Of_Files.Append (Input_Files, Input_File_Name);
+               else
+                  Ada.Text_IO.Put_Line
+                    ("File """ & Input_File_Name.all & """ not found");
+               end if;
+            end;
+         end loop;
+
+      --  Exception handling for the part in charge of parsing the command
+      --  line.
+      exception
+         when GNAT.Command_Line.Invalid_Switch =>
+            Ada.Text_IO.Put_Line
+              ("Invalid Switch " & GNAT.Command_Line.Full_Switch);
+            Ada.Text_IO.New_Line;
+
+            Print_Usage_And_Exit;
+
+         when GNAT.Command_Line.Invalid_Parameter =>
+            Ada.Text_IO.Put_Line
+              ("Missing or wrong parameter for " &
+               GNAT.Command_Line.Full_Switch);
+            Ada.Text_IO.New_Line;
+
+            Print_Usage_And_Exit;
+
+         when others =>
+            Ada.Text_IO.Put_Line
+              ("Unrecognized command line option " &
+               GNAT.Command_Line.Full_Switch);
+               Ada.Text_IO.New_Line;
+
                Print_Usage_And_Exit;
-         end case;
-      end loop;
-
-      --  Get list of input files
-
-      loop
-         declare
-            Input_File_Name : constant GNAT.Strings.String_Access :=
-              new String'(GNAT.Command_Line.Get_Argument (True));
-         begin
-            exit when Input_File_Name'Length = 0;
-
-            --  Skip the file if it does not exist
-
-            if Is_Stack_Usage_Information_File (Input_File_Name.all) then
-               List_Of_Files.Append (Input_Files, Input_File_Name);
-            else
-               Ada.Text_IO.Put_Line
-                 ("File """ & Input_File_Name.all & """ not found");
-            end if;
-         end;
-      end loop;
+      end;
 
       --  Once we know the list of input files we can parse the information
       --  which is within these files.
@@ -606,7 +677,6 @@ package body Parser is
       if List_Of_Files.Is_Empty (Input_Files) then
          Ada.Text_IO.Put_Line
            ("Specify at least one .ci (callgraph information) file");
-
          Ada.Text_IO.New_Line;
 
          Print_Usage_And_Exit;
@@ -643,19 +713,6 @@ package body Parser is
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Global_Data.List_Of_Subprograms, Add_Ada_Entry_Points'Access);
       end if;
-
-   exception
-      when GNAT.Command_Line.Invalid_Switch =>
-         Ada.Text_IO.Put_Line
-           ("Invalid Switch " & GNAT.Command_Line.Full_Switch);
-
-         Print_Usage_And_Exit;
-
-      when GNAT.Command_Line.Invalid_Parameter =>
-         Ada.Text_IO.Put_Line
-           ("No parameter for " & GNAT.Command_Line.Full_Switch);
-
-         Print_Usage_And_Exit;
    end Parse_Arguments;
 
    ---------------------------
@@ -746,20 +803,22 @@ package body Parser is
 
    procedure Parse_Input_Line (Input : String) is
    begin
+      --  Parsing subprogram
       if GNAT.Regpat.Match (Node_Regexp, Input) then
          Parse_Node (Input);
 
+      --  Parsing call
       elsif GNAT.Regpat.Match (Edge_Regexp, Input) then
          Parse_Edge (Input);
 
-      elsif Options.Debug then
-         Ada.Text_IO.Put_Line ("Skipping: " & Input);
-      end if;
+      --  Skip informative lines
+      elsif GNAT.Regpat.Match (Allowed_Lines_Regexp, Input) then
+         null;
 
-   exception
-      when Parser_Error =>
-         Ada.Text_IO.Put_Line ("Error parsing:");
-         Ada.Text_IO.Put_Line (Input);
+      --  Error otherwise
+      else
+         raise Parser_Error;
+      end if;
    end Parse_Input_Line;
 
    ----------------
@@ -1369,6 +1428,12 @@ package body Parser is
       end loop;
 
       Ada.Text_IO.Close (Descriptor);
+   exception
+      when Parser_Error =>
+         Ada.Text_IO.Put_Line
+           ("Error parsing file " & List_Of_Files.Element (File).all);
+
+         raise;
    end Parse_Input_File;
 
    --------------------------
