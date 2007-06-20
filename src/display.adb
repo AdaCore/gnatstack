@@ -529,11 +529,12 @@ package body Display is
 
          Expand_Stack_Usage (Stack_Info);
 
-         --  If the code is not reachable from any of the specified entry
-         --  points we mark the subprogram as unreachable.
+         --  If the code is not directly reachable from any of the specified
+         --  entry points we mark the subprogram as such. The subprogram may
+         --  be reachable via indirect calls
 
          if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (unreachable)");
+            Ada.Text_IO.Put (" (not directly reachable)");
          end if;
 
          --  Send stack information to the XML file if needed
@@ -550,7 +551,7 @@ package body Display is
       end Print_Node;
 
    begin
-      --  Iterate the list of subprograms looking for the most stack consumming
+      --  Iterate the list of subprograms looking for the most stack consuming
       --  subprograms.
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
@@ -1440,11 +1441,12 @@ package body Display is
 
          Close_Tag ("external");
 
-         --  If the code is not reachable from any of the specified entry
-         --  points we mark the subprogram as unreachable.
+         --  If the code is not directly reachable from any of the specified
+         --  entry points we mark the subprogram as such. The subprogram may
+         --  be reachable via indirect calls
 
          if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (unreachable)");
+            Ada.Text_IO.Put (" (not directly reachable)");
          end if;
 
          Ada.Text_IO.New_Line;
@@ -1516,11 +1518,12 @@ package body Display is
 
          Print_Name (Node);
 
-         --  If the code is not reachable from any of the specified entry
-         --  points we mark the subprogram as unreachable.
+         --  If the code is not directly reachable from any of the specified
+         --  entry points we mark the subprogram as such. The subprogram may
+         --  be reachable via indirect calls
 
          if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (unreachable)");
+            Ada.Text_IO.Put (" (not directly reachable)");
          end if;
 
          Ada.Text_IO.New_Line;
@@ -1556,11 +1559,12 @@ package body Display is
 
          Print_Name (Node);
 
-         --  If the code is not reachable from any of the specified entry
-         --  points we mark the subprogram as unreachable.
+         --  If the code is not directly reachable from any of the specified
+         --  entry points we mark the subprogram as such. The subprogram may
+         --  be reachable via indirect calls
 
          if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (unreachable)");
+            Ada.Text_IO.Put (" (not directly reachable)");
          end if;
 
          Ada.Text_IO.New_Line;
