@@ -22,16 +22,18 @@
 with Ada.Containers.Vectors;
 with Ada.Containers.Ordered_Sets;
 
+with GNAT.Strings;
+
 package Static_Stack_Analysis is
 
    ---------------
    -- Locations --
    ---------------
 
-   type Name is access all String;
+   type Name is new GNAT.Strings.String_Access;
    --  Type that contains the name (for a subprogram or an object)
 
-   type File_Name is access all String;
+   type File_Name is new GNAT.Strings.String_Access;
    --  Type that contains the name of a file
 
    Indirect_Call : constant Name;
