@@ -70,8 +70,6 @@ with GNAT.OS_Lib;
 --  Used for OS_Exit
 --           Is_Regular_File
 
-with Ada.Unchecked_Deallocation;
-
 package body Parser is
 
    use type Static_Stack_Analysis.Node_Id;
@@ -113,9 +111,6 @@ package body Parser is
    pragma Inline (Print_Usage_And_Exit);
    --  Print how to use the tool and exit
 
-   procedure Free is new
-     Ada.Unchecked_Deallocation (String, GNAT.OS_Lib.String_Access);
-
    ------------------------
    -- Handle input files --
    ------------------------
@@ -145,8 +140,23 @@ package body Parser is
    --  Append all stack usage information files contained in a directory to
    --  the list of input files.
 
+   procedure Deallocate_File_Names (Position : List_Of_Files.Cursor);
+   --  Deallocate the strings used to store file names
+
    subtype File_Id is List_Of_Files.Cursor;
    --  Unique identifier for files
+
+   ---------------------------
+   -- Deallocate_File_Names --
+   ---------------------------
+
+   procedure Deallocate_File_Names (Position : List_Of_Files.Cursor) is
+      File_Name : GNAT.Strings.String_Access :=
+        List_Of_Files.Element (Position);
+
+   begin
+      GNAT.Strings.Free (File_Name);
+   end Deallocate_File_Names;
 
    -----------------------
    -- Expected patterns --
@@ -363,6 +373,9 @@ package body Parser is
          Fullname : constant String := Full_Name (Directory_Entry);
       begin
          if Is_Stack_Usage_Information_File (Fullname) then
+            --  This dynamically allocated String is later destroyed in
+            --  procedure Parse_Arguments.
+
             List_Of_Files.Append (Input_Files, new String'(Fullname));
          end if;
       end Callback;
@@ -401,7 +414,6 @@ package body Parser is
 
    procedure Get_Stack_Usage_Files (From_File : String) is
       Descriptor : Ada.Text_IO.File_Type;
-      File_Name  : GNAT.Strings.String_Access;
 
    begin
       Ada.Text_IO.Open (Descriptor, Ada.Text_IO.In_File, From_File);
@@ -409,11 +421,17 @@ package body Parser is
       --  Parse information line by line
 
       while not Ada.Text_IO.End_Of_File (Descriptor) loop
-         File_Name := new String'(Ada.Text_IO.Get_Line (Descriptor));
+         declare
+            File_Name : constant String := Ada.Text_IO.Get_Line (Descriptor);
 
-         if Is_Stack_Usage_Information_File (File_Name.all) then
-            List_Of_Files.Append (Input_Files, File_Name);
-         end if;
+         begin
+            if Is_Stack_Usage_Information_File (File_Name) then
+               --  This dynamically allocated String is later destroyed in
+               --  procedure Parse_Arguments.
+
+               List_Of_Files.Append (Input_Files, new String'(File_Name));
+            end if;
+         end;
       end loop;
 
       Ada.Text_IO.Close (Descriptor);
@@ -589,20 +607,32 @@ package body Parser is
 
             --  List of entry points
             when 'e' =>
-               Free (Options.List_Of_Entry_Points);
+               GNAT.Strings.Free (Options.List_Of_Entry_Points);
+
+               --  This dynamically allocated String is later destroyed after
+               --  being used.
+
                Options.List_Of_Entry_Points :=
                  new String'(GNAT.Command_Line.Parameter);
 
             --  Pattern for subprograms to be considered entry points
             when 'r' =>
-               Free (Options.Entry_Point_Pattern);
+               GNAT.Strings.Free (Options.Entry_Point_Pattern);
+
+               --  This dynamically allocated String is later destroyed after
+               --  being used.
+
                Options.Entry_Point_Pattern :=
                  new String'(GNAT.Command_Line.Parameter);
 
             when 'f' =>
                --  Output graph file
                if GNAT.Command_Line.Full_Switch = "f" then
-                  Free (Options.Output_VCG);
+                  GNAT.Strings.Free (Options.Output_VCG);
+
+                  --  This dynamically allocated String is later destroyed
+                  --  after being used.
+
                   Options.Output_VCG :=
                     new String'(GNAT.Command_Line.Parameter);
 
@@ -628,18 +658,25 @@ package body Parser is
 
          loop
             declare
-               Input_File_Name : constant GNAT.Strings.String_Access :=
-                 new String'(GNAT.Command_Line.Get_Argument (True));
+               Input_File_Name : constant String :=
+                 GNAT.Command_Line.Get_Argument (True);
+
             begin
                exit when Input_File_Name'Length = 0;
 
                --  Skip the file if it does not exist
 
-               if Is_Stack_Usage_Information_File (Input_File_Name.all) then
-                  List_Of_Files.Append (Input_Files, Input_File_Name);
+               if Is_Stack_Usage_Information_File (Input_File_Name) then
+                  --  This dynamically allocated String will be later
+                  --  destroyed after being used.
+
+                  List_Of_Files.Append
+                    (Input_Files, new String'(Input_File_Name));
                else
                   Ada.Text_IO.Put_Line
-                    ("File """ & Input_File_Name.all & """ not found");
+                    ("File """ & Input_File_Name & """ not found");
+
+                  raise Ada.Text_IO.Name_Error;
                end if;
             end;
          end loop;
@@ -661,14 +698,6 @@ package body Parser is
             Ada.Text_IO.New_Line;
 
             Print_Usage_And_Exit;
-
-         when others =>
-            Ada.Text_IO.Put_Line
-              ("Unrecognized command line option " &
-               GNAT.Command_Line.Full_Switch);
-               Ada.Text_IO.New_Line;
-
-               Print_Usage_And_Exit;
       end;
 
       --  Once we know the list of input files we can parse the information
@@ -683,6 +712,12 @@ package body Parser is
 
       else
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
+
+         --  We do not need this list any more, so we destroy the list of
+         --  files.
+         List_Of_Files.Iterate (Input_Files, Deallocate_File_Names'Access);
+
+         List_Of_Files.Clear (Input_Files);
       end if;
 
       --  Get the list of subprograms to be considered as entry points
@@ -694,11 +729,19 @@ package body Parser is
 
          Parse_Entry_Points (Options.List_Of_Entry_Points.all);
 
+         --  Destroy the String once used
+
+         GNAT.Strings.Free (Options.List_Of_Entry_Points);
+
       elsif Options.Entry_Point_Pattern /= null then
          --  Add the entry points matching the pattern
 
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Global_Data.List_Of_Subprograms, Add_Pattern_Entry'Access);
+
+         --  Destroy the String once used
+
+         GNAT.Strings.Free (Options.Entry_Point_Pattern);
 
       elsif Options.Explore_All then
          --  Explore every node that contains subprograms defined within the
@@ -725,11 +768,17 @@ package body Parser is
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 4);
 
-      Tmp_Location  : Static_Stack_Analysis.Location;
+      Tmp_Location : Static_Stack_Analysis.Location;
+
+      Ignore   : Static_Stack_Analysis.List_Of_Locations.Cursor;
+      Inserted : Boolean;
+
    begin
       GNAT.Regpat.Match (Data_Location_Regexp, Input, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
+         --  This dynamically created object will be later destroyed if it
+         --  is not used (inserted in the list).
 
          Tmp_Location.Demangled :=
            new String'(Input (Matches (1).First .. Matches (1).Last));
@@ -751,7 +800,18 @@ package body Parser is
 
          --  Include the parsed location if it is not already in the list
 
-         Dynamic_Objects.Include (Tmp_Location);
+         Dynamic_Objects.Insert (Tmp_Location, Ignore, Inserted);
+
+         --  Destroy the String that was previously allocated if it is
+         --  no longer needed.
+
+         if not Inserted then
+            GNAT.Strings.Free
+              (GNAT.Strings.String_Access (Tmp_Location.Demangled));
+
+            GNAT.Strings.Free
+              (GNAT.Strings.String_Access (Tmp_Location.File));
+         end if;
 
       else
          raise Parser_Error;
@@ -918,8 +978,10 @@ package body Parser is
             --  These nodes are there only for supporting edges representing
             --  indirect calls. The indirect nodes are created when analyzing
             --  the edges, so we do not need to create any node here.
+            --  Deallocated objects that are no longer needed.
 
-            null;
+            GNAT.Strings.Free (GNAT.Strings.String_Access (Symbol_Name));
+            GNAT.Strings.Free (GNAT.Strings.String_Access (Demangled_Name));
 
          --  Unresolved
          elsif not Locally_Defined then
@@ -928,7 +990,11 @@ package body Parser is
             --  add.
 
             if not List_Of_Nodes.Has_Element (Found_Id) then
-               --  Insert new unresolved node
+               --  Insert new unresolved node.
+
+               --  This dynamically created object cannot be deallocated
+               --  because it is inserted in a list that may be used at any
+               --  time during the analysis.
 
                Node_Ptr := new Unresolved_Node'
                  (Target_Calls            => List_Of_Edges.Empty_Vector,
@@ -951,6 +1017,10 @@ package body Parser is
 
             if not List_Of_Nodes.Has_Element (Found_Id) then
                --  Insert new explicit node
+
+               --  This dynamically created object cannot be deallocated
+               --  because it is inserted in a list that may be used at any
+               --  time during the analysis.
 
                Node_Ptr := new Explicit_Node'
                  (Target_Calls            => List_Of_Edges.Empty_Vector,
@@ -1040,6 +1110,10 @@ package body Parser is
    is
    begin
       if Input'Length /= 0 then
+         --  This dynamically created object cannot be deallocated because
+         --  it is inserted in a list that may be used at any time during
+         --  the analysis.
+
          Symbol := new String'(Input);
       else
          raise Parser_Error;
@@ -1071,6 +1145,9 @@ package body Parser is
          --  Demangled name
 
          if Matches (1) /= GNAT.Regpat.No_Match then
+            --  This dynamically allocated String is later destroyed if it is
+            --  not used (inserted in the list).
+
             Demangled :=
               new String'(Input (Matches (1).First .. Matches (1).Last));
          else
@@ -1086,6 +1163,7 @@ package body Parser is
                Locations);
          else
             Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+            GNAT.Strings.Free (GNAT.Strings.String_Access (Demangled));
          end if;
 
          --  Stack usage
@@ -1122,7 +1200,10 @@ package body Parser is
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 4);
 
-      Tmp_Location  : Static_Stack_Analysis.Location;
+      Tmp_Location : Static_Stack_Analysis.Location;
+
+      Ignore   : Static_Stack_Analysis.List_Of_Locations.Cursor;
+      Inserted : Boolean;
 
    begin
       --  Check for no location specified
@@ -1136,6 +1217,8 @@ package body Parser is
          GNAT.Regpat.Match (Subprogram_Location_Regexp, Input, Matches);
 
          if Matches (0) /= GNAT.Regpat.No_Match then
+            --  This dynamically created object will be later destroyed if it
+            --  is not used (inserted in the list).
 
             Tmp_Location.File :=
               new String'(Input (Matches (1).First .. Matches (1).Last));
@@ -1165,7 +1248,15 @@ package body Parser is
 
             --  Include the parsed location if it is not already in the list
 
-            Locations.Include (Tmp_Location);
+            Locations.Insert (Tmp_Location, Ignore, Inserted);
+
+            --  Destroy the String that was previously allocated if it is no
+            --  longer needed.
+
+            if not Inserted then
+               GNAT.Strings.Free
+                 (GNAT.Strings.String_Access (Tmp_Location.File));
+            end if;
 
          else
             raise Parser_Error;
@@ -1344,6 +1435,9 @@ package body Parser is
          --  Get the location of this call
 
          if Matches (3) /= GNAT.Regpat.No_Match then
+            --  This dynamically created object is later destroyed if it is
+            --  not used (not inserted in the list).
+
             Tmp_Location.File :=
               new String'(Input (Matches (4).First .. Matches (4).Last));
 
@@ -1357,9 +1451,11 @@ package body Parser is
          --  different edges.
 
          declare
-            Index : Static_Stack_Analysis.Edge_Id;
+            Index  : Static_Stack_Analysis.Edge_Id;
 
-            Call : Static_Stack_Analysis.Edge;
+            Call   : Static_Stack_Analysis.Edge;
+
+            Ignore : Static_Stack_Analysis.List_Of_Locations.Cursor;
 
          begin
             --  For indirect calls we created a new node, and hence we will
@@ -1381,7 +1477,16 @@ package body Parser is
                   --  Add new location.
 
                   if Tmp_Location /= Static_Stack_Analysis.Null_Location then
-                     Call.Point_Of_Call.Include (Tmp_Location);
+                     Call.Point_Of_Call.Insert
+                       (Tmp_Location, Ignore, Inserted);
+
+                     if not Inserted then
+                        --  Destroy the String that was previously allocated
+                        --  if it is no longer needed.
+
+                        GNAT.Strings.Free
+                          (GNAT.Strings.String_Access (Tmp_Location.File));
+                     end if;
                   end if;
 
                   --  We found the edge so that we leave
