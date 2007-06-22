@@ -276,12 +276,16 @@ package body Display is
 
       if Options.Generate_XML_Output then
          Close_Tag ("GNATstack_Information");
+
          Ada.Text_IO.Close (XML_Descriptor);
+         GNAT.Strings.Free (Options.Output_XML);
       end if;
 
       Ada.Text_IO.Close (Undefined_Descriptor);
+      GNAT.Strings.Free (Options.Output_Undefined);
 
       Ada.Text_IO.Close (VCG_Descriptor);
+      GNAT.Strings.Free (Options.Output_VCG);
    end Close_Output_Files;
 
    ---------------
@@ -355,6 +359,9 @@ package body Display is
       --  graph.vcg.
 
       if Options.Output_VCG = null then
+         --  This dinamically allocated String will be later destroyed in
+         --  procedure Close_Output_Files.
+
          Options.Output_VCG := new String'("graph.vcg");
       end if;
 
@@ -370,6 +377,9 @@ package body Display is
       --  use the default undefined.ciu.
 
       if Options.Output_Undefined = null then
+         --  This dinamically allocated String will be later destroyed in
+         --  procedure Close_Output_Files.
+
          Options.Output_Undefined := new String'("undefined.ciu");
       end if;
 
@@ -390,6 +400,9 @@ package body Display is
          --  stack_usage.xml.
 
          if Options.Output_XML = null then
+            --  This dinamically allocated String will be later destroyed in
+            --  procedure Close_Output_Files.
+
             Options.Output_XML := new String'("stack_usage.xml");
          end if;
 
