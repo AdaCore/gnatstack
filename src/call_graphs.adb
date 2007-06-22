@@ -350,6 +350,8 @@ package body Call_Graphs is
            Iterations => 1);
       --  Potential cycle to be analyzed for determining whether it is
       --  already known or not.
+      --  This dynamically created object is later destroyed if it is not
+      --  used (it happens when it is not inserted in the list of cycles).
 
       procedure Mark_Nodes
         (Position : Static_Stack_Analysis.Paths.Cursor);
@@ -380,6 +382,7 @@ package body Call_Graphs is
       Add_Node_To_Path (New_Cycle, Position);
 
       --  Add the new cycle to the list of detected cycles, if not there yet.
+      --  The object is deleted if it is no longer used.
 
       if Already_Detected_Cycle (New_Cycle) then
          New_Cycle.Path.Clear;
