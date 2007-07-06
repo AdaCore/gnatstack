@@ -275,6 +275,10 @@ package Static_Stack_Analysis is
          --  (including cycles) to which this node belongs. Once this flag is
          --  set to True, any analysis arriving to this node can stop.
 
+         Is_Called : Boolean;
+         --  Indicates whether this subprogram is directly accessible from any
+         --  other.
+
          Cycles : List_Of_Cycles.Vector;
          --  A node may be part of different cycles in the call graph, and
          --  this field contains the set of cycles to which this node belongs.

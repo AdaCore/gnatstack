@@ -58,6 +58,13 @@ package Global_Data is
      Static_Stack_Analysis.List_Of_Nodes.Empty_Set;
    --  List of all nodes under analysis
 
+   -------------
+   -- Tasking --
+   -------------
+
+   Ada_Tasking_Used : Boolean := False;
+   --  Set to True when Ada tasking is used
+
    function Is_Task_Entry
      (Name : Static_Stack_Analysis.Name) return Boolean;
    --  Returns True if the node corresponds to a task entry
@@ -81,7 +88,7 @@ package Global_Data is
    -- Phases of analysis --
    ------------------------
 
-   type Phase_Type is (Parse, Accuracy_Analysis, Print_Warnings,
+   type Phase_Type is (Parse, Call_Graph_Analysis, Print_Warnings,
                        Worst_Case_Analysis, Print_Results);
    --  Type for Phase variable
 

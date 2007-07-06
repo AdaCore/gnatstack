@@ -30,7 +30,7 @@ with Display;
 --           Generate_Warnings
 
 with Call_Graphs;
---  Used for Check_Accuracy
+--  Used for Analyze_Call_Graph
 
 with Global_Data;
 --  Used for Entry_Points
@@ -46,10 +46,10 @@ begin
    Global_Data.Phase := Global_Data.Parse;
    Parser.Parse_Arguments;
 
-   --  Do accuracy analysis of the graph
+   --  Do accuracy analysis of the graph and extract entry points
 
-   Global_Data.Phase := Global_Data.Accuracy_Analysis;
-   Global_Data.Entry_Points.Iterate (Call_Graphs.Check_Accuracy'Access);
+   Global_Data.Phase := Global_Data.Call_Graph_Analysis;
+   Call_Graphs.Analyze_Call_Graph;
 
    --  Open (and create) the required output files
 

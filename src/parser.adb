@@ -22,6 +22,7 @@
 with Global_Data;
 --  Used for Entry_Points
 --           Is_Task_Entry
+--           Ada_Tasking_Used
 
 with Static_Stack_Analysis;
 --  Used for Get_Node
@@ -91,15 +92,6 @@ package body Parser is
    procedure Usage;
    --  Print how to use the tool
 
-   procedure Add_Ada_Entry_Points
-     (Position : in Static_Stack_Analysis.Node_Id);
-   --  Add the entry points corresponding to the main procedure and the task
-   --  entry points.
-
-   procedure Add_Local_Entry (Position : in Static_Stack_Analysis.Node_Id);
-   --  Add the node to the list of entry points to analyze if it contains a
-   --  subprogram that is part of the application code.
-
    procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
@@ -110,6 +102,10 @@ package body Parser is
    procedure Print_Usage_And_Exit;
    pragma Inline (Print_Usage_And_Exit);
    --  Print how to use the tool and exit
+
+   procedure Get_Task_Wrapper (Position : in Static_Stack_Analysis.Node_Id);
+   --  Get a pointer to this node if it contains the task wrapper (used for
+   --  Ada tasking).
 
    ------------------------
    -- Handle input files --
@@ -172,9 +168,9 @@ package body Parser is
    Edge_Regexp : constant String :=
      "^edge: { sourcename: " & '"' & "([^" & '"' & "]+)" & '"' &
      " targetname: " & '"' & "([^" & '"' & "]+)" & '"' & "(" &
-     " label: " & '"' & "(.+):([0-9]+)" & '"' & ")??" & " }";
+     " label: " & '"' & "(.+):([0-9]+)" & '"' & "| priority: .+)??" & " }";
    --  Pattern: ^edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
-   --           ( label: "(.+):([0-9]+)")?? }
+   --           ( label: "(.+):([0-9]+)"| priority: .+)?? }
 
    Allowed_Lines_Regexp : constant String :=
      "^(\s*)((})|(graph: { title:)|(--)|$)";
@@ -206,6 +202,11 @@ package body Parser is
    Entry_Regexp : constant String :=
      "^([^:,]+),*(.+)*$";
    --  Pattern: ^([^:,]+),*(.+)*$
+
+   Create_Task : constant String := "system__tasking__stages__create_task";
+   Create_Ravenscar_Task : constant String :=
+     "system__tasking__restricted__stages__create_restricted_task";
+   --  Subprograms called to create tasks
 
    ------------------------
    -- Parsing operations --
@@ -271,61 +272,6 @@ package body Parser is
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of data locations in source files.
    --  Format: [\n name filename:line[\n name filename:line]]
-
-   --------------------------
-   -- Add_Ada_Entry_Points --
-   --------------------------
-
-   procedure Add_Ada_Entry_Points
-     (Position : in Static_Stack_Analysis.Node_Id)
-   is
-      Node : constant Static_Stack_Analysis.Node_Class_Access :=
-        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
-
-      Subprogram : constant Static_Stack_Analysis.Name :=
-        Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
-
-      use type Static_Stack_Analysis.Node_Id;
-
-   begin
-      --  If the referenced node describes a subprogram containing the pattern
-      --  defined in Options.Entry_Point_Pattern we add this subprogram to the
-      --  list of potential entry points.
-
-      if Subprogram.all = "main"
-        or else Global_Data.Is_Task_Entry (Subprogram)
-      then
-         Global_Data.Entry_Points.Append (Position);
-      end if;
-
-      --  Get the task wrapper information in case this data has been
-      --  generated.
-
-      if not Static_Stack_Analysis.List_Of_Nodes.Has_Element
-               (Global_Data.Task_Wrapper)
-        and then GNAT.Regpat.Match ("stages__task_wrapper$", Subprogram.all)
-      then
-         Global_Data.Task_Wrapper := Position;
-      end if;
-   end Add_Ada_Entry_Points;
-
-   ---------------------
-   -- Add_Local_Entry --
-   ---------------------
-
-   procedure Add_Local_Entry (Position : in Static_Stack_Analysis.Node_Id) is
-      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
-        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
-
-   begin
-      --  Consider only explicit nodes as potential entry points, which means
-      --  excluding external subprograms and indirect (including dispatching)
-      --  calls.
-
-      if Explored_Node.all in Static_Stack_Analysis.Explicit_Node'Class then
-         Global_Data.Entry_Points.Append (Position);
-      end if;
-   end Add_Local_Entry;
 
    -----------------------
    -- Add_Pattern_Entry --
@@ -437,6 +383,25 @@ package body Parser is
       Ada.Text_IO.Close (Descriptor);
 
    end Get_Stack_Usage_Files;
+
+   ----------------------
+   -- Get_Task_Wrapper --
+   ----------------------
+
+   procedure Get_Task_Wrapper (Position : in Static_Stack_Analysis.Node_Id) is
+   begin
+      if Static_Stack_Analysis.List_Of_Nodes.Has_Element
+          (Global_Data.Task_Wrapper)
+        and then
+          GNAT.Regpat.Match
+            ("stages__task_wrapper$",
+             Static_Stack_Analysis.Get_Subprogram_Name
+               (Static_Stack_Analysis.List_Of_Nodes.Element
+                  (Position).all).all)
+      then
+         Global_Data.Task_Wrapper := Position;
+      end if;
+   end Get_Task_Wrapper;
 
    -------------------------------------
    -- Is_Stack_Usage_Information_File --
@@ -722,20 +687,16 @@ package body Parser is
 
       --  Get the list of subprograms to be considered as entry points
 
-      --  Entry points specified by hand
-
+      --  Add the entry points that have been specified in the command line
       if Options.List_Of_Entry_Points /= null then
-         --  Add the entry points that have been specified in the command line
-
          Parse_Entry_Points (Options.List_Of_Entry_Points.all);
 
          --  Destroy the String once used
 
          GNAT.Strings.Free (Options.List_Of_Entry_Points);
 
+      --  Add the entry points matching the pattern
       elsif Options.Entry_Point_Pattern /= null then
-         --  Add the entry points matching the pattern
-
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Global_Data.List_Of_Subprograms, Add_Pattern_Entry'Access);
 
@@ -743,18 +704,17 @@ package body Parser is
 
          GNAT.Strings.Free (Options.Entry_Point_Pattern);
 
-      elsif Options.Explore_All then
-         --  Explore every node that contains subprograms defined within the
-         --  application.
-
-         Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Global_Data.List_Of_Subprograms, Add_Local_Entry'Access);
-
+      --  Use the mechanism to automatically detect entry points
       else
-         --  Automatic entry points (main procedure and task entry points)
+         Options.Automatic_Entry_Point_Detection := True;
+      end if;
 
+      --  Get the task wrapper information in case Ada tasking is used and
+      --  the information is available.
+
+      if Global_Data.Ada_Tasking_Used then
          Static_Stack_Analysis.List_Of_Nodes.Iterate
-           (Global_Data.List_Of_Subprograms, Add_Ada_Entry_Points'Access);
+           (Global_Data.List_Of_Subprograms, Get_Task_Wrapper'Access);
       end if;
    end Parse_Arguments;
 
@@ -964,6 +924,15 @@ package body Parser is
          end if;
       end if;
 
+      --  Check whether this is an application using Ada tasking
+
+      if not Global_Data.Ada_Tasking_Used and then
+        (Symbol_Name.all = Create_Task or else
+           Symbol_Name.all = Create_Ravenscar_Task)
+      then
+         Global_Data.Ada_Tasking_Used := True;
+      end if;
+
       --  Check whether the node is already in the list. We use the symbol
       --  name as the unique identifier.
 
@@ -1003,6 +972,7 @@ package body Parser is
                   Subprogram              => Symbol_Name,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
+                  Is_Called               => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert
@@ -1031,6 +1001,7 @@ package body Parser is
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
+                  Is_Called               => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                List_Of_Nodes.Insert
@@ -1078,6 +1049,7 @@ package body Parser is
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
                      Analysis_Finished       => False,
+                     Is_Called               => False,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
@@ -1372,6 +1344,7 @@ package body Parser is
                  new String'(Input (Matches (1).First .. Matches (1).Last)),
                Under_Analysis          => False,
                Analysis_Finished       => False,
+               Is_Called               => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             Global_Data.List_Of_Subprograms.Insert
@@ -1396,6 +1369,7 @@ package body Parser is
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Under_Analysis          => False,
                Analysis_Finished       => False,
+               Is_Called               => False,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             Global_Data.List_Of_Subprograms.Insert
@@ -1423,6 +1397,7 @@ package body Parser is
                     new String'(Input (Matches (2).First .. Matches (2).Last)),
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
+                  Is_Called               => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                Global_Data.List_Of_Subprograms.Insert
@@ -1434,7 +1409,10 @@ package body Parser is
 
          --  Get the location of this call
 
-         if Matches (3) /= GNAT.Regpat.No_Match then
+         if Matches (3) /= GNAT.Regpat.No_Match
+           and then Matches (4) /= GNAT.Regpat.No_Match
+           and then Matches (5) /= GNAT.Regpat.No_Match
+         then
             --  This dynamically created object is later destroyed if it is
             --  not used (not inserted in the list).
 
@@ -1561,7 +1539,7 @@ package body Parser is
       Put_Line ("Usage: gnatstack [args ...] [<.ci files>]");
       New_Line;
       Put_Line ("where possible arguments are:");
-      Put_Line ("  -a           use all  subprograms as entry points");
+      Put_Line ("  -a           use all subprograms as entry points");
       Put_Line ("  -aO dir      search for .ci files in dir");
       Put_Line ("  -ca          extract all cycles");
       Put_Line ("  -d size      default for unbounded (dynamic) calls");

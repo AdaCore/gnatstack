@@ -19,14 +19,13 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
-with Static_Stack_Analysis;
-
 package Call_Graphs is
 
-   procedure Check_Accuracy
-     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+   procedure Analyze_Call_Graph;
    --  Depending on the selected flags, this procedure will extract all the
-   --  cycles that can be reached from the specified entry point, as well as
-   --  undefined references, indirect calls and unbounded frames.
+   --  cycles that can be reached from any subprogram, as well as undefined
+   --  references, indirect calls and unbounded frames. It will also get the
+   --  entry points for the application (depending on the options defined by
+   --  the user).
 
 end Call_Graphs;

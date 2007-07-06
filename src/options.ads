@@ -70,6 +70,10 @@ package Options is
    --  Consider as entry points all the subprograms containing this pattern in
    --  the symbol name.
 
+   Automatic_Entry_Point_Detection : Boolean := False;
+   --  Flag that determines whether the automatic mechanism to detect entry
+   --  points is to be used.
+
    Output_VCG : GNAT.Strings.String_Access := null;
    --  Name of the generated call graph file
 
