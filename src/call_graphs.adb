@@ -503,7 +503,7 @@ package body Call_Graphs is
         (Global_Data.List_Of_Subprograms, Analyze_Subprogram'Access);
 
       if Global_Data.Entities_Processed (Global_Data.Cycle) > 0 then
-            Ada.Text_IO.New_Line;
+         Ada.Text_IO.New_Line;
       end if;
    end Analyze_Call_Graph;
 
