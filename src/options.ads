@@ -50,7 +50,7 @@ package Options is
    --  Active warnings (for cycles, unbounded frames, external calls, and
    --  indirect calls)
 
-   Display_Call_Chains : Boolean := False;
+   Display_Call_Chains : Boolean := True;
    --  Print the call chain information for the different entry points. This
    --  is the list of subprograms that make up the longest path in terms of
    --  stack usage.

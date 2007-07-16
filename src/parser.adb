@@ -433,7 +433,7 @@ package body Parser is
          loop
             case
               GNAT.Command_Line.Getopt
-                ("a aO: ca d: e: f: files= g h l: o= p r: u: v W! x")
+                ("a aO: ca d: e: f: files= g h l: np o= p r: u: v W! x")
             is
             when ASCII.NUL =>
                exit;
@@ -572,6 +572,16 @@ package body Parser is
             --  Display call chain (paths) for the entry points
             when 'p' =>
                Options.Display_Call_Chains := True;
+
+            when 'n' =>
+               --  Do not display call chain (paths) for the entry points
+               if GNAT.Command_Line.Full_Switch = "np" then
+                  Options.Display_Call_Chains := False;
+
+               --  Wrong option
+               else
+                  raise GNAT.Command_Line.Invalid_Switch;
+               end if;
 
             --  List of entry points
             when 'e' =>
@@ -1592,11 +1602,12 @@ package body Parser is
       Put_Line ("  -g           debug information");
       Put_Line ("  -h           display help message");
       Put_Line ("  -l n         print the n subprograms requiring the " &
-                               "biggest local stack usage");
+                                "biggest local stack usage");
+      Put_Line ("  -np          do not display paths for entry points");
       Put_Line ("  -o={a,s}     order for displaying call graphs");
       Put_Line ("      a        alphabetical");
       Put_Line ("      s        stack usage (default)");
-      Put_Line ("  -p           display the worst-case path for entry points");
+      Put_Line ("  -p           display paths for entry points (default)");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
       Put_Line ("  -u size      default for unknown (external) calls");
