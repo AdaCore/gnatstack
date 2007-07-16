@@ -681,6 +681,10 @@ package body Parser is
       else
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
 
+         if Global_Data.Entities_Processed (Global_Data.Subprogram) > 0 then
+            Ada.Text_IO.New_Line;
+         end if;
+
          --  We do not need this list any more, so we destroy the list of
          --  files.
          List_Of_Files.Iterate (Input_Files, Deallocate_File_Names'Access);

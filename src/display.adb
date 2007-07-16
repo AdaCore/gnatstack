@@ -975,8 +975,6 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
-      Ada.Text_IO.New_Line;
-
       --  XML section describing global application properties
 
       Open_Tag ("global");
@@ -994,9 +992,42 @@ package body Display is
 
          Ada.Text_IO.New_Line;
 
-         Ada.Text_IO.Put_Line
-           ("Worst case analysis is *not* accurate ; use -W options for " &
-            "details");
+         Ada.Text_IO.Put ("Worst case analysis is *not* accurate because of ");
+
+         if not Global_Data.Cycles.Is_Empty then
+            Ada.Text_IO.Put ("cycles");
+
+            if Global_Data.Unbounded_Frames
+              or else Global_Data.External_Calls
+              or else Global_Data.Indirect_Calls
+            then
+               Ada.Text_IO.Put (", ");
+            end if;
+         end if;
+
+         if Global_Data.Unbounded_Frames then
+            Ada.Text_IO.Put ("unbounded frames");
+
+            if Global_Data.External_Calls
+              or else Global_Data.Indirect_Calls
+            then
+               Ada.Text_IO.Put (", ");
+            end if;
+         end if;
+
+         if Global_Data.External_Calls then
+            Ada.Text_IO.Put ("external calls");
+
+            if Global_Data.Indirect_Calls then
+               Ada.Text_IO.Put (", ");
+            end if;
+         end if;
+
+         if Global_Data.Indirect_Calls then
+               Ada.Text_IO.Put ("indirect calls");
+         end if;
+
+         Ada.Text_IO.Put_Line (". Use -Wa for details.");
          Ada.Text_IO.New_Line;
 
          --  XML output
@@ -1209,6 +1240,13 @@ package body Display is
                   Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage),
          0);
 
+      if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
+        or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
+        or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value
+      then
+         Ada.Text_IO.Put ("+?");
+      end if;
+
       Ada.Text_IO.Put (" bytes");
 
       --  Clarify stack usage information when we have something which is not
@@ -1353,19 +1391,7 @@ package body Display is
 
       Expand_Stack_Usage (Accumulated_Stack);
 
-      if not Options.Debug
-        and then
-          (Accumulated_Stack.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-             or else
-           Accumulated_Stack.Unknown_Usage /= Static_Stack_Analysis.No_Value
-             or else
-           Accumulated_Stack.Cycle_Usage /= Static_Stack_Analysis.No_Value)
-      then
-         --  In non-verbose mode we just put a mark indicating that the
-         --  resulting value is not accurate.
-
-         Ada.Text_IO.Put (" *");
-      end if;
+      Ada.Text_IO.New_Line;
 
       --  Print entry point information to the XML file
 
