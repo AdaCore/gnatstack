@@ -27,16 +27,6 @@ with Options;
 --           Warnings
 --           Generate_XML_Output
 
-with Global_Data;
---  Used for List_Of_Subprograms
---           Entry_Points
---           Phase
---           Unbounded_Frames
---           External_Calls
---           Indirect_Calls
---           Cycles
---           Is_Task_Entry
-
 with Static_Stack_Analysis;
 --  Used for List_Of_Locations
 --           List_Of_Nodes
@@ -985,6 +975,8 @@ package body Display is
 
    procedure Generate_Warnings is
    begin
+      Ada.Text_IO.New_Line;
+
       --  XML section describing global application properties
 
       Open_Tag ("global");
@@ -999,6 +991,8 @@ package body Display is
         or else Global_Data.Indirect_Calls
       then
          --  Screen output
+
+         Ada.Text_IO.New_Line;
 
          Ada.Text_IO.Put_Line
            ("Worst case analysis is *not* accurate ; use -W options for " &
@@ -1027,7 +1021,6 @@ package body Display is
            ("List of cycles:");
          Ada.Text_IO.New_Line;
          Global_Data.Cycles.Iterate (Print_Cycle'Access);
-         Ada.Text_IO.New_Line;
       end if;
 
       Close_Tag ("cycleset");
@@ -1258,6 +1251,33 @@ package body Display is
       end if;
    end Expand_Stack_Usage;
 
+   --------------------
+   -- Increase_Count --
+   --------------------
+
+   procedure Increase_Count (Entity : Global_Data.Entities) is
+      use Global_Data;
+
+   begin
+      Entities_Processed (Entity) := Entities_Processed (Entity) + 1;
+
+      case Entity is
+         when Subprogram | Call_To_Subprogram =>
+            Ada.Text_IO.Put
+              ("Parsing " &
+               Natural'Image (Entities_Processed (Subprogram)) &
+               " subprograms and " &
+               Natural'Image (Entities_Processed (Call_To_Subprogram)) &
+               " calls to subprogram" & ASCII.CR);
+
+         when Cycle =>
+            Ada.Text_IO.Put
+              ("Checking " &
+               Natural'Image (Entities_Processed (Cycle)) &
+               " cycles" & ASCII.CR);
+      end case;
+   end Increase_Count;
+
    ------------------------
    -- Print_Node_In_Path --
    ------------------------
@@ -1346,8 +1366,6 @@ package body Display is
 
          Ada.Text_IO.Put (" *");
       end if;
-
-      Ada.Text_IO.New_Line;
 
       --  Print entry point information to the XML file
 
@@ -1489,33 +1507,41 @@ package body Display is
          Location : constant Static_Stack_Analysis.Location :=
            Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
+         use type Static_Stack_Analysis.Location;
+         use type Static_Stack_Analysis.File_Name;
       begin
-         --  File location
+         --  Do not print anything if the location is empty
 
-         Ada.Text_IO.Put ("    at " & Location.File.all & ":");
-         Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
-         Ada.Text_IO.New_Line;
+         if Location /= Static_Stack_Analysis.Null_Location
+           and then Location.File /= null
+         then
+            --  File location
 
-         --  Print location to the XML file
+            Ada.Text_IO.Put ("    at " & Location.File.all & ":");
+            Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+            Ada.Text_IO.New_Line;
 
-         if Options.Generate_XML_Output then
-            Open_Tag ("indirectcall");
+            --  Print location to the XML file
 
-            Open_Tag ("file type=""strings""");
-            Report_XML (Message => "<value>", New_Line => False);
-            Ada.Text_IO.Put_Line
-              (XML_Descriptor, Location.File.all & "</value>");
-            Close_Tag ("file");
+            if Options.Generate_XML_Output then
+               Open_Tag ("indirectcall");
 
-            Open_Tag ("line type=""integers""");
-            Report_XML (Message => "<value>", New_Line => False);
-            Ada.Integer_Text_IO.Put
-              (XML_Descriptor, Location.Line_Number, 0);
-            Ada.Text_IO.Put_Line
-              (XML_Descriptor, "</value>");
-            Close_Tag ("line");
+               Open_Tag ("file type=""strings""");
+               Report_XML (Message => "<value>", New_Line => False);
+               Ada.Text_IO.Put_Line
+                 (XML_Descriptor, Location.File.all & "</value>");
+               Close_Tag ("file");
 
-            Close_Tag ("indirectcall");
+               Open_Tag ("line type=""integers""");
+               Report_XML (Message => "<value>", New_Line => False);
+               Ada.Integer_Text_IO.Put
+                 (XML_Descriptor, Location.Line_Number, 0);
+               Ada.Text_IO.Put_Line
+                 (XML_Descriptor, "</value>");
+               Close_Tag ("line");
+
+               Close_Tag ("indirectcall");
+            end if;
          end if;
       end Print_Location;
 

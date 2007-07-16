@@ -19,6 +19,9 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
+with Global_Data;
+--  Used for Entities
+
 package Display is
 
    procedure Open_Output_Files;
@@ -34,5 +37,9 @@ package Display is
    procedure Generate_Results;
    --  Generate all the results of the analysis (local stack usage and call
    --  graph and worst case stack usage information).
+
+   procedure Increase_Count
+     (Entity : Global_Data.Entities);
+   --  Increase and print the number of subprograms, calls, or paths parsed
 
 end Display;

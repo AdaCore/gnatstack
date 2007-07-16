@@ -42,6 +42,9 @@ with Options;
 --           Order
 --           Display_Call_Chains
 
+with Display;
+--  Used for Increase_Count
+
 with Version;
 --  Used for Version_String;
 
@@ -939,6 +942,7 @@ package body Parser is
       declare
          Found_Id   : constant Node_Id := Get_Node (Symbol_Name.all);
          Found_Node : Node_Class_Access := null;
+         New_Node   : Boolean := False;
 
       begin
          --  Indirect call
@@ -975,6 +979,10 @@ package body Parser is
                   Is_Called               => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
+               --  Insert new subprogram descriptor
+
+               New_Node := True;
+
                List_Of_Nodes.Insert
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
             end if;
@@ -1003,6 +1011,10 @@ package body Parser is
                   Analysis_Finished       => False,
                   Is_Called               => False,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
+
+               --  Insert new subprogram descriptor
+
+               New_Node := True;
 
                List_Of_Nodes.Insert
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
@@ -1049,7 +1061,7 @@ package body Parser is
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
                      Analysis_Finished       => False,
-                     Is_Called               => False,
+                     Is_Called               => Found_Node.Is_Called,
                      Cycles                  => List_Of_Cycles.Empty_Vector);
 
                   --  Merge the location list
@@ -1069,6 +1081,10 @@ package body Parser is
 
                end if;
             end if;
+         end if;
+
+         if New_Node then
+            Display.Increase_Count (Global_Data.Subprogram);
          end if;
       end;
    end Parse_Node;
@@ -1170,13 +1186,12 @@ package body Parser is
       Demangled : in Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 4);
+      Matches      : GNAT.Regpat.Match_Array (0 .. 4);
 
       Tmp_Location : Static_Stack_Analysis.Location;
 
-      Ignore   : Static_Stack_Analysis.List_Of_Locations.Cursor;
-      Inserted : Boolean;
-
+      Ignore       : Static_Stack_Analysis.List_Of_Locations.Cursor;
+      New_Location : Boolean := False;
    begin
       --  Check for no location specified
 
@@ -1220,12 +1235,12 @@ package body Parser is
 
             --  Include the parsed location if it is not already in the list
 
-            Locations.Insert (Tmp_Location, Ignore, Inserted);
+            Locations.Insert (Tmp_Location, Ignore, New_Location);
 
             --  Destroy the String that was previously allocated if it is no
             --  longer needed.
 
-            if not Inserted then
+            if not New_Location then
                GNAT.Strings.Free
                  (GNAT.Strings.String_Access (Tmp_Location.File));
             end if;
@@ -1318,7 +1333,17 @@ package body Parser is
       Tmp_Location : Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.Null_Location;
 
-      Inserted     : Boolean;
+      New_Node     : Boolean := False;
+
+      procedure Mark_As_Called
+        (Target : Static_Stack_Analysis.Node_Class_Access);
+      --  Mark the subprogram as being called by someone else
+
+      procedure Mark_As_Called
+        (Target : Static_Stack_Analysis.Node_Class_Access) is
+      begin
+         Target.Is_Called := True;
+      end Mark_As_Called;
 
    begin
       --  The pattern of the input line is:
@@ -1348,9 +1373,9 @@ package body Parser is
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             Global_Data.List_Of_Subprograms.Insert
-              (Source_Ptr, Source_Id, Inserted);
+              (Source_Ptr, Source_Id, New_Node);
 
-            pragma Assert (Inserted);
+            pragma Assert (New_Node);
          else
             --  Get the node so we can add the new information later on
 
@@ -1369,26 +1394,32 @@ package body Parser is
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Under_Analysis          => False,
                Analysis_Finished       => False,
-               Is_Called               => False,
+               Is_Called               => True,
                Cycles                  => List_Of_Cycles.Empty_Vector);
 
             Global_Data.List_Of_Subprograms.Insert
-              (Target_Ptr, Target_Id, Inserted);
+              (Target_Ptr, Target_Id, New_Node);
 
             --  ??? For the moment we create the same indirect node for all
             --  indirect calls. We should create different ones, but there
             --  is no means yet to distinguish them. It will be possible when
             --  we add the location to the calls.
 
-            --  pragma Assert (Inserted);
+            --  pragma Assert (New_Node);
 
          else
             Target_Id :=
               Get_Node (Input (Matches (2).First .. Matches (2).Last));
 
-            if not List_Of_Nodes.Has_Element (Target_Id) then
-               --  This node is considered unresolved for the moment. It can be
-               --  later modified if we find more information.
+            if List_Of_Nodes.Has_Element (Target_Id) then
+               --  Mark the subprogram as called by another
+
+               Static_Stack_Analysis.List_Of_Nodes.Query_Element
+                 (Target_Id, Mark_As_Called'Access);
+
+            --  This node is considered unresolved for the moment. It can be
+            --  later modified if we find more information.
+            else
                Target_Ptr := new Unresolved_Node'
                  (Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
@@ -1397,14 +1428,18 @@ package body Parser is
                     new String'(Input (Matches (2).First .. Matches (2).Last)),
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
-                  Is_Called               => False,
+                  Is_Called               => True,
                   Cycles                  => List_Of_Cycles.Empty_Vector);
 
                Global_Data.List_Of_Subprograms.Insert
-                 (Target_Ptr, Target_Id, Inserted);
+                 (Target_Ptr, Target_Id, New_Node);
 
-               pragma Assert (Inserted);
+               pragma Assert (New_Node);
             end if;
+         end if;
+
+         if New_Node then
+            Display.Increase_Count (Global_Data.Subprogram);
          end if;
 
          --  Get the location of this call
@@ -1435,6 +1470,7 @@ package body Parser is
 
             Ignore : Static_Stack_Analysis.List_Of_Locations.Cursor;
 
+            New_Location : Boolean := False;
          begin
             --  For indirect calls we created a new node, and hence we will
             --  create a new edge.
@@ -1456,9 +1492,9 @@ package body Parser is
 
                   if Tmp_Location /= Static_Stack_Analysis.Null_Location then
                      Call.Point_Of_Call.Insert
-                       (Tmp_Location, Ignore, Inserted);
+                       (Tmp_Location, Ignore, New_Location);
 
-                     if not Inserted then
+                     if not New_Location then
                         --  Destroy the String that was previously allocated
                         --  if it is no longer needed.
 
@@ -1487,6 +1523,8 @@ package body Parser is
                     Point_Of_Call  => List_Of_Locations.To_Set (Tmp_Location),
                     Feasible_Call  => True,
                     Under_Analysis => False));
+
+               Display.Increase_Count (Global_Data.Call_To_Subprogram);
             end if;
          end;
       else

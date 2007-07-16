@@ -95,4 +95,15 @@ package Global_Data is
    Phase : Phase_Type;
    --  Variable that indicates the phase of the analysis in which we are
 
+   ----------------
+   -- Statistics --
+   ----------------
+
+   type Entities is (Subprogram, Call_To_Subprogram, Cycle);
+   --  Main entities to be analyzed
+
+   Entities_Processed : array (Entities) of Natural := (others => 0);
+   --  Number of subprograms, calls-to-subprogram, and cycles taken into
+   --  account for the different parts of the analysis.
+
 end Global_Data;

@@ -39,53 +39,33 @@ package body Worst_Case_Analyzer is
    -- Local procedures --
    ----------------------
 
-   procedure Compute_Worst_Case
-     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
-   --  Compute the worst case stack usage starting from the indicated entry
-   --  point.
+   procedure Worst_Case_For_Entry
+        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+      --  Compute the worst case stack usage starting from the indicated entry
+      --  point.
 
-   procedure Compute_Worst_Case (Position : in Static_Stack_Analysis.Edge_Id);
-   --  Compute the worst case stack usage starting from the indicated call
-
-   procedure Compute_Worst_Case (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Worst_Case_For_Subprogram
+     (Position : in Static_Stack_Analysis.Node_Id);
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
+
+   procedure Worst_Case_For_Call (Position : in Static_Stack_Analysis.Edge_Id);
+   --  Compute the worst case stack usage starting from the indicated call
 
    ------------------------
    -- Compute_Worst_Case --
    ------------------------
 
-   procedure Compute_Worst_Case
-     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
-   is
+   procedure Worst_Case_For_Entry
+     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
    begin
       --  Analyze the indicated node
 
-      Compute_Worst_Case
+      Worst_Case_For_Subprogram
         (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
-   end Compute_Worst_Case;
+   end Worst_Case_For_Entry;
 
-   procedure Compute_Worst_Case
-     (Position : in Static_Stack_Analysis.Edge_Id)
-   is
-      Explored_Edge : constant Static_Stack_Analysis.Edge :=
-        Static_Stack_Analysis.List_Of_Edges.Element (Position);
-
-   begin
-      --  Mark it under analysis
-
-      Explored_Edge.Under_Analysis := True;
-
-      --  Analyze the node to which this call points
-
-      Compute_Worst_Case (Explored_Edge.Target);
-
-      --  Mark the end of the analysis for this edge
-
-      Explored_Edge.Under_Analysis := False;
-   end Compute_Worst_Case;
-
-   procedure Compute_Worst_Case
+   procedure Worst_Case_For_Subprogram
      (Position : in Static_Stack_Analysis.Node_Id)
    is
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
@@ -112,7 +92,7 @@ package body Worst_Case_Analyzer is
             --  Iterate
 
             Static_Stack_Analysis.List_Of_Edges.Iterate
-              (Explored_Node.Target_Calls, Compute_Worst_Case'Access);
+              (Explored_Node.Target_Calls, Worst_Case_For_Call'Access);
 
             --  Sort
 
@@ -138,11 +118,28 @@ package body Worst_Case_Analyzer is
          end if;
 
          --  Mark the end of the analysis for this node
-
          Explored_Node.Under_Analysis := False;
-
       end if;
-   end Compute_Worst_Case;
+   end Worst_Case_For_Subprogram;
+
+   procedure Worst_Case_For_Call (Position : in Static_Stack_Analysis.Edge_Id)
+   is
+      Explored_Edge : constant Static_Stack_Analysis.Edge :=
+        Static_Stack_Analysis.List_Of_Edges.Element (Position);
+
+   begin
+      --  Mark it under analysis
+
+      Explored_Edge.Under_Analysis := True;
+
+      --  Analyze the node to which this call points
+
+      Worst_Case_For_Subprogram (Explored_Edge.Target);
+
+      --  Mark the end of the analysis for this edge
+
+      Explored_Edge.Under_Analysis := False;
+   end Worst_Case_For_Call;
 
    ----------------------
    -- Get_Longest_Path --
@@ -196,7 +193,7 @@ package body Worst_Case_Analyzer is
       --  Explore every entry point
 
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
-        (Global_Data.Entry_Points, Compute_Worst_Case'Access);
+        (Global_Data.Entry_Points, Worst_Case_For_Entry'Access);
    end Worst_Case_Analysis;
 
 end Worst_Case_Analyzer;

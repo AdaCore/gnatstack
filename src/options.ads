@@ -56,7 +56,8 @@ package Options is
    --  stack usage.
 
    Explore_All : Boolean := False;
-   --  Compute worst case stack usage for every node in the partition
+   --  Compute worst case stack usage for every node in the partition (every
+   --  node not called by any other).
 
    Compute_All_Cycles : Boolean := False;
    --  Flag that indicates whether we want to get the full list of potential

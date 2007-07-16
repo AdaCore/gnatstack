@@ -76,5 +76,6 @@ begin
 
 exception
    when others =>
+      Ada.Text_IO.New_Line;
       Ada.Text_IO.Put_Line ("GNATstack: analysis abandoned");
 end Gnatstack;

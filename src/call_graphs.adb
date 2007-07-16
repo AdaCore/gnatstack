@@ -24,6 +24,9 @@ with Static_Stack_Analysis;
 --           Edge_Id
 --           Cycle
 
+with Display;
+--  Used for Increase_Count
+
 with Global_Data;
 --  Used for Unbounded_Frames
 --           External_Calls
@@ -321,6 +324,7 @@ package body Call_Graphs is
          end if;
       end Ada_Binder_Main;
 
+   --  start processing for Analyze_Node
    begin
       --  Do nothing if this node has been fully analyzed. It means that all
       --  the cycles to which it belongs are already known.
@@ -429,14 +433,12 @@ package body Call_Graphs is
 
          Analyze_Node (Explored_Edge.Target);
 
-         --  Mark the target subprogram as being directly called
-
-         Target_Node.Is_Called := True;
-
          --  Mark the end of the analysis for this edge
 
          Explored_Edge.Under_Analysis := False;
       end if;
+
+      pragma Assert (Target_Node.Is_Called);
    end Analyze_Call;
 
    ------------------------
@@ -496,6 +498,8 @@ package body Call_Graphs is
 
    begin
       --  Iterate over all the subprograms
+
+      Ada.Text_IO.New_Line;
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
         (Global_Data.List_Of_Subprograms, Analyze_Subprogram'Access);
@@ -565,6 +569,10 @@ package body Call_Graphs is
          --  Mark the nodes as belonging to this cycle
 
          New_Cycle.Path.Iterate (Mark_Nodes'Access);
+
+         --  Increase the count of cycles analyzed
+
+         Display.Increase_Count (Global_Data.Cycle);
 
          --  We mark this cycle to be analyzed later
 
