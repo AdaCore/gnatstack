@@ -9,7 +9,7 @@
 @c                                                                            o
 @c                          G N A T S T A C K _ U G                           o
 @c                                                                            o
-@c                        Copyright (C) 2006, AdaCore                         o
+@c                      Copyright (C) 2006-2007, AdaCore                      o
 @c                                                                            o
 @c  GNAT is free software;  you can  redistribute it  and/or modify it under  o
 @c  terms of the  GNU General Public License as published  by the Free Soft-  o
@@ -53,7 +53,7 @@
 @vskip 0pt plus 1filll
 
 
-@copyright{} Copyright 2006, AdaCore
+@copyright{} Copyright 2006-2007, AdaCore
 
 Permission is granted to make and distribute verbatim copies of
 this manual provided the copyright notice and this permission notice
@@ -76,7 +76,7 @@ The Static Stack Analysis Tool
 
 @noindent
 AdaCore@*
-Copyright @copyright{} 2006, AdaCore
+Copyright @copyright{} 2006-2007, AdaCore
 
 @noindent
 Permission is granted to make and distribute verbatim copies of
@@ -92,6 +92,7 @@ are preserved on all copies.
 * Examples ::
 * Index ::
 
+@detailmenu
  --- The Detailed Node Listing ---
 
 About This Guide
@@ -110,6 +111,7 @@ Additional Capabilities
 Examples
 
 Index
+@end detailmenu
 @end menu
 @end ifnottex
 
@@ -133,13 +135,9 @@ supported, including both native and cross compilers. It requires GNAT
 Pro 5.04a or later.
 
 Support in the Project Manager for @value{gnatstack} (see @ref{Use of
-Project Files}) was finished on September 8th 2006, so only compiler
-wavefronts issued subsequent to the date above, as well as future
-releases, incorporate this capability.
-
-Detailed information about dynamically allocated local objects (using
-the @code{-fcallgraph-info=da} compiler switch) requires GNAT Pro
-6.0.1 or later.
+Project Files}), and detailed information about dynamically allocated
+local objects (using the @code{-fcallgraph-info=da} compiler switch
+require GNAT Pro 6.0.1 or later.
 
 @c *********************************
 @node The GNATstack Tool
@@ -250,9 +248,13 @@ look for the longest paths in terms of stack usage.
 
 @smallexample
 $ gnatstack *.ci
+[...]
 Accumulated stack usage information for entry points
 
 main : total 376 bytes
+ +-> main
+ +-> main_unit
+ +-> process
 @end smallexample
 
 @noindent
@@ -328,7 +330,11 @@ Select alphabetical order.
 @item -p
 @cindex @option{-p}
 Print all the subprograms that make up the worst-case path for every
-entry point.
+entry point (the default mode).
+
+@item -np
+@cindex @option{-np}
+Do not print worst-case path for entry points.
 
 @item -f @var{file}
 @cindex @option{-f}
@@ -382,6 +388,10 @@ Turn on warnings for external calls.
 Turn on warnings for indirect (including dispatching) calls.
 
 @end table
+
+@item -x
+@cindex @option{-x}
+Generate file @var{stack_usage.xml} with the information in XML format.
 
 @end table
 
@@ -587,13 +597,31 @@ analysis is not accurate. This situation is indicated by
 warning message:
 
 @smallexample
-Worst case analysis is *not* accurate ; use -W options for details
+Worst case analysis is *not* accurate because of ...; use -Wa for details
 @end smallexample
 
 @noindent
 In addition @value{gnatstack} provides accuracy information on a
 per-subprogram basis. The mark @code{*} is attached to the
 subprograms when there is any missing information.
+
+The accumulated worst-case stack usage for the different entry points
+will contain the mark @code{+?} to indicate that extra stack
+utilization may happen.
+
+@smallexample
+$ gnatstack *.ci
+[...]
+Worst case analysis is *not* accurate because of cycles, external calls.
+Use -Wa for details.
+
+Accumulated stack usage information for entry points
+
+main : total 504+? bytes
+ +-> main
+ +-> proc_a *
+ +-> proc_b *
+@end smallexample
 
 
 @c *********************************
@@ -744,11 +772,17 @@ $ gcc -c ext.adb
 $ gnatmake p.adb -cargs -fcallgraph-info=su,da
 [...]
 $ gnatstack *.ci
-Worst case analysis is *not* accurate ; use -W options for details
+[...]
+Worst case analysis is *not* accurate because of cycles, unbounded frames,
+external calls, indirect calls. Use -Wa for details.
 
 Accumulated stack usage information for entry points
 
-main : total 472 bytes *
+main : total 472+? bytes
+ +-> main
+ +-> p
+ +-> p.q *
+ +-> p.r *
 @end smallexample
 
 @noindent
@@ -761,36 +795,36 @@ and per-subprogram stack requirements:
 
 @smallexample
 $ gnatstack -Wa -v -p *.ci
-Worst case analysis is *not* accurate ; use -W options for details
+[...]
 
 List of cycles:
 
-<c0> p.q
- +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
- +-> p.r at R:p.adb:9:14 : 104 bytes (cycle) (<c0>)
- +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
-
+<c1> p.q
+ +-> p.q at Q:p.adb:11:14 : 144+? bytes (unbounded,cycle) (<c1>)
+ +-> p.r at R:p.adb:9:14 : 104+? bytes (cycle) (<c1>)
+ +-> p.q at Q:p.adb:11:14 : 144+? bytes (unbounded,cycle) (<c1>)
 
 List of subprograms with dynamic unbounded frames:
 
-  p.q at Q:p.adb:11:14
+  In p.q at Q:p.adb:11:14 (not directly reachable)
     Data at p.adb:12
 
 List of external subprograms:
 
-  ext.get_size
+  ext.get_size at Get_Size:ext.ads:3:13
 
 List of indirect (including dispatching) calls:
 
   1 indirect calls in: p at P:p.adb:4:11
+    at p.adb:24
 
 Accumulated stack usage information for entry points
 
-main : total 472 bytes (unbounded,cycle) *
+main : total 472+? bytes (unbounded,cycle)
  +-> main at main:b~p.ads:24:14 : 112 bytes
- +-> p at P:p.adb:4:11 : 112 bytes
- +-> p.q at Q:p.adb:11:14 : 144 bytes (unbounded,cycle) (<c0>)
- +-> p.r at R:p.adb:9:14 : 104 bytes (cycle) (<c0>)
+ +-> p at ada_main_program:b~p.adb:28:17,P:p.adb:4:11 : 112 bytes
+ +-> p.q at Q:p.adb:11:14 : 144+? bytes (unbounded,cycle) (<c1>)
+ +-> p.r at R:p.adb:9:14 : 104+? bytes (cycle) (<c1>)
 @end smallexample
 
 @noindent
@@ -800,7 +834,7 @@ usage information.
 
 @value{gnatstack} has detected one cycle in the call graph (@code{Q}
 calling @code{R} which in turn calls @code{Q}). The cycle has been
-tagged as @code{<c0>} for later references. The following section of the
+tagged as @code{<c1>} for later references. The following section of the
 report indicates that the use of a dynamically sized local object
 (@code{Data}) derives into a dynamic unbounded frame (subprogram
 @code{Q}). We then have the list of subprograms for which there is no
@@ -811,7 +845,7 @@ is an indirect call.
 Looking at the information about entry points we can see that the
 computed stack requirements for the @code{main} entry point is 472
 bytes. However, this result is not accurate (as indicated by the mark
-@code{*}), and we see that the two problems that have been found is
+@code{+?}), and we see that the two problems that have been found is
 the existence of cycles and unbounded frames.
 
 The call chain information provides more detailed information about
