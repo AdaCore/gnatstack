@@ -45,8 +45,8 @@ package Global_Data is
    --  any entry point that represents an indirect (including dispatching)
    --  call.
 
-   Cycles : Static_Stack_Analysis.List_Of_Cycles.Vector :=
-     Static_Stack_Analysis.List_Of_Cycles.Empty_Vector;
+   Cycles : Static_Stack_Analysis.List_Of_Cycles.Set :=
+     Static_Stack_Analysis.List_Of_Cycles.Empty_Set;
    --  List of paths corresponding to the different cycles that have been
    --  detected.
 

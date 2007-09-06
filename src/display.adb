@@ -1302,15 +1302,15 @@ package body Display is
       case Entity is
          when Subprogram | Call_To_Subprogram =>
             Ada.Text_IO.Put
-              ("Parsing " &
+              ("Parsing" &
                Natural'Image (Entities_Processed (Subprogram)) &
-               " subprograms and " &
+               " subprograms and" &
                Natural'Image (Entities_Processed (Call_To_Subprogram)) &
                " calls to subprogram" & ASCII.CR);
 
          when Cycle =>
             Ada.Text_IO.Put
-              ("Checking " &
+              ("Detected" &
                Natural'Image (Entities_Processed (Cycle)) &
                " cycles" & ASCII.CR);
       end case;

@@ -118,6 +118,32 @@ package body Static_Stack_Analysis is
                  Static_Stack_Analysis.List_Of_Nodes.Element (Right);
    end "=";
 
+   function "=" (Left, Right : Cycle) return Boolean is
+      Left_Index  : Paths.Cursor := Left.Path.First;
+      Right_Index : Paths.Cursor := Right.Path.First;
+
+      use type Ada.Containers.Count_Type;
+
+   begin
+      if Left.Path.Length = Right.Path.Length then
+         while Paths.Has_Element (Left_Index)
+           and then Paths.Has_Element (Right_Index)
+           and then Paths.Element (Left_Index) = Paths.Element (Right_Index)
+         loop
+            Paths.Next (Left_Index);
+            Paths.Next (Right_Index);
+         end loop;
+
+         --  If we have reached the end of both paths and all elements are
+         --  the same then the paths are exactly the same.
+
+         return (not Paths.Has_Element (Left_Index) and then
+                 not Paths.Has_Element (Right_Index));
+      else
+         return False;
+      end if;
+   end "=";
+
    ------------------------
    -- Alphabetical_Order --
    ------------------------
@@ -128,17 +154,23 @@ package body Static_Stack_Analysis is
       --  the line number.
 
       if Left.File = null then
-         return True;
+         return Right.File /= null;
+
       elsif Right.File = null then
          return False;
+
       elsif Left.File.all /= Right.File.all then
          return Left.File.all < Right.File.all;
-      elsif Left.Demangled = null then
+
+      elsif Left.Demangled = null and then Right.Demangled /= null then
          return True;
+
       elsif Right.Demangled = null then
          return False;
+
       elsif Left.Demangled.all /= Right.Demangled.all then
          return Left.Demangled.all < Right.Demangled.all;
+
       else
          return Left.Line_Number < Right.Line_Number;
       end if;
@@ -148,12 +180,43 @@ package body Static_Stack_Analysis is
      (Left, Right : Node_Class_Access) return Boolean is
    begin
       if Left = null then
-         return True;
+         return Right /= null;
+
       elsif Right = null then
          return False;
+
       else
          return Get_Subprogram_Name (Left.all).all <
            Get_Subprogram_Name (Right.all).all;
+      end if;
+   end Alphabetical_Order;
+
+   function Alphabetical_Order (Left, Right : Cycle) return Boolean is
+      Left_Index  : Paths.Cursor := Left.Path.First;
+      Right_Index : Paths.Cursor := Right.Path.First;
+   begin
+      --  Look for the first different subprogram
+
+      while Paths.Has_Element (Left_Index)
+        and then Paths.Has_Element (Right_Index)
+        and then Paths.Element (Left_Index).Source_Node =
+                 Paths.Element (Right_Index).Source_Node
+      loop
+         Static_Stack_Analysis.Paths.Next (Left_Index);
+         Static_Stack_Analysis.Paths.Next (Right_Index);
+      end loop;
+
+      if not Paths.Has_Element (Left_Index) then
+         return Paths.Has_Element (Right_Index);
+
+      elsif not Paths.Has_Element (Right_Index) then
+         return False;
+
+      --  Compare the subprogram names
+      else
+         return Alphabetical_Order
+           (List_Of_Nodes.Element (Paths.Element (Left_Index).Source_Node),
+            List_Of_Nodes.Element (Paths.Element (Right_Index).Source_Node));
       end if;
    end Alphabetical_Order;
 
@@ -167,6 +230,15 @@ package body Static_Stack_Analysis is
         or else (Left /= null
                  and then Right /= null
                  and then Left.all = Right.all);
+   end Equal;
+
+   function Equal (Left, Right : Path_Element) return Boolean is
+      use type Node_Id;
+      use type Edge_Id;
+
+   begin
+      return Left.Source_Node = Right.Source_Node
+        and then Left.Call_To = Right.Call_To;
    end Equal;
 
    ---------------------------------
@@ -346,6 +418,59 @@ package body Static_Stack_Analysis is
    begin
       return Get_Subprogram_Name (Element.all).all;
    end Key;
+
+   ---------------
+   -- Normalize --
+   ---------------
+
+   procedure Normalize (Target : Cycle) is
+      The_First  : Paths.Cursor := Target.Path.First;
+      Index      : Paths.Cursor := Paths.Next (The_First);
+
+      First_Name : Name :=
+        Get_Subprogram_Name
+          (List_Of_Nodes.Element (Paths.Element (The_First).Source_Node).all);
+      Index_Name : Name := null;
+
+      Counter : Ada.Containers.Count_Type;
+
+      use type Paths.Cursor;
+      use type Ada.Containers.Count_Type;
+
+   begin
+      --  Look for the first in alphabetical order
+
+      while Paths.Has_Element (Index) loop
+
+         Index_Name :=
+           Get_Subprogram_Name
+             (List_Of_Nodes.Element (Paths.Element (Index).Source_Node).all);
+
+         if Index_Name.all < First_Name.all then
+            The_First := Index;
+            First_Name := Index_Name;
+         end if;
+
+         Paths.Next (Index);
+      end loop;
+
+      --  Rearrange the list.
+
+      --  Move the item in the first position to the last
+
+      Index := Target.Path.First;
+      Counter := 0;
+
+      while Index /= The_First loop
+         Target.Path.Append (Paths.Element (Index));
+         Counter := Counter + 1;
+         Paths.Next (Index);
+      end loop;
+
+      --  Remove those that have been relocated
+
+      Target.Path.Delete_First (Counter);
+   end Normalize;
 
    -----------------------
    -- Stack_Usage_Order --

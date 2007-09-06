@@ -221,7 +221,11 @@ package Static_Stack_Analysis is
    --  made up by the source node and the edge that represent the call from
    --  this node to the next.
 
-   package Paths is new Ada.Containers.Vectors (Natural, Path_Element);
+   function Equal (Left, Right : Path_Element) return Boolean;
+   --  Equality operation between two path elements. They are equal if the
+   --  content is the same.
+
+   package Paths is new Ada.Containers.Vectors (Natural, Path_Element, Equal);
    --  Paths are represented as a set of nodes together with the calls between
    --  two adjacent nodes.
 
@@ -247,8 +251,21 @@ package Static_Stack_Analysis is
    Empty_Cycle : constant Cycle_Element;
    --  Cycle with no elements inside
 
-   package List_Of_Cycles is new Ada.Containers.Vectors (Natural, Cycle);
-   --  Package used for identifying collections of call graph cycles
+   procedure Normalize (Target : Cycle);
+   --  Modify the call graph that represents the cycle in a way that the first
+   --  element contains the first subprogram in alphabetical order.
+   --  When analyzing whether a cycle has already been detected we need to
+   --  compare two paths, and this process is simpler if there is some order in
+   --  the way the path is represented.
+
+   function "=" (Left, Right : Cycle) return Boolean;
+
+   function Alphabetical_Order (Left, Right : Cycle) return Boolean;
+
+   package List_Of_Cycles is new
+     Ada.Containers.Ordered_Sets (Cycle, Alphabetical_Order, "=");
+   --  Package used for identifying collections of call graph cycles. Cycles
+   --  are ordered alphabetically.
 
    -------------------
    -- Abstract node --
@@ -279,7 +296,7 @@ package Static_Stack_Analysis is
          --  Indicates whether this subprogram is directly accessible from any
          --  other.
 
-         Cycles : List_Of_Cycles.Vector;
+         Cycles : List_Of_Cycles.Set;
          --  A node may be part of different cycles in the call graph, and
          --  this field contains the set of cycles to which this node belongs.
       end record;

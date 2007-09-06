@@ -708,6 +708,17 @@ package body Parser is
       if Options.List_Of_Entry_Points /= null then
          Parse_Entry_Points (Options.List_Of_Entry_Points.all);
 
+         --  Verify that at least one entry point matching the pattern has
+         --  been found.
+
+         if Global_Data.Entry_Points.Is_Empty then
+            Ada.Text_IO.Put_Line
+              ("Could not find any entry point from the list " &
+               Options.List_Of_Entry_Points.all);
+
+            raise Parser_Error with "No entry point found";
+         end if;
+
          --  Destroy the String once used
 
          GNAT.Strings.Free (Options.List_Of_Entry_Points);
@@ -716,6 +727,17 @@ package body Parser is
       elsif Options.Entry_Point_Pattern /= null then
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Global_Data.List_Of_Subprograms, Add_Pattern_Entry'Access);
+
+         --  Verify that at least one entry point matching the pattern has
+         --  been found.
+
+         if Global_Data.Entry_Points.Is_Empty then
+            Ada.Text_IO.Put_Line
+              ("Could not find any entry point matching the pattern " &
+               Options.Entry_Point_Pattern.all);
+
+            raise Parser_Error with "No entry point found";
+         end if;
 
          --  Destroy the String once used
 
@@ -818,6 +840,10 @@ package body Parser is
 
          else
             --  The entry point does not exist
+
+            Ada.Text_IO.Put_Line
+              ("Could not find the entry point " &
+               Input (Matches (1).First .. Matches (1).Last));
 
             raise Parser_Error with "The entry point does not exist";
          end if;
@@ -991,7 +1017,7 @@ package body Parser is
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
-                  Cycles                  => List_Of_Cycles.Empty_Vector);
+                  Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
 
@@ -1024,7 +1050,7 @@ package body Parser is
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
-                  Cycles                  => List_Of_Cycles.Empty_Vector);
+                  Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
 
@@ -1076,7 +1102,7 @@ package body Parser is
                      Under_Analysis          => False,
                      Analysis_Finished       => False,
                      Is_Called               => Found_Node.Is_Called,
-                     Cycles                  => List_Of_Cycles.Empty_Vector);
+                     Cycles                  => List_Of_Cycles.Empty_Set);
 
                   --  Merge the location list
 
@@ -1384,7 +1410,7 @@ package body Parser is
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => False,
-               Cycles                  => List_Of_Cycles.Empty_Vector);
+               Cycles                  => List_Of_Cycles.Empty_Set);
 
             Global_Data.List_Of_Subprograms.Insert
               (Source_Ptr, Source_Id, New_Node);
@@ -1409,7 +1435,7 @@ package body Parser is
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => True,
-               Cycles                  => List_Of_Cycles.Empty_Vector);
+               Cycles                  => List_Of_Cycles.Empty_Set);
 
             Global_Data.List_Of_Subprograms.Insert
               (Target_Ptr, Target_Id, New_Node);
@@ -1443,7 +1469,7 @@ package body Parser is
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => True,
-                  Cycles                  => List_Of_Cycles.Empty_Vector);
+                  Cycles                  => List_Of_Cycles.Empty_Set);
 
                Global_Data.List_Of_Subprograms.Insert
                  (Target_Ptr, Target_Id, New_Node);
