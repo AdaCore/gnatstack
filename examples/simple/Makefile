@@ -1,6 +1,6 @@
 all:
 	$(PREFIX)gnatmake $(RUNTIME) main_unit -cargs -fcallgraph-info=su
-	$(PREFIX)gnatstack -p *.ci
+	gnatstack -p *.ci
 
 clean:
 	rm -f *.o *.ali b~* *.ci main_unit$(EXE) undefined.ciu graph.vcg
