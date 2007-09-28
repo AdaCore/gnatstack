@@ -27,15 +27,18 @@ install: all
 	mkdir -p $(prefix)/share/examples/gnatstack
 	cp -r examples/* $(prefix)/share/examples/gnatstack
 	if [ ! -d $(prefix)/share/doc/gnatstack ]; then \
-           mkdir -p $(prefix)/share/doc/gnatstack; \
-        fi
+	   mkdir -p $(prefix)/share/doc/gnatstack; \
+	fi
 	if [ -f docs/ug/gnatstack_ug.html ]; then \
-  	   cp -p  docs/ug/gnatstack_ug.html $(prefix)/share/doc/gnatstack; \
+	   cp -p docs/ug/gnatstack_ug.html $(prefix)/share/doc/gnatstack; \
 	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.html; \
 	fi
 	if [ -f docs/ug/gnatstack_ug.pdf ]; then \
 	   cp -p docs/ug/gnatstack_ug.pdf $(prefix)/share/doc/gnatstack; \
 	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.pdf; \
 	fi
-
+	if [ -f docs/ug/gnatstack_ug.txt ]; then \
+	   cp -p docs/ug/gnatstack_ug.txt $(prefix)/share/doc/gnatstack; \
+	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.txt; \
+	fi
 
