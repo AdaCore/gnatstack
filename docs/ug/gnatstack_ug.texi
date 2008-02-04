@@ -135,8 +135,8 @@ supported, including both native and cross compilers. It requires GNAT
 Pro 5.04a or later.
 
 Support in the Project Manager for @value{gnatstack} (see @ref{Use of
-Project Files}), and detailed information about dynamically allocated
-local objects (using the @code{-fcallgraph-info=da} compiler switch
+Project Files}) and detailed information about dynamically allocated
+local objects (using the @code{-fcallgraph-info=da} compiler switch)
 require GNAT Pro 6.0.1 or later.
 
 @c *********************************
