@@ -630,7 +630,7 @@ main : total 504+? bytes
 
 @noindent
 This section contains a number of examples of the use of
-@value{gnatstack} tool showing how to use to tool and how to interpret
+@value{gnatstack} showing how to use the tool and how to interpret
 the results. Let us start analyzing a simple program like the
 following:
 
