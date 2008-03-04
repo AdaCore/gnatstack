@@ -40,16 +40,16 @@ package body Worst_Case_Analyzer is
    ----------------------
 
    procedure Worst_Case_For_Entry
-        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
       --  Compute the worst case stack usage starting from the indicated entry
       --  point.
 
    procedure Worst_Case_For_Subprogram
-     (Position : in Static_Stack_Analysis.Node_Id);
+     (Position : Static_Stack_Analysis.Node_Id);
    --  Compute the worst case stack usage starting from the indicated
    --  subprogram.
 
-   procedure Worst_Case_For_Call (Position : in Static_Stack_Analysis.Edge_Id);
+   procedure Worst_Case_For_Call (Position : Static_Stack_Analysis.Edge_Id);
    --  Compute the worst case stack usage starting from the indicated call
 
    ------------------------
@@ -57,7 +57,7 @@ package body Worst_Case_Analyzer is
    ------------------------
 
    procedure Worst_Case_For_Entry
-     (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
+     (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
    begin
       --  Analyze the indicated node
 
@@ -66,7 +66,7 @@ package body Worst_Case_Analyzer is
    end Worst_Case_For_Entry;
 
    procedure Worst_Case_For_Subprogram
-     (Position : in Static_Stack_Analysis.Node_Id)
+     (Position : Static_Stack_Analysis.Node_Id)
    is
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
@@ -122,7 +122,7 @@ package body Worst_Case_Analyzer is
       end if;
    end Worst_Case_For_Subprogram;
 
-   procedure Worst_Case_For_Call (Position : in Static_Stack_Analysis.Edge_Id)
+   procedure Worst_Case_For_Call (Position : Static_Stack_Analysis.Edge_Id)
    is
       Explored_Edge : constant Static_Stack_Analysis.Edge :=
         Static_Stack_Analysis.List_Of_Edges.Element (Position);
@@ -147,7 +147,7 @@ package body Worst_Case_Analyzer is
 
    procedure Get_Longest_Path
      (Path   : in out Static_Stack_Analysis.Paths.Vector;
-      Target : in Static_Stack_Analysis.Node_Id)
+      Target : Static_Stack_Analysis.Node_Id)
    is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Target);

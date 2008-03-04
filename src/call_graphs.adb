@@ -48,22 +48,22 @@ package body Call_Graphs is
    -- Local subprograms --
    -----------------------
 
-   procedure Analyze_Call (Position : in Static_Stack_Analysis.Edge_Id);
+   procedure Analyze_Call (Position : Static_Stack_Analysis.Edge_Id);
    --  Analyze potential problems for this call (cycles, external or indirect
    --  calls, or unbounded frames).
 
-   procedure Analyze_Node (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Analyze_Node (Position : Static_Stack_Analysis.Node_Id);
    --  Analyze potential problems for this call (cycles, external or indirect
    --  calls, or unbounded frames).
 
    procedure Analyze_Detected_Cycle
-     (Position : in Static_Stack_Analysis.Node_Id);
+     (Position : Static_Stack_Analysis.Node_Id);
    --  Check whether the detected cycle (the one whose root is the indicated
    --  node) is already known.
 
    procedure Add_Node_To_Path
-     (Cycle : in Static_Stack_Analysis.Cycle;
-      Node  : in Static_Stack_Analysis.Node_Id);
+     (Cycle : Static_Stack_Analysis.Cycle;
+      Node  : Static_Stack_Analysis.Node_Id);
    --  This procedure adds the specified node to the cycle and annotates the
    --  node belonging to this cycle to mark that the node is part of the cycle.
 
@@ -107,8 +107,8 @@ package body Call_Graphs is
    ----------------------
 
    procedure Add_Node_To_Path
-     (Cycle : in Static_Stack_Analysis.Cycle;
-      Node  : in Static_Stack_Analysis.Node_Id)
+     (Cycle : Static_Stack_Analysis.Cycle;
+      Node  : Static_Stack_Analysis.Node_Id)
    is
       use type Static_Stack_Analysis.Edge_Id;
       use type Static_Stack_Analysis.Node_Id;
@@ -178,7 +178,7 @@ package body Call_Graphs is
    -- Analyze_Node --
    ------------------
 
-   procedure Analyze_Node (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Analyze_Node (Position : Static_Stack_Analysis.Node_Id) is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -222,7 +222,7 @@ package body Call_Graphs is
       end if;
    end Analyze_Node;
 
-   procedure Analyze_Call (Position : in Static_Stack_Analysis.Edge_Id) is
+   procedure Analyze_Call (Position : Static_Stack_Analysis.Edge_Id) is
       Explored_Edge : constant Static_Stack_Analysis.Edge :=
         Static_Stack_Analysis.List_Of_Edges.Element (Position);
 
@@ -254,13 +254,13 @@ package body Call_Graphs is
    procedure Analyze_Call_Graph is
 
       procedure Analyze_Subprogram
-        (Position : in Static_Stack_Analysis.Node_Id);
+        (Position : Static_Stack_Analysis.Node_Id);
       --  Depending on the selected flags, this procedure will extract all the
       --  cycles that can be reached from the specified entry point, as well as
       --  undefined references, indirect calls and unbounded frames.
 
       procedure Analyze_Subprogram
-        (Position : in Static_Stack_Analysis.Node_Id)
+        (Position : Static_Stack_Analysis.Node_Id)
       is
          Node : constant Static_Stack_Analysis.Node_Class_Access :=
            Static_Stack_Analysis.List_Of_Nodes.Element (Position);
@@ -313,12 +313,12 @@ package body Call_Graphs is
       Cycle_Counter : Natural := 1;
 
       procedure Tag_Cycle
-        (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
+        (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor);
       --  Allocate unique identifiers to the cycles (their position in the
       --  global list of cycles.
 
       procedure Tag_Cycle
-        (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor) is
+        (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor) is
       begin
          Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Id :=
            Cycle_Counter;
@@ -345,7 +345,7 @@ package body Call_Graphs is
    ----------------------------
 
    procedure Analyze_Detected_Cycle
-     (Position : in Static_Stack_Analysis.Node_Id)
+     (Position : Static_Stack_Analysis.Node_Id)
    is
       New_Cycle : Static_Stack_Analysis.Cycle :=
         new Static_Stack_Analysis.Cycle_Element'
@@ -542,11 +542,11 @@ package body Call_Graphs is
      (Node : Static_Stack_Analysis.Node_Class_Access)
    is
       procedure Mark_End_Of_Analysis
-        (Position : in Static_Stack_Analysis.Edge_Id);
+        (Position : Static_Stack_Analysis.Edge_Id);
       --  Mark the target node as analyzed
 
       procedure Mark_End_Of_Analysis
-        (Position : in Static_Stack_Analysis.Edge_Id) is
+        (Position : Static_Stack_Analysis.Edge_Id) is
       begin
          Mark_Tree_End_Of_Analysis
            (Static_Stack_Analysis.List_Of_Nodes.Element

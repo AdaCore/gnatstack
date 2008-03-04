@@ -138,29 +138,29 @@ package body Display is
      (Stack_Info : Static_Stack_Analysis.Stack_Usage_Info);
    --  Print the information about stack usage (local and accumulated)
 
-   procedure Expand_Node (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Expand_Node (Position : Static_Stack_Analysis.Node_Id);
    --  Print the information about the specified node, including stack usage
    --  (and accumulated stack usage), and subprograms that are called.
 
-   procedure Print_Unbounded (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Print_Unbounded (Position : Static_Stack_Analysis.Node_Id);
    --  Print the list of dynamic objects if the position corresponds to a node
    --  with a dynamic and unbounded stack usage.
 
-   procedure Print_External (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Print_External (Position : Static_Stack_Analysis.Node_Id);
    --  Print the subprogram name if the position corresponds to a node with
    --  no information about stack usage.
 
-   procedure Print_Indirect (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Print_Indirect (Position : Static_Stack_Analysis.Node_Id);
    --  Print the information about indirect (including dispatching) calls made
    --  by this subprogram.
 
    procedure Print_Node
      (Subprogram_Name         : String;
-      Local_Stack_Usage       : in Static_Stack_Analysis.Stack_Usage_Info;
-      Accumulated_Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info;
-      Locations               : in Static_Stack_Analysis.List_Of_Locations.Set;
-      Unresolved              : in Boolean := False;
-      To_Undefined_File       : in Boolean := False);
+      Local_Stack_Usage       : Static_Stack_Analysis.Stack_Usage_Info;
+      Accumulated_Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info;
+      Locations               : Static_Stack_Analysis.List_Of_Locations.Set;
+      Unresolved              : Boolean := False;
+      To_Undefined_File       : Boolean := False);
    --  Print the information about this concrete subprogram with the format
    --  used by the compiler when generating call graph and stack usage
    --  information. If To_Undefined_File is True then the node is generated in
@@ -169,7 +169,7 @@ package body Display is
    --  file containing the VCG call graph being generated.
 
    procedure Print_Edge
-     (Source : in String; Target : in String; File : Ada.Text_IO.File_Type);
+     (Source : String; Target : String; File : Ada.Text_IO.File_Type);
    --  Print the information about this concrete call-to-subprogram with the
    --  format used by the compiler when generating call graph and stack usage
    --  information.
@@ -179,18 +179,18 @@ package body Display is
    --  usage, and subprogram called, depending on the verbosity chosen).
 
    procedure Print_Node_In_Path
-     (Position : in Static_Stack_Analysis.Paths.Cursor);
+     (Position : Static_Stack_Analysis.Paths.Cursor);
    --  Iterator for printing all the nodes in a path
 
    procedure Print_Entry (Root : Static_Stack_Analysis.Node_Class_Access);
    --  Print a summary of the stack requirements for an entry point
 
    procedure Print_Cycle_Id
-     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
+     (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor);
    --  Print the unique identifier associated to the cycle
 
    procedure Print_Cycle
-     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor);
+     (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor);
    --  Print the set of subprograms belonging to the cycle
 
    procedure Print_Biggest_Frames (Frames : Natural);
@@ -202,7 +202,7 @@ package body Display is
    --  Print the location of a list of dynamically sized local objects using
    --  the format: name file:line
 
-   procedure Print_XML_Edge (Position : in Static_Stack_Analysis.Edge_Id);
+   procedure Print_XML_Edge (Position : Static_Stack_Analysis.Edge_Id);
    --  Print the information about this call to subprogram using the format:
    --   <subprogram>
    --     <prefixname type="strings">
@@ -231,7 +231,7 @@ package body Display is
    --   </location>
 
    procedure Print_XML_Stack_Usage
-     (Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info);
+     (Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info);
    --  Print the stack usage using the format:
    --   <size type="integers">
    --     <value>102</value>
@@ -446,12 +446,12 @@ package body Display is
       --  to their local stack usage (in decreasing order).
 
       procedure Get_Biggest_Frame
-        (Position : in Static_Stack_Analysis.Node_Id);
+        (Position : Static_Stack_Analysis.Node_Id);
       --  Check whether this node is one of those with the biggest stack
       --  requirements and add it to the list if that is the case.
 
       procedure Print_Node
-        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
       --  Print the subprogram name and its local stack usage
 
       package Ordered_Frames is
@@ -474,7 +474,7 @@ package body Display is
       end Local_Usage_Ordering;
 
       procedure Get_Biggest_Frame
-        (Position : in Static_Stack_Analysis.Node_Id)
+        (Position : Static_Stack_Analysis.Node_Id)
       is
          Node : constant Static_Stack_Analysis.Node_Class_Access :=
            Static_Stack_Analysis.List_Of_Nodes.Element (Position);
@@ -511,7 +511,7 @@ package body Display is
       end Get_Biggest_Frame;
 
       procedure Print_Node
-        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
+        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor)
       is
          Node : constant Static_Stack_Analysis.Node_Class_Access :=
            Static_Stack_Analysis.List_Of_Nodes.Element
@@ -630,7 +630,7 @@ package body Display is
    ----------------
 
    procedure Print_Edge
-     (Source : in String; Target : in String; File : Ada.Text_IO.File_Type)
+     (Source : String; Target : String; File : Ada.Text_IO.File_Type)
    is
    begin
       --  Caller
@@ -655,15 +655,15 @@ package body Display is
    procedure Print_Longest_Paths is
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.Node_Id);
+        (Position : Static_Stack_Analysis.Node_Id);
       --  Print the longest path for the specified subprogram
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
+        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
       --  Print the longest path for the specified entry point
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.Node_Id)
+        (Position : Static_Stack_Analysis.Node_Id)
       is
          Path : Static_Stack_Analysis.Paths.Vector :=
            Static_Stack_Analysis.Paths.Empty_Vector;
@@ -696,7 +696,7 @@ package body Display is
       end Print_Longest_Path;
 
       procedure Print_Longest_Path
-        (Position : in Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
+        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
       begin
          Print_Longest_Path
            (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
@@ -774,12 +774,12 @@ package body Display is
    ----------------
 
    procedure Print_Node
-     (Subprogram_Name         : in String;
-      Local_Stack_Usage       : in Static_Stack_Analysis.Stack_Usage_Info;
-      Accumulated_Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info;
-      Locations               : in Static_Stack_Analysis.List_Of_Locations.Set;
-      Unresolved              : in Boolean := False;
-      To_Undefined_File       : in Boolean := False) is
+     (Subprogram_Name         : String;
+      Local_Stack_Usage       : Static_Stack_Analysis.Stack_Usage_Info;
+      Accumulated_Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info;
+      Locations               : Static_Stack_Analysis.List_Of_Locations.Set;
+      Unresolved              : Boolean := False;
+      To_Undefined_File       : Boolean := False) is
    begin
       --  Generate the node line
 
@@ -1114,7 +1114,7 @@ package body Display is
    -- Expand_Node --
    -----------------
 
-   procedure Expand_Node (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Expand_Node (Position : Static_Stack_Analysis.Node_Id) is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -1130,10 +1130,10 @@ package body Display is
       Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
            Static_Stack_Analysis.Get_Location_List (Node.all);
 
-      procedure Expand_Edge (Position : in Static_Stack_Analysis.Edge_Id);
+      procedure Expand_Edge (Position : Static_Stack_Analysis.Edge_Id);
       --  Generate the information about this call to subprogram
 
-      procedure Expand_Edge (Position : in Static_Stack_Analysis.Edge_Id) is
+      procedure Expand_Edge (Position : Static_Stack_Analysis.Edge_Id) is
          Target : constant Static_Stack_Analysis.Node_Class_Access :=
            Static_Stack_Analysis.List_Of_Nodes.Element
              (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
@@ -1321,7 +1321,7 @@ package body Display is
    ------------------------
 
    procedure Print_Node_In_Path
-     (Position : in Static_Stack_Analysis.Paths.Cursor)
+     (Position : Static_Stack_Analysis.Paths.Cursor)
    is
       Explored_Item : constant Static_Stack_Analysis.Path_Element :=
         Static_Stack_Analysis.Paths.Element (Position);
@@ -1431,7 +1431,7 @@ package body Display is
    -----------------
 
    procedure Print_Cycle
-     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor)
+     (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor)
    is
       Path : constant Static_Stack_Analysis.Paths.Vector :=
         Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Path;
@@ -1470,7 +1470,7 @@ package body Display is
    --------------------
 
    procedure Print_Cycle_Id
-     (Cycle : in Static_Stack_Analysis.List_Of_Cycles.Cursor) is
+     (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor) is
    begin
       Ada.Text_IO.Put ("<c");
 
@@ -1484,7 +1484,7 @@ package body Display is
    -- Print_External --
    --------------------
 
-   procedure Print_External (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Print_External (Position : Static_Stack_Analysis.Node_Id) is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -1514,7 +1514,7 @@ package body Display is
    -- Print_Indirect --
    --------------------
 
-   procedure Print_Indirect (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Print_Indirect (Position : Static_Stack_Analysis.Node_Id) is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -1608,7 +1608,7 @@ package body Display is
    -- Print_Unbounded --
    ---------------------
 
-   procedure Print_Unbounded (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Print_Unbounded (Position : Static_Stack_Analysis.Node_Id) is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -1650,7 +1650,7 @@ package body Display is
    -- Print_XML_Edge --
    --------------------
 
-   procedure Print_XML_Edge (Position : in Static_Stack_Analysis.Edge_Id) is
+   procedure Print_XML_Edge (Position : Static_Stack_Analysis.Edge_Id) is
       Target : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element
           (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
@@ -1725,7 +1725,7 @@ package body Display is
    ---------------------------
 
    procedure Print_XML_Stack_Usage
-     (Stack_Usage : in Static_Stack_Analysis.Stack_Usage_Info)
+     (Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info)
    is
    begin
       Open_Tag ("size type=""integers""");

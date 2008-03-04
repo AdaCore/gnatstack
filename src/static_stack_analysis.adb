@@ -285,11 +285,11 @@ package body Static_Stack_Analysis is
       List_Of_Indirect_Calls : List_Of_Locations.Set :=
         List_Of_Locations.Empty_Set;
 
-      procedure Extract_Indirect_Calls (Position : in Edge_Id);
+      procedure Extract_Indirect_Calls (Position : Edge_Id);
       --  If the referenced call is an indirect call then insert its location
       --  within the set to be returned.
 
-      procedure Extract_Indirect_Calls (Position : in Edge_Id) is
+      procedure Extract_Indirect_Calls (Position : Edge_Id) is
          Call : constant Edge := List_Of_Edges.Element (Position);
 
       begin

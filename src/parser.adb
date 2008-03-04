@@ -95,7 +95,7 @@ package body Parser is
    procedure Usage;
    --  Print how to use the tool
 
-   procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Add_Pattern_Entry (Position : Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
 
@@ -106,7 +106,7 @@ package body Parser is
    pragma Inline (Print_Usage_And_Exit);
    --  Print how to use the tool and exit
 
-   procedure Get_Task_Wrapper (Position : in Static_Stack_Analysis.Node_Id);
+   procedure Get_Task_Wrapper (Position : Static_Stack_Analysis.Node_Id);
    --  Get a pointer to this node if it contains the task wrapper (used for
    --  Ada tasking).
 
@@ -231,11 +231,11 @@ package body Parser is
    --  ^node: { title: "symbol_name" label: "LABEL"[ shape : ellipse] }
 
    procedure Parse_Title
-     (Input : in String; Symbol : out Static_Stack_Analysis.Name);
+     (Input : String; Symbol : out Static_Stack_Analysis.Name);
    --  The input String should contain the symbol name
 
    procedure Parse_Label
-     (Input           : in String;
+     (Input           : String;
       Demangled       : out Static_Stack_Analysis.Name;
       Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
@@ -248,18 +248,18 @@ package body Parser is
    --  [M dynamic objects[\n DLOC[\n DLOC]]]
 
    procedure Parse_Locations
-     (Input     : in String;
-      Demangled : in Static_Stack_Analysis.Name;
+     (Input     : String;
+      Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of locations in source files.
    --  Format: [filename:line:[column][,filename:line:[column]]
 
    procedure Parse_Stack_Usage
-     (Input : in String; Stack : out Static_Stack_Analysis.Stack_Usage_Info);
+     (Input : String; Stack : out Static_Stack_Analysis.Stack_Usage_Info);
    --  Extract stack requirements.
    --  Format: N bytes[ (static|dynamic[,bounded])]
 
-   procedure Parse_Shape (Input : in String; Local : out Boolean);
+   procedure Parse_Shape (Input : String; Local : out Boolean);
    --  Local is set to True if the subprogram is defined in the compilation
    --  unit. For unresolved subprograms it returns False.
    --  Format :  shape : ellipse
@@ -271,7 +271,7 @@ package body Parser is
    --  [label: "location" ] }
 
    procedure Parse_Dynamic_Objects
-     (Input           : in String;
+     (Input           : String;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of data locations in source files.
    --  Format: [\n name filename:line[\n name filename:line]]
@@ -280,7 +280,7 @@ package body Parser is
    -- Add_Pattern_Entry --
    -----------------------
 
-   procedure Add_Pattern_Entry (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Add_Pattern_Entry (Position : Static_Stack_Analysis.Node_Id) is
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
@@ -391,7 +391,7 @@ package body Parser is
    -- Get_Task_Wrapper --
    ----------------------
 
-   procedure Get_Task_Wrapper (Position : in Static_Stack_Analysis.Node_Id) is
+   procedure Get_Task_Wrapper (Position : Static_Stack_Analysis.Node_Id) is
    begin
       if Static_Stack_Analysis.List_Of_Nodes.Has_Element
           (Global_Data.Task_Wrapper)
@@ -762,7 +762,7 @@ package body Parser is
    ---------------------------
 
    procedure Parse_Dynamic_Objects
-     (Input           : in String;
+     (Input           : String;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 4);
@@ -1134,7 +1134,7 @@ package body Parser is
    -----------------
 
    procedure Parse_Title
-     (Input : in String; Symbol : out Static_Stack_Analysis.Name)
+     (Input : String; Symbol : out Static_Stack_Analysis.Name)
    is
    begin
       if Input'Length /= 0 then
@@ -1153,7 +1153,7 @@ package body Parser is
    -----------------
 
    procedure Parse_Label
-     (Input           : in String;
+     (Input           : String;
       Demangled       : out Static_Stack_Analysis.Name;
       Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
@@ -1222,8 +1222,8 @@ package body Parser is
    --------------------
 
    procedure Parse_Locations
-     (Input     : in String;
-      Demangled : in Static_Stack_Analysis.Name;
+     (Input     : String;
+      Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
       Matches      : GNAT.Regpat.Match_Array (0 .. 4);
@@ -1297,7 +1297,7 @@ package body Parser is
    -----------------------
 
    procedure Parse_Stack_Usage
-     (Input : in String; Stack : out Static_Stack_Analysis.Stack_Usage_Info)
+     (Input : String; Stack : out Static_Stack_Analysis.Stack_Usage_Info)
    is
       Matches : GNAT.Regpat.Match_Array (0 .. 2);
 
@@ -1347,7 +1347,7 @@ package body Parser is
    -- Parse_Shape --
    -----------------
 
-   procedure Parse_Shape (Input : in String; Local : out Boolean) is
+   procedure Parse_Shape (Input : String; Local : out Boolean) is
    begin
       --  The mark 'ellipse' indicates an external subprogram, i.e., not
       --  locally defined.
