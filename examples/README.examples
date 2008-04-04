@@ -83,4 +83,4 @@ problem_detection:
     analysis, such as detection of indirect calls, recursion, missing stack
     information, and dynamic frames.
 
-           Thank you for using GNATstack, and happy training !
+           Thank you for using GNATstack, and happy training!
