@@ -9,7 +9,7 @@
 @c                                                                            o
 @c                          G N A T S T A C K _ U G                           o
 @c                                                                            o
-@c                      Copyright (C) 2006-2007, AdaCore                      o
+@c                      Copyright (C) 2006-2008, AdaCore                      o
 @c                                                                            o
 @c  GNAT is free software;  you can  redistribute it  and/or modify it under  o
 @c  terms of the  GNU General Public License as published  by the Free Soft-  o
@@ -53,7 +53,7 @@
 @vskip 0pt plus 1filll
 
 
-@copyright{} Copyright 2006-2007, AdaCore
+@copyright{} Copyright 2006-2008, AdaCore
 
 Permission is granted to make and distribute verbatim copies of
 this manual provided the copyright notice and this permission notice
@@ -76,7 +76,7 @@ The Static Stack Analysis Tool
 
 @noindent
 AdaCore@*
-Copyright @copyright{} 2006-2007, AdaCore
+Copyright @copyright{} 2006-2008, AdaCore
 
 @noindent
 Permission is granted to make and distribute verbatim copies of
@@ -176,6 +176,14 @@ point will need to be specified using the @option{-e} option (see
 @ref{Options for GNATstack}).
 @cindex @option{-e}
 
+@value{gnatstack} also generates a @emph{Visualization of Compiler Graphs}
+(VCG) file containing the complete call tree for the application,
+decorated with both local and accumulated stack usage
+information. The VCG graph description language (see
+@url{http://rw4.cs.uni-sb.de/users/sander/html/gsvcg1.html}) is used
+in GCC for other graph outputs.
+
+Apart from the computation of worst-case stack requirements,
 @value{gnatstack} can also perform four additional types of analysis:
 
 @itemize @bullet
@@ -217,12 +225,12 @@ externals calls, and user-defined bounds for unbounded frames.
 
 @noindent
 Two steps are needed to analyze stack usage: generation of the basic
-stack consumption and callgraph information and worst-case stack
+stack consumption and call-graph information and worst-case stack
 analysis.
 
 The first step is to compile the application with the required options
 to generate the information about per-subprogram stack consumption and
-callgraph information. The @option{-fcallgraph-info=su} compiler
+call-graph information. The @option{-fcallgraph-info=su} compiler
 switch outputs this information on a per-file basis in the common VCG
 format.
 @cindex @code{-fcallgraph-info=su}
@@ -572,7 +580,7 @@ Very simple cases can be detected by using @code{pragma Restrictions
 execution of a subprogram the same subprogram is not invoked. More
 complex situations require call graph analysis. @command{gnatcheck},
 see @cite{GNAT User's Guide}, can be used to detect potential
-recursion. @command{gnatstack} can also detect all the occurrences of
+recursion. @value{gnatstack} can also detect all the occurrences of
 cycles in the call graph using the options @option{-ca -Wc}.
 @cindex @code{pragma Restrictions}
 @cindex @code{No_Recursion} restriction
@@ -661,7 +669,7 @@ end Main_Unit;
 @noindent
 A typical project file would contain the flags to compile the
 application with the required options to generate stack consumption
-and callgraph information. In addition, it would contain the desired
+and call-graph information. In addition, it would contain the desired
 option for the stack analysis phase:
 
 @smallexample @c projectfile
@@ -700,7 +708,7 @@ main : total 376 bytes
 Note that we do not need to specify the @file{.ci} files for the
 application. The @command{gnat} driver computes automatically this
 list. In addition, the main entry point has also been automatically
-detected by @command{gnatstack}.
+detected by @value{gnatstack}.
 
 The execution of the tool tells that the longest path (in terms of
 stack consumption) is that made up by @code{main} (the program entry
