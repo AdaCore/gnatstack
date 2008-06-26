@@ -7,7 +7,9 @@ get_gnat_dir () {
    else
       ggd_prog="$ggd_prefix-gnatmake"
    fi
-   if [ `type $ggd_prog 2>&1` -ne 0 ]; then
+
+   type $ggd_prog > /dev/null 2>&1
+   if [ "$?" -ne 0 ]; then
       # GNAT Pro installation not found
       echo ""
    else
