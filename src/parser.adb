@@ -19,60 +19,21 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
-with Global_Data;
---  Used for Entry_Points
---           Is_Task_Entry
---           Ada_Tasking_Used
-
-with Static_Stack_Analysis;
---  Used for Get_Node
---           List_Of_Nodes
---           List_Of_Edges
---           List_Of_Locations
---           Unknown_Stack_Usage
-
-with Options;
---  Used for Verbose
---           Debug
---           Explore_All
---           Default_Unknown
---           Default_Unbounded
---           List_Of_Entry_Points
---           Output_VCG
---           Order
---           Display_Call_Chains
-
-with Display;
---  Used for Increase_Count
-
-with Version;
---  Used for Version_String;
-
 with Ada.Containers.Vectors;
 with Ada.Directories;
-
+with Ada.Strings.Fixed;
 with Ada.Text_IO;
---  Used for Open
---           Close
---           End_Of_File
---           Get_Line
---           Put_Line
---           New_Line
 
 with GNAT.Regpat;
---  Used for Match
-
 with GNAT.Command_Line;
---  Used for Getopt
---           Get_Argument
---           Parameter
-
 with GNAT.Strings;
---  Used for String_Access
-
 with GNAT.OS_Lib;
---  Used for OS_Exit
---           Is_Regular_File
+
+with Global_Data;
+with Static_Stack_Analysis;
+with Options;
+with Display;
+with Version;
 
 package body Parser is
 
@@ -87,6 +48,10 @@ package body Parser is
 
    Parser_Error : exception;
    --  Exception to be raised when unexpected data is found
+
+   Descriptor : Ada.Text_IO.File_Type;
+   --  File descriptor for the file being processed. It is places as a global
+   --  variable for better warning messages.
 
    -----------------------
    -- Local subprograms --
@@ -163,29 +128,42 @@ package body Parser is
 
    Node_Regexp : constant String :=
      "^node: {" &
-     " title: " & '"' & "([^" & '"' & "]+)" & '"' &
-     " label: " & '"' & "([^" & '"' & "]+)" & '"' & "(" &
-     " shape : (.+)*" & ")??" & " }";
-   --  Pattern: ^node: { title: "([^"]+)" label: "([^"]+)" (shape : (.+)*)?? }
+     " title: ""([^""]+)""" &
+     "( label: ""[^""]*"")??" &
+     "( shape : \w*)??" &
+     "\s*}";
+   --  Pattern: ^node: { title: "([^"]*)"( label: "[^"]*")??
+   --           ( shape : \w*)??\s*}
+   --  The information that is mandatory for a node is the title which
+   --  represents the subprogram symbol.
 
    Edge_Regexp : constant String :=
-     "^edge: { sourcename: " & '"' & "([^" & '"' & "]+)" & '"' &
-     " targetname: " & '"' & "([^" & '"' & "]+)" & '"' & "(" &
-     " label: " & '"' & "(.+):([0-9]+)" & '"' & "| priority: .+)??" & " }";
+     "^edge: {" &
+     " sourcename: ""([^""]*)""" &
+     " targetname: ""([^""]*)""" &
+     "( label: "".*""| priority: .*)??" &
+     "\s*}";
    --  Pattern: ^edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
    --           ( label: "(.+):([0-9]+)"| priority: .+)?? }
+   --  The information that is mandatory for an edge is the symbols associated
+   --  to the subprograms acting as caller and callee.
 
    Allowed_Lines_Regexp : constant String :=
      "^(\s*)((})|(graph: { title:)|(--)|$)";
    --  Pattern: ^(\s*)((})|(graph: { title:)|(--)|$)
 
-   Label_Regexp : constant String :=
-     "^([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
+   Node_Label_Regexp : constant String :=
+     "^ label: """ &
+     "([^\\:]+)??(\\n)??([^\\]+)??(\\n)??([0-9]+ bytes" &
      "( \(static\)| \(dynamic\)| \(dynamic,bounded\))??)??" &
-     "(\\n[0-9]+ dynamic objects(\\n (.+)*)??)??$";
+     "(\\n[0-9]+ dynamic objects(\\n (.+)*)??)??""$";
    --  Pattern: (([^\\:]+)??(\\n)??(([^\\]+)??(\\n)??([0-9]+ bytes
    --           ( \(static\)| \(dynamic\)| \(dynamic,bounded\))??
    --           (\\n[0-9]+ dynamic objects(\n (.+)*)??)??$
+
+   Edge_Label_Regexp : constant String :=
+     "^ label: ""(.+):([0-9]+)""";
+   --  Pattern: ^ label: "(.+):([0-9]+)"
 
    No_Location_Regexp : constant String := "^<no location>$";
    --  Pattern : ^<no location>$
@@ -234,7 +212,7 @@ package body Parser is
      (Input : String; Symbol : out Static_Stack_Analysis.Name);
    --  The input String should contain the symbol name
 
-   procedure Parse_Label
+   procedure Parse_Node_Label
      (Input           : String;
       Demangled       : out Static_Stack_Analysis.Name;
       Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
@@ -247,7 +225,7 @@ package body Parser is
    --  [demangled_name\n][LOC[,LOC]\n][N bytes[ (static|dynamic[,bounded])]]
    --  [M dynamic objects[\n DLOC[\n DLOC]]]
 
-   procedure Parse_Locations
+   procedure Parse_Node_Locations
      (Input     : String;
       Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
@@ -948,12 +926,21 @@ package body Parser is
 
             --  Get information from the label
 
-            Parse_Label
-              (Input (Matches (2).First .. Matches (2).Last),
-               Demangled_Name,
-               Locations_Set,
-               Stack_Info,
-               Dynamic_Objects);
+            if Matches (2) /= GNAT.Regpat.No_Match then
+               Parse_Node_Label
+                 (Input (Matches (2).First .. Matches (2).Last),
+                  Demangled_Name,
+                  Locations_Set,
+                  Stack_Info,
+                  Dynamic_Objects);
+            else
+               Demangled_Name := null;
+               Locations_Set := List_Of_Locations.Empty_Set;
+               Stack_Info := Unknown_Stack_Usage;
+               Stack_Info.Unknown_Usage :=
+                 Static_Stack_Analysis.Frame_Size (Options.Default_Unknown);
+               Dynamic_Objects := List_Of_Locations.Empty_Set;
+            end if;
 
             --  Get information from the shape
 
@@ -1148,11 +1135,11 @@ package body Parser is
       end if;
    end Parse_Title;
 
-   -----------------
-   -- Parse_Label --
-   -----------------
+   ----------------------
+   -- Parse_Node_Label --
+   ----------------------
 
-   procedure Parse_Label
+   procedure Parse_Node_Label
      (Input           : String;
       Demangled       : out Static_Stack_Analysis.Name;
       Locations       : out Static_Stack_Analysis.List_Of_Locations.Set;
@@ -1162,7 +1149,7 @@ package body Parser is
       Matches : GNAT.Regpat.Match_Array (0 .. 8);
 
    begin
-      GNAT.Regpat.Match (Label_Regexp, Input, Matches);
+      GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
 
       if Matches (0) = GNAT.Regpat.No_Match then
          raise Parser_Error;
@@ -1185,7 +1172,7 @@ package body Parser is
          --  Subprogram location
 
          if Matches (3) /= GNAT.Regpat.No_Match then
-            Parse_Locations
+            Parse_Node_Locations
               (Input (Matches (3).First .. Matches (3).Last),
                Demangled,
                Locations);
@@ -1215,13 +1202,13 @@ package body Parser is
               Static_Stack_Analysis.List_Of_Locations.Empty_Set;
          end if;
       end if;
-   end Parse_Label;
+   end Parse_Node_Label;
 
-   --------------------
-   -- Parse_Location --
-   --------------------
+   -------------------------
+   -- Parse_Node_Location --
+   -------------------------
 
-   procedure Parse_Locations
+   procedure Parse_Node_Locations
      (Input     : String;
       Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
@@ -1232,6 +1219,8 @@ package body Parser is
 
       Ignore       : Static_Stack_Analysis.List_Of_Locations.Cursor;
       New_Location : Boolean := False;
+
+      use type Ada.Text_IO.Positive_Count;
    begin
       --  Check for no location specified
 
@@ -1267,7 +1256,7 @@ package body Parser is
             --  Parse additional locations, if any
 
             if Matches (4) /= GNAT.Regpat.No_Match then
-               Parse_Locations
+               Parse_Node_Locations
                  (Input (Matches (4).First .. Matches (4).Last),
                   Demangled,
                   Locations);
@@ -1286,11 +1275,26 @@ package body Parser is
             end if;
 
          else
-            raise Parser_Error;
+            --  The file location is malformed. This information is not
+            --  required for computing stack usage (it is only helpful to
+            --  present the results).
+
+            Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+
+            if Options.Debug then
+               Ada.Text_IO.Put_Line
+                 (Ada.Directories.Simple_Name
+                    (Ada.Text_IO.Name (Descriptor)) & ":" &
+                  Ada.Strings.Fixed.Trim
+                    (Ada.Text_IO.Positive_Count'Image
+                       (Ada.Text_IO.Line (Descriptor) - 1),
+                     Ada.Strings.Both) &
+                  ": Could not parse the label");
+            end if;
          end if;
 
       end if;
-   end Parse_Locations;
+   end Parse_Node_Locations;
 
    -----------------------
    -- Parse_Stack_Usage --
@@ -1362,7 +1366,8 @@ package body Parser is
    procedure Parse_Edge (Input : String) is
       use Static_Stack_Analysis;
 
-      Matches      : GNAT.Regpat.Match_Array (0 .. 5);
+      Matches      : GNAT.Regpat.Match_Array (0 .. 3);
+      Loc_Matches  : GNAT.Regpat.Match_Array (0 .. 2);
 
       Source_Id    : Static_Stack_Analysis.Node_Id;
       Target_Id    : Static_Stack_Analysis.Node_Id;
@@ -1385,10 +1390,11 @@ package body Parser is
          Target.Is_Called := True;
       end Mark_As_Called;
 
+      use type Ada.Text_IO.Positive_Count;
    begin
       --  The pattern of the input line is:
-      --  edge: { sourcename: "([^"]+)" targetname: "([^"]+)"
-      --  ( label: "([^:]+):([0-9]+)")?? }
+      --  edge: { sourcename: "([^"]*)" targetname: "([^"]*)"
+      --  ( label: ".*"| priority: .*)?? }
 
       --  Get source and target
 
@@ -1484,18 +1490,49 @@ package body Parser is
 
          --  Get the location of this call
 
-         if Matches (3) /= GNAT.Regpat.No_Match
-           and then Matches (4) /= GNAT.Regpat.No_Match
-           and then Matches (5) /= GNAT.Regpat.No_Match
+         if Matches (3) /= GNAT.Regpat.No_Match and then
+           GNAT.Regpat.Match
+             (Edge_Label_Regexp,
+              Input (Matches (3).First .. Matches (3).Last))
          then
+            GNAT.Regpat.Match
+              (Edge_Label_Regexp,
+               Input (Matches (3).First .. Matches (3).Last),
+               Loc_Matches);
+
             --  This dynamically created object is later destroyed if it is
             --  not used (not inserted in the list).
 
             Tmp_Location.File :=
-              new String'(Input (Matches (4).First .. Matches (4).Last));
+              new String'
+                (Input (Loc_Matches (1).First .. Loc_Matches (1).Last));
 
             Tmp_Location.Line_Number :=
-              Integer'Value (Input (Matches (5).First .. Matches (5).Last));
+              Integer'Value
+                (Input (Loc_Matches (2).First .. Loc_Matches (2).Last));
+
+         --  Emit warning when the label cannot be processed. Ignore lines
+         --  with " priority: .*" or with nothing.
+         elsif Options.Debug and then
+           ((Matches (3) = GNAT.Regpat.No_Match
+                and then
+             not GNAT.Regpat.Match
+               ("^\s*}\s*$", Input (Matches (2).Last + 2 .. Input'Last)))
+               or else
+            (Matches (3) /= GNAT.Regpat.No_Match
+                and then
+             not GNAT.Regpat.Match
+               ("^ priority: .*",
+                Input (Matches (3).First .. Matches (3).Last))))
+         then
+            Ada.Text_IO.Put_Line
+              (Ada.Directories.Simple_Name
+                    (Ada.Text_IO.Name (Descriptor)) & ":" &
+               Ada.Strings.Fixed.Trim
+                 (Ada.Text_IO.Positive_Count'Image
+                    (Ada.Text_IO.Line (Descriptor) - 1),
+                  Ada.Strings.Both) &
+               ": Could not parse the label");
          end if;
 
          --  Now we need to check whether there is already an edge joining
@@ -1577,7 +1614,6 @@ package body Parser is
    ----------------------
 
    procedure Parse_Input_File (File : File_Id) is
-      Descriptor : Ada.Text_IO.File_Type;
    begin
       Ada.Text_IO.Open
         (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
@@ -1593,6 +1629,10 @@ package body Parser is
       when Parser_Error =>
          Ada.Text_IO.Put_Line
            ("Error parsing file " & List_Of_Files.Element (File).all);
+
+         if Ada.Text_IO.Is_Open (Descriptor) then
+            Ada.Text_IO.Close (Descriptor);
+         end if;
 
          raise;
    end Parse_Input_File;

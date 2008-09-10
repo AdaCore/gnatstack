@@ -519,9 +519,8 @@ package body Static_Stack_Analysis is
          Target.Stack_Info.Dynamic_Usage := Frame_Size'Max
            (Target.Stack_Info.Dynamic_Usage, Stack_Usage.Dynamic_Usage);
 
-         --  There cannot an unknown part for a explicit node
-
-         Target.Stack_Info.Unknown_Usage := No_Value;
+         Target.Stack_Info.Unknown_Usage := Frame_Size'Max
+           (Target.Stack_Info.Unknown_Usage, Stack_Usage.Unknown_Usage);
 
          Target.Stack_Info.Cycle_Usage := Frame_Size'Max
            (Target.Stack_Info.Cycle_Usage, Stack_Usage.Cycle_Usage);
