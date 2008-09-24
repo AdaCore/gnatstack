@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,10 +20,7 @@
 ------------------------------------------------------------------------------
 
 with Global_Data;
---  Used for List_Of_Subprograms
-
 with Options;
---  Used for Default_Unknown
 
 package body Static_Stack_Analysis is
 

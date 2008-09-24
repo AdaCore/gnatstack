@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -172,6 +172,9 @@ package Static_Stack_Analysis is
    ------------------------------
 
    type Edge_Element is record
+      Ada_File_Name : File_Name;
+      --  Name of the Ada file where this call appears
+
       Target        : Node_Id;
       --  Target node for this edge
 
@@ -273,6 +276,9 @@ package Static_Stack_Analysis is
 
    type Node is abstract tagged
       record
+         Ada_File_Name : File_Name;
+         --  Name of the Ada file where this subprogram is defined
+
          Target_Calls : List_Of_Edges.Vector;
          --  Target_Calls represent the set of possible nodes that can be
          --  called from this node (frame).

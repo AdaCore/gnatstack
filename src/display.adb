@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1130,16 +1130,26 @@ package body Display is
       Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
            Static_Stack_Analysis.Get_Location_List (Node.all);
 
+      type Indirect_Call_States is (None, Unknown_Indirect_Call, User_Defined);
+      Indirect_Call_Status : Indirect_Call_States := None;
+      --  Used to distinguish whether the subprogram being analyzed contains
+      --  indirect calls, and whether the user has specified the required
+      --  manual information to determine potential targets to this call.
+
       procedure Expand_Edge (Position : Static_Stack_Analysis.Edge_Id);
       --  Generate the information about this call to subprogram
 
       procedure Expand_Edge (Position : Static_Stack_Analysis.Edge_Id) is
+         Edge   : constant Static_Stack_Analysis.Edge :=
+           Static_Stack_Analysis.List_Of_Edges.Element (Position);
+
          Target : constant Static_Stack_Analysis.Node_Class_Access :=
-           Static_Stack_Analysis.List_Of_Nodes.Element
-             (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target);
+           Static_Stack_Analysis.List_Of_Nodes.Element (Edge.Target);
 
          Callee : constant String :=
            Static_Stack_Analysis.Get_Subprogram_Name (Target.all).all;
+
+         use type Static_Stack_Analysis.File_Name;
 
       begin
          --  Print both to the VCG file containing the call graph and to the
@@ -1148,11 +1158,19 @@ package body Display is
          Print_Edge
            (Source => Caller, Target => Callee, File => VCG_Descriptor);
 
-         if Target.all in Static_Stack_Analysis.Fake_Node'Class then
-            Print_Edge
-              (Source => Caller,
-               Target => "XXX",
-               File => Undefined_Descriptor);
+         if Edge.Ada_File_Name = null then
+            --  The user defined manually some targets for this call so we
+            --  do not ask again.
+
+            Indirect_Call_Status := User_Defined;
+
+         elsif Indirect_Call_Status = None and then
+           Target.all in Static_Stack_Analysis.Fake_Node'Class then
+            --  Mark this as information needed. The mark can be later removed
+            --  if the user has specified manually potential targets for this
+            --  call.
+
+            Indirect_Call_Status := Unknown_Indirect_Call;
          end if;
 
       end Expand_Edge;
@@ -1188,6 +1206,13 @@ package body Display is
 
       Static_Stack_Analysis.List_Of_Edges.Iterate
         (Node.Target_Calls, Expand_Edge'Access);
+
+      if Indirect_Call_Status = Unknown_Indirect_Call then
+         Print_Edge
+           (Source => Caller,
+            Target => "XXX",
+            File   => Undefined_Descriptor);
+      end if;
 
       Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
 

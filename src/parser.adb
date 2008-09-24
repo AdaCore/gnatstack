@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -48,6 +48,10 @@ package body Parser is
 
    Parser_Error : exception;
    --  Exception to be raised when unexpected data is found
+
+   Ada_File_Name : Static_Stack_Analysis.File_Name := null;
+   --  Name of the Ada file originating the .ci file that we are currently
+   --  processing.
 
    Descriptor : Ada.Text_IO.File_Type;
    --  File descriptor for the file being processed. It is places as a global
@@ -148,9 +152,14 @@ package body Parser is
    --  The information that is mandatory for an edge is the symbols associated
    --  to the subprograms acting as caller and callee.
 
+   Header_Regexp : constant String :=
+     "^graph: { title: ""([^""]*)""$";
+   --  Pattern: ^graph: { title: "([^"]*)"$
+   --  It indicates that it is a compiler-generated file
+
    Allowed_Lines_Regexp : constant String :=
-     "^(\s*)((})|(graph: { title:)|(--)|$)";
-   --  Pattern: ^(\s*)((})|(graph: { title:)|(--)|$)
+     "^\s*(}|--|$)";
+   --  Pattern: ^\s*(}|--|$)
 
    Node_Label_Regexp : constant String :=
      "^ label: """ &
@@ -192,6 +201,10 @@ package body Parser is
    ------------------------
    -- Parsing operations --
    ------------------------
+
+   procedure Parse_Ada_File_Name (Input : String);
+   --  Get the name of the Ada file from which the stack usage information is
+   --  derived.
 
    procedure Parse_Entry_Points (Input : String);
    --  Get the list of entry points to be analyzed. The format of the input
@@ -395,6 +408,23 @@ package body Parser is
         and then Ada.Directories.Extension (File_Name) =
           Stack_Usage_File_Extension;
    end Is_Stack_Usage_Information_File;
+
+   -------------------------
+   -- Parse_Ada_File_Name --
+   -------------------------
+
+   procedure Parse_Ada_File_Name (Input : String) is
+      Matches : GNAT.Regpat.Match_Array (0 .. 1);
+   begin
+      --  Get the file name
+
+      GNAT.Regpat.Match (Header_Regexp, Input, Matches);
+
+      if Matches (1) /= GNAT.Regpat.No_Match then
+         Ada_File_Name :=
+           new String'(Input (Matches (1).First .. Matches (1).Last));
+      end if;
+   end Parse_Ada_File_Name;
 
    ---------------------
    -- Parse Arguments --
@@ -852,6 +882,10 @@ package body Parser is
       elsif GNAT.Regpat.Match (Edge_Regexp, Input) then
          Parse_Edge (Input);
 
+      --  Get the Ada file name associated to the file being parsed
+      elsif GNAT.Regpat.Match (Header_Regexp, Input) then
+         Parse_Ada_File_Name (Input);
+
       --  Skip informative lines
       elsif GNAT.Regpat.Match (Allowed_Lines_Regexp, Input) then
          null;
@@ -997,7 +1031,8 @@ package body Parser is
                --  time during the analysis.
 
                Node_Ptr := new Unresolved_Node'
-                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                 (Ada_File_Name           => Ada_File_Name,
+                  Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
@@ -1028,7 +1063,8 @@ package body Parser is
                --  time during the analysis.
 
                Node_Ptr := new Explicit_Node'
-                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                 (Ada_File_Name           => Ada_File_Name,
+                  Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
@@ -1080,7 +1116,8 @@ package body Parser is
                   --  will include the information that we already had.
 
                   Node_Ptr := new Explicit_Node'
-                    (Target_Calls            => Found_Node.Target_Calls,
+                    (Ada_File_Name           => Ada_File_Name,
+                     Target_Calls            => Found_Node.Target_Calls,
                      Accumulated_Stack_Usage => Unknown_Stack_Usage,
                      Location_List           => Locations_Set,
                      Subprogram              => Symbol_Name,
@@ -1408,7 +1445,8 @@ package body Parser is
 
          if not List_Of_Nodes.Has_Element (Source_Id) then
             Source_Ptr := new Unresolved_Node'
-              (Target_Calls            => List_Of_Edges.Empty_Vector,
+              (Ada_File_Name           => Ada_File_Name,
+               Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              =>
@@ -1436,7 +1474,8 @@ package body Parser is
            Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
          then
             Target_Ptr := new Indirect_Node'
-              (Target_Calls            => List_Of_Edges.Empty_Vector,
+              (Ada_File_Name           => Ada_File_Name,
+               Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Under_Analysis          => False,
                Analysis_Finished       => False,
@@ -1467,7 +1506,8 @@ package body Parser is
             --  later modified if we find more information.
             else
                Target_Ptr := new Unresolved_Node'
-                 (Target_Calls            => List_Of_Edges.Empty_Vector,
+                 (Ada_File_Name           => Ada_File_Name,
+                  Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => List_Of_Locations.Empty_Set,
                   Subprogram              =>
@@ -1596,6 +1636,7 @@ package body Parser is
                Static_Stack_Analysis.List_Of_Edges.Append
                  (Source_Ptr.Target_Calls,
                   new Static_Stack_Analysis.Edge_Element'(
+                    Ada_File_Name  => Ada_File_Name,
                     Target         => Target_Id,
                     Point_Of_Call  => List_Of_Locations.To_Set (Tmp_Location),
                     Feasible_Call  => True,
@@ -1615,6 +1656,9 @@ package body Parser is
 
    procedure Parse_Input_File (File : File_Id) is
    begin
+      --  We do not know yet the originating Ada file
+      GNAT.Strings.Free (GNAT.Strings.String_Access (Ada_File_Name));
+
       Ada.Text_IO.Open
         (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
 
