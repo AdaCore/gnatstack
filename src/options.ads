@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,7 +20,7 @@
 ------------------------------------------------------------------------------
 
 with GNAT.Strings;
---  Used for String_Access
+with Static_Stack_Analysis;
 
 package Options is
 
@@ -85,11 +85,11 @@ package Options is
    Output_XML : GNAT.Strings.String_Access := null;
    --  Name of the generated file containing the XML output
 
-   Default_Unknown : Natural := 0;
+   Default_Unknown : Integer := Static_Stack_Analysis.Unspecified_Value;
    --  Value used (in bytes) when there is no information about stack usage
    --  for a given subprogram.
 
-   Default_Unbounded : Natural := 0;
+   Default_Unbounded : Integer := Static_Stack_Analysis.Unspecified_Value;
    --  Value used (in bytes) when there is an unbounded stack allocation for
    --  a given subprogram.
 end Options;

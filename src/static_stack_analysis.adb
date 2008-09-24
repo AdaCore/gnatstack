@@ -40,7 +40,7 @@ package body Static_Stack_Analysis is
 
    function "+" (Left, Right : Frame_Size) return Frame_Size is
       function Normalize (Stack_Usage : Frame_Size) return Integer;
-      --  Function for removing No_Value
+      --  Function for removing Empty_Value and Unspecified_Value
 
       function Normalize (Stack_Usage : Frame_Size) return Integer is
       begin
@@ -55,14 +55,16 @@ package body Static_Stack_Analysis is
       function Local_Add (Left, Right : Frame_Size) return Frame_Size;
       --  Function for adding the different fields fo Stack_Usage_Info. It is
       --  different from the normal addition because we want to keep the
-      --  No_Value.
+      --  Empty_Value and Unspecified_Value.
 
       function Local_Add (Left, Right : Frame_Size) return Frame_Size is
       begin
-         if Left = No_Value then
+         if Left = Empty_Value then
             return Right;
-         elsif Right = No_Value then
+         elsif Right = Empty_Value then
             return Left;
+         elsif Left = Unspecified_Value or else Right = Unspecified_Value then
+            return Unspecified_Value;
          else
             return Left + Right;
          end if;
@@ -349,21 +351,7 @@ package body Static_Stack_Analysis is
    function Get_Stack_Usage
      (Target : Explicit_Node) return Stack_Usage_Info is
    begin
-      if Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Target.Cycles) then
-         return Target.Stack_Info;
-
-      else
-         --  ??? It simply indicates that there is a cycle, but we need to
-         --  find the way for accounting the stack requirements imposed by
-         --  the cycles.
-
-         return Stack_Usage_Info'
-           (Frame_Type    => Target.Stack_Info.Frame_Type,
-            Static_Usage  => Target.Stack_Info.Static_Usage,
-            Dynamic_Usage => Target.Stack_Info.Dynamic_Usage,
-            Unknown_Usage => Target.Stack_Info.Unknown_Usage,
-            Cycle_Usage   => 0);
-      end if;
+      return Target.Stack_Info;
    end Get_Stack_Usage;
 
    function Get_Stack_Usage
@@ -372,10 +360,10 @@ package body Static_Stack_Analysis is
    begin
       return Stack_Usage_Info'
         (Frame_Type    => Unknown,
-         Static_Usage  => No_Value,
-         Dynamic_Usage => No_Value,
+         Static_Usage  => Empty_Value,
+         Dynamic_Usage => Empty_Value,
          Unknown_Usage => Frame_Size (Options.Default_Unknown),
-         Cycle_Usage   => No_Value);
+         Cycle_Usage   => Empty_Value);
    end Get_Stack_Usage;
 
    function Get_Stack_Usage
@@ -384,10 +372,10 @@ package body Static_Stack_Analysis is
    begin
       return Stack_Usage_Info'
         (Frame_Type    => Unknown,
-         Static_Usage  => No_Value,
-         Dynamic_Usage => No_Value,
+         Static_Usage  => Empty_Value,
+         Dynamic_Usage => Empty_Value,
          Unknown_Usage => Frame_Size (Options.Default_Unknown),
-         Cycle_Usage   => No_Value);
+         Cycle_Usage   => Empty_Value);
    end Get_Stack_Usage;
 
    -------------------------

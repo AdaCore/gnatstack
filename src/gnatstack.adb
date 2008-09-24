@@ -20,24 +20,12 @@
 ------------------------------------------------------------------------------
 
 with Parser;
---  Used for Parse_Arguments
-
 with Worst_Case_Analyzer;
---  Used for Worst_Case_Analysis
-
 with Display;
---  Used for Generate_Results
---           Generate_Warnings
-
 with Call_Graphs;
---  Used for Analyze_Call_Graph
-
 with Global_Data;
---  Used for Entry_Points
---           Phase
 
 with Ada.Text_IO;
---  Used for Put_Line
 
 procedure Gnatstack is
 begin

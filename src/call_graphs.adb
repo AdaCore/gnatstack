@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2008, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,25 +20,11 @@
 ------------------------------------------------------------------------------
 
 with Static_Stack_Analysis;
---  Used for Node_Id
---           Edge_Id
---           Cycle
-
 with Display;
---  Used for Increase_Count
-
 with Global_Data;
---  Used for Unbounded_Frames
---           External_Calls
---           Indirect_Calls
---           Cycles
-
 with Options;
---  Used for Verbose
---           Compute_All_Cycles
 
 with Ada.Text_IO;
---  Used for Put_Line
 
 with Ada.Unchecked_Deallocation;
 
@@ -373,10 +359,17 @@ package body Call_Graphs is
              (Static_Stack_Analysis.Paths.Element
                   (Position).Source_Node);
 
+         use Static_Stack_Analysis;
       begin
          --  Add the cycle to the list of cycles for this node
 
          Element.Cycles.Insert (New_Cycle);
+
+         --  Its stack usage includes an unspecified part because of the cycle
+         if Element.all in Explicit_Node'Class then
+            Explicit_Node (Element.all).Stack_Info.Cycle_Usage :=
+              Unspecified_Value;
+         end if;
       end Mark_Nodes;
 
    begin

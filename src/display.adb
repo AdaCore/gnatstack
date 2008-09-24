@@ -20,49 +20,20 @@
 ------------------------------------------------------------------------------
 
 with Options;
---  Used for Output_VCG
---           Explore_All
---           Verbose
---           Order
---           Warnings
---           Generate_XML_Output
-
 with Static_Stack_Analysis;
---  Used for List_Of_Locations
---           List_Of_Nodes
---           List_Of_Edges
---           Get_Stack_Usage
---           Get_Subprogram_Name
-
 with Worst_Case_Analyzer;
---  Used for Get_Longest_Path
-
-with Ada.Text_IO;
---  Used for Create
---           Close
---           Put
---           Put_Line
 
 with Ada.Containers;
---  Used for Count_Type
 
+with Ada.Text_IO;
 with Ada.Integer_Text_IO;
---  Used for Put
-
 with Ada.Strings.Fixed;
---  Used for "*"
 
 with GNAT.OS_Lib;
---  Used for Delete_File
-
 with GNAT.Strings;
---  Used for String_Access
-
 with GNAT.Regpat;
---  Used for Match
 
 with Demangle;
---  Used for Ada_Decode
 
 package body Display is
 
@@ -869,9 +840,9 @@ package body Display is
 
       elsif Global_Data.Phase = Global_Data.Print_Results
         and then
-      (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-       or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
-       or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value)
+      (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.Empty_Value or else
+       Stack_Info.Unknown_Usage /= Static_Stack_Analysis.Empty_Value or else
+       Stack_Info.Cycle_Usage /= Static_Stack_Analysis.Empty_Value)
       then
          --  In non-verbose mode we just put a mark indicating that the
          --  resulting value is not accurate when we are printing the paths.
@@ -1257,60 +1228,77 @@ package body Display is
    procedure Expand_Stack_Usage
      (Stack_Info : Static_Stack_Analysis.Stack_Usage_Info)
    is
-      use type Static_Stack_Analysis.Stack_Usage;
+      use Static_Stack_Analysis;
+
+      Minimum_Size : constant Integer :=
+        Integer (Stack_Info.Static_Usage  + Stack_Info.Dynamic_Usage +
+                 Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage);
+
+      Uncertain_Part : constant Boolean :=
+        Stack_Info.Dynamic_Usage = Unspecified_Value or else
+        Stack_Info.Unknown_Usage = Unspecified_Value or else
+        Stack_Info.Cycle_Usage   = Unspecified_Value;
 
    begin
-      Ada.Integer_Text_IO.Put
-        (Integer (Stack_Info.Static_Usage + Stack_Info.Dynamic_Usage +
-                  Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage),
-         0);
+      if Minimum_Size = 0 and then Uncertain_Part then
+         Ada.Text_IO.Put ("? bytes");
 
-      if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-        or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
-        or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value
-      then
-         Ada.Text_IO.Put ("+?");
+      elsif Minimum_Size > 0 then
+         Ada.Integer_Text_IO.Put (Minimum_Size, 0);
+
+         if Uncertain_Part then
+            Ada.Text_IO.Put ("+?");
+         end if;
+
+         Ada.Text_IO.Put (" bytes");
       end if;
-
-      Ada.Text_IO.Put (" bytes");
 
       --  Clarify stack usage information when we have something which is not
       --  static, or we have a cycle.
 
-      if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-        or else Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
-        or else Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value
+      if Options.Verbose and then
+        (Stack_Info.Dynamic_Usage /= Empty_Value or else
+         Stack_Info.Unknown_Usage /= Empty_Value or else
+         Stack_Info.Cycle_Usage   /= Empty_Value)
       then
-         if Options.Verbose then
-            Ada.Text_IO.Put (" (");
+         Ada.Text_IO.Put (" (");
 
-            if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value then
-               Ada.Text_IO.Put ("unbounded");
-            end if;
+         --  Unbounded part
+         if Stack_Info.Dynamic_Usage = Unspecified_Value then
+            Ada.Text_IO.Put ("unbounded");
 
-            if Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value then
-               if
-                 Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-               then
-                  Ada.Text_IO.Put (",");
-               end if;
-
-               Ada.Text_IO.Put ("unresolved");
-            end if;
-
-            if Stack_Info.Cycle_Usage /= Static_Stack_Analysis.No_Value then
-               if Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.No_Value
-                 or else
-                   Stack_Info.Unknown_Usage /= Static_Stack_Analysis.No_Value
-               then
-                  Ada.Text_IO.Put (",");
-               end if;
-
-               Ada.Text_IO.Put ("cycle");
-            end if;
-
-            Ada.Text_IO.Put (")");
+         elsif Stack_Info.Dynamic_Usage >= 0 then
+            Ada.Text_IO.Put
+              ("with -d" & Integer'Image (Options.Default_Unbounded));
          end if;
+
+         --  Unknown part
+         if Stack_Info.Unknown_Usage /= Empty_Value then
+
+            if Stack_Info.Dynamic_Usage /= Empty_Value then
+               Ada.Text_IO.Put (",");
+            end if;
+
+            if Stack_Info.Unknown_Usage = Unspecified_Value then
+               Ada.Text_IO.Put ("unresolved");
+
+            elsif Stack_Info.Unknown_Usage >= 0 then
+               Ada.Text_IO.Put
+                 ("with -u" & Integer'Image (Options.Default_Unknown));
+            end if;
+         end if;
+
+         if Stack_Info.Cycle_Usage /= Empty_Value then
+            if Stack_Info.Dynamic_Usage /= Empty_Value or else
+               Stack_Info.Unknown_Usage /= Empty_Value
+            then
+               Ada.Text_IO.Put (",");
+            end if;
+
+            Ada.Text_IO.Put ("cycle");
+         end if;
+
+         Ada.Text_IO.Put (")");
       end if;
    end Expand_Stack_Usage;
 

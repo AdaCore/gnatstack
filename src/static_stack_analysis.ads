@@ -78,12 +78,18 @@ package Static_Stack_Analysis is
    --  passed to the frame, which can be bounded or unbounded), or completely
    --  unknown.
 
-   No_Value : constant := -1;
-   --  Indicates that the stack requirements are not known
+   Empty_Value : constant := -2;
+   --  Indicates that the stack requirements are known to be zero. For example,
+   --  it applies when there are no unbounded frames, the part about unbounded
+   --  is known to be zero.
 
-   type Frame_Size is new Integer range No_Value ..  Integer'Last;
+   Unspecified_Value : constant := -1;
+   --  Indicates that the stack requirements have not been specified, but they
+   --  are needed.
+
+   type Frame_Size is new Integer range Empty_Value ..  Integer'Last;
    --  This type represents the static part (in bytes) that is reserved in the
-   --  frame. -1 represents that the value does not apply.
+   --  frame.
 
    function "+" (Left, Right : Frame_Size) return Frame_Size;
 
@@ -514,10 +520,10 @@ private
 
    Unknown_Stack_Usage : constant Stack_Usage_Info :=
      (Frame_Type    => Unknown,
-      Static_Usage  => No_Value,
-      Dynamic_Usage => No_Value,
-      Unknown_Usage => No_Value,
-      Cycle_Usage   => No_Value);
+      Static_Usage  => Empty_Value,
+      Dynamic_Usage => Empty_Value,
+      Unknown_Usage => Empty_Value,
+      Cycle_Usage   => Empty_Value);
 
    Empty_Cycle : constant Cycle_Element :=
      (Id         => 0,

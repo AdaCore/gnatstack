@@ -1354,9 +1354,9 @@ package body Parser is
            or else Input (Matches (2).First .. Matches (2).Last) = " (static)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Static;
-            Stack.Dynamic_Usage := Static_Stack_Analysis.No_Value;
-            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
-            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
+            Stack.Dynamic_Usage := Static_Stack_Analysis.Empty_Value;
+            Stack.Unknown_Usage := Static_Stack_Analysis.Empty_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.Empty_Value;
 
          elsif
            Input (Matches (2).First .. Matches (2).Last) = " (dynamic)"
@@ -1364,16 +1364,16 @@ package body Parser is
             Stack.Frame_Type := Static_Stack_Analysis.Unbounded;
             Stack.Dynamic_Usage :=
               Static_Stack_Analysis.Frame_Size (Options.Default_Unbounded);
-            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
-            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
+            Stack.Unknown_Usage := Static_Stack_Analysis.Empty_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.Empty_Value;
 
          elsif
            Input (Matches (2).First .. Matches (2).Last) = " (dynamic,bounded)"
          then
             Stack.Frame_Type := Static_Stack_Analysis.Bounded;
-            Stack.Dynamic_Usage := Static_Stack_Analysis.No_Value;
-            Stack.Unknown_Usage := Static_Stack_Analysis.No_Value;
-            Stack.Cycle_Usage   := Static_Stack_Analysis.No_Value;
+            Stack.Dynamic_Usage := Static_Stack_Analysis.Empty_Value;
+            Stack.Unknown_Usage := Static_Stack_Analysis.Empty_Value;
+            Stack.Cycle_Usage   := Static_Stack_Analysis.Empty_Value;
 
          else
             raise Parser_Error;
