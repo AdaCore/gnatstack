@@ -157,9 +157,9 @@ package body Parser is
    --  Ada comments and blank lines are allowed
 
    Location_Regexp : constant String :=
-     "(([a-zA-Z0-9_/ \.~]+)|" &
-     "([a-zA-Z]:\\[a-zA-Z0-9_\\ \.~]+)|" &
-     "(\\\\[a-zA-Z0-9_\\ \.~]+))\.([a-zA-Z0-9]+):([0-9]+)(:[0-9]+)??";
+     "(([a-zA-Z0-9_/ \.~\-]+)|" &
+     "([a-zA-Z]:\\[a-zA-Z0-9_\\ \.~\-]+)|" &
+     "(\\\\[a-zA-Z0-9_\\ \.~\-]+))\.([a-zA-Z0-9]+):([0-9]+)(:[0-9]+)??";
    --  Accepted locations are Unix-style (directories separated by slashes)
    --  and Windows UNC-style (drive_letter:\path or \\server\path). There is
    --  also .extension for the file, and file location (:line[:column]).
