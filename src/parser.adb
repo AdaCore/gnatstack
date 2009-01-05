@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -169,7 +169,7 @@ package body Parser is
    --  At least the size in bytes
 
    Node_Label_Regexp : constant String :=
-     "^ label: ""([a-zA-Z0-9_]+)??(\\n)??"&
+     "^ label: ""([a-zA-Z0-9_&\*\+\-/<>=]+)??(\\n)??" &
      "(" & Location_Regexp & ",??)*" & "(\\n)??" &
      "(" & Stack_Regexp & ")??" &
      "(\\n[0-9]+ dynamic objects(\\n .*)??)??""$";
