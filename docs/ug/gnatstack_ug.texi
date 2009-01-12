@@ -55,9 +55,16 @@
 
 @copyright{} Copyright 2006-2009, AdaCore
 
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1
+or any later version published by the Free Software Foundation;
+with the Invariant Sections being ``GNU Free Documentation License'', with the
+Front-Cover Texts being
+``@value{gnatstack} User's Guide',
+and with no Back-Cover Texts.
+A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
+
 @end titlepage
 
 @ifnottex
@@ -79,9 +86,15 @@ AdaCore@*
 Copyright @copyright{} 2006-2009, AdaCore
 
 @noindent
-Permission is granted to make and distribute verbatim copies of
-this manual provided the copyright notice and this permission notice
-are preserved on all copies.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1
+or any later version published by the Free Software Foundation;
+with the Invariant Sections being ``GNU Free Documentation License'', with the
+Front-Cover Texts being
+``@value{gnatstack} User's Guide',
+and with no Back-Cover Texts.
+A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
 
 @menu
 * About This Guide ::
@@ -90,6 +103,7 @@ are preserved on all copies.
 * Getting Started with GNATstack ::
 * Additional Capabilities ::
 * Examples ::
+* GNU Free Documentation License::
 * Index ::
 
 @detailmenu
@@ -864,6 +878,12 @@ the existence of cycles and unbounded frames.
 The call chain information provides more detailed information about
 the subprograms that are part of a cycle (@code{Q} and @code{R} in
 this case), and the dynamic size of the frame for subprogram @code{Q}.
+
+@c **********************************
+@c * GNU Free Documentation License *
+@c **********************************
+@include gfdl.texi
+@c GNU Free Documentation License
 
 @c ******************* N O D E *******************
 @node Index

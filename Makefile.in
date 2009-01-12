@@ -10,11 +10,11 @@ all: bin/gnatstack$(EXEEXT) $(MAYBE_DOC)
 
 doc: docs/ug/gnatstack_ug.html docs/ug/gnatstack_ug.pdf  docs/ug/gnatstack_ug.txt
 
-docs/ug/gnatstack_ug.html: docs/ug/gnatstack_ug.texi
+docs/ug/gnatstack_ug.html: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 	(cd docs/ug && texi2html  gnatstack_ug.texi)
-docs/ug/gnatstack_ug.pdf: docs/ug/gnatstack_ug.texi
+docs/ug/gnatstack_ug.pdf: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 	(cd docs/ug && texi2pdf gnatstack_ug.texi)
-docs/ug/gnatstack_ug.txt: docs/ug/gnatstack_ug.texi
+docs/ug/gnatstack_ug.txt: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 	makeinfo --force --no-headers --no-split -o $@ $<
 
 install: all
