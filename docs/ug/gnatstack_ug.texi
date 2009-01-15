@@ -30,7 +30,7 @@
 
 @set gnatstack GNATstack
 
-@set gnatstack_version 1.2.0w
+@set gnatstack_version 1.2.1
 
 @settitle @value{gnatstack} User's Guide
 @setchapternewpage odd
