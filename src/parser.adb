@@ -170,7 +170,7 @@ package body Parser is
    --  At least the size in bytes
 
    Node_Label_Regexp : constant String :=
-     "^ label: ""([a-zA-Z0-9_]+|&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)??(\\n)??" &
+     "^ label: ""((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?[a-zA-Z0-9_]*)??(\\n)??" &
      "(" & Location_Regexp & ",??)*" & "(\\n)??" &
      "(" & Stack_Regexp & ")??" &
      "(\\n[0-9]+ dynamic objects(\\n .*)??)??""$";
@@ -1236,7 +1236,7 @@ package body Parser is
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 18);
+      Matches : GNAT.Regpat.Match_Array (0 .. 19);
 
    begin
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
@@ -1261,9 +1261,9 @@ package body Parser is
 
          --  Subprogram location
 
-         if Matches (3) /= GNAT.Regpat.No_Match then
+         if Matches (4) /= GNAT.Regpat.No_Match then
             Parse_Node_Locations
-              (Input (Matches (3).First .. Matches (3).Last),
+              (Input (Matches (4).First .. Matches (4).Last),
                Demangled,
                Locations);
          else
@@ -1273,9 +1273,9 @@ package body Parser is
 
          --  Stack usage
 
-         if Matches (14) /= GNAT.Regpat.No_Match then
+         if Matches (15) /= GNAT.Regpat.No_Match then
             Parse_Stack_Usage
-              (Input (Matches (14).First .. Matches (14).Last), Stack);
+              (Input (Matches (15).First .. Matches (15).Last), Stack);
          else
             Stack := Static_Stack_Analysis.Unknown_Stack_Usage;
             Stack.Unknown_Usage :=
@@ -1284,9 +1284,9 @@ package body Parser is
 
          --  Dynamic objects
 
-         if Matches (18) /= GNAT.Regpat.No_Match then
+         if Matches (19) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (18).First .. Matches (18).Last),
+              (Input (Matches (19).First .. Matches (19).Last),
                Dynamic_Objects);
          else
             Dynamic_Objects :=
