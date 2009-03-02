@@ -159,11 +159,12 @@ package body Parser is
    Location_Regexp : constant String :=
      "(<no location>)|" &
      "((([a-zA-Z0-9_/ \.~\-]+)|" &
-     "([a-zA-Z]:\\[a-zA-Z0-9_\\ \.~\-]+)|" &
+     "([a-zA-Z]:[\\/][a-zA-Z0-9_\\/ \.~\-]+)|" &
      "(\\\\[a-zA-Z0-9_\\ \.~\-]+))\.([a-zA-Z0-9]+):([0-9]+)(:[0-9]+)??)";
-   --  Accepted locations are Unix-style (directories separated by slashes)
-   --  and Windows UNC-style (drive_letter:\path or \\server\path). There is
-   --  also .extension for the file, and file location (:line[:column]).
+   --  Accepted locations are Unix-style (directories separated by slashes),
+   --  Windows UNC-style (drive_letter:\path or \\server\path), and
+   --  cygwin-style (drive_letter:/path). There is also .extension for the
+   --  file, and file location (:line[:column]).
 
    Stack_Regexp : constant String :=
      "([0-9]+)+ bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))??";
