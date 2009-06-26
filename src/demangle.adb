@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2006-2007, AdaCore                     --
+--                     Copyright (C) 2006-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -41,25 +41,25 @@ package body Demangle is
    --  the field Source) and their Ada counterpart (in the field Target).
 
    Conversion_Table : constant array (Positive range <>) of Operator_Pair :=
-     (Operator_Pair'(new String'("0abs"),      new String'("""abs""")),
-      Operator_Pair'(new String'("0and"),      new String'("""and""")),
-      Operator_Pair'(new String'("0mod"),      new String'("""mod""")),
-      Operator_Pair'(new String'("0not"),      new String'("""not""")),
-      Operator_Pair'(new String'("0or"),       new String'("""or""")),
-      Operator_Pair'(new String'("0rem"),      new String'("""rem""")),
-      Operator_Pair'(new String'("0xor"),      new String'("""xor""")),
-      Operator_Pair'(new String'("0eq"),       new String'("""=""")),
-      Operator_Pair'(new String'("0ne"),       new String'("""/=""")),
-      Operator_Pair'(new String'("0lt"),       new String'("""<""")),
-      Operator_Pair'(new String'("0le"),       new String'("""<=""")),
-      Operator_Pair'(new String'("0gt"),       new String'(""">""")),
-      Operator_Pair'(new String'("0ge"),       new String'(""">=""")),
-      Operator_Pair'(new String'("0add"),      new String'("""+""")),
-      Operator_Pair'(new String'("0subtract"), new String'("""-""")),
-      Operator_Pair'(new String'("0concat"),   new String'("""&""")),
-      Operator_Pair'(new String'("0multiply"), new String'("""*""")),
-      Operator_Pair'(new String'("0divide"),   new String'("""/""")),
-      Operator_Pair'(new String'("0expon"),    new String'("""**""")));
+     (Operator_Pair'(new String'("Oabs"),      new String'("""abs""")),
+      Operator_Pair'(new String'("Oand"),      new String'("""and""")),
+      Operator_Pair'(new String'("Omod"),      new String'("""mod""")),
+      Operator_Pair'(new String'("Onot"),      new String'("""not""")),
+      Operator_Pair'(new String'("Oor"),       new String'("""or""")),
+      Operator_Pair'(new String'("Orem"),      new String'("""rem""")),
+      Operator_Pair'(new String'("Oxor"),      new String'("""xor""")),
+      Operator_Pair'(new String'("Oeq"),       new String'("""=""")),
+      Operator_Pair'(new String'("One"),       new String'("""/=""")),
+      Operator_Pair'(new String'("Olt"),       new String'("""<""")),
+      Operator_Pair'(new String'("Ole"),       new String'("""<=""")),
+      Operator_Pair'(new String'("Ogt"),       new String'(""">""")),
+      Operator_Pair'(new String'("Oge"),       new String'(""">=""")),
+      Operator_Pair'(new String'("Oadd"),      new String'("""+""")),
+      Operator_Pair'(new String'("Osubtract"), new String'("""-""")),
+      Operator_Pair'(new String'("Oconcat"),   new String'("""&""")),
+      Operator_Pair'(new String'("Omultiply"), new String'("""*""")),
+      Operator_Pair'(new String'("Odivide"),   new String'("""/""")),
+      Operator_Pair'(new String'("Oexpon"),    new String'("""**""")));
    --  Table used for translating encoded operator names
 
    ----------------
@@ -169,6 +169,10 @@ package body Demangle is
             Length := Length -
               (Conversion_Table (Index).Source.all'Length -
                Conversion_Table (Index).Target.all'Length);
+
+            --  ??? will skip trailing chars in some cases, e.g.
+            --  cxa4006__test_block__bs_40__Oconcat__B71b___clean
+            --  will be replaced by cxa4006.test_block.bs_40."&"
 
             Buffer (1 .. Length) :=
               Buffer (1 .. Matches (1).First - 1) &
