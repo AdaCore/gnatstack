@@ -157,10 +157,13 @@ package body Parser is
    --  Ada comments and blank lines are allowed
 
    Location_Regexp : constant String :=
-     "(<no location>)|(<built-in>)|" &
-     "((([a-zA-Z0-9_/ \.~\-]+)|" &
-     "([a-zA-Z]:[\\/][a-zA-Z0-9_\\/ \.~\-]+)|" &
-     "(\\\\[a-zA-Z0-9_\\ \.~\-]+))\.([a-zA-Z0-9]+):([0-9]+)(:[0-9]+)??)";
+     "(<no location>)|" &
+     "(<built-in>)|" &
+     "((([a-zA-Z0-9_/ \.~\-]+)|" &  -- Unix-style
+     "([a-zA-Z]:[\\/][a-zA-Z0-9_\\/ \.~\-]+)|" &  -- UNC-style
+     "(\\\\[a-zA-Z0-9_\\ \.~\-]+))" &  -- cygwin-style
+     "\.([a-zA-Z0-9_ ~\-]+)" &  -- file extension
+     ":([0-9]+)(:[0-9]+)??)";
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
    --  cygwin-style (drive_letter:/path). There is also .extension for the
