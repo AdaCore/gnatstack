@@ -589,7 +589,7 @@ The use of dynamically sized local objects (such as those whose size
 depends on an input argument) makes it impossible to statically bound
 stack usage.
 The @option{-Wu} option can be used to signal all the occurrences of
-external calls in the program under analysis.
+unbounded frames in the program under analysis.
 @cindex @option{-Wu}
 
 @item Recursion.
