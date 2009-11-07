@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -48,7 +48,7 @@ package Global_Data is
    Cycles : Static_Stack_Analysis.List_Of_Cycles.Set :=
      Static_Stack_Analysis.List_Of_Cycles.Empty_Set;
    --  List of paths corresponding to the different cycles that have been
-   --  detected.
+   --  detected, and that can be reached from any entry point.
 
    -----------------
    -- Subprograms --

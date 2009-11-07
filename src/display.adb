@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1020,7 +1020,7 @@ package body Display is
         and then not Global_Data.Cycles.Is_Empty
       then
          Ada.Text_IO.Put_Line
-           ("List of cycles:");
+           ("List of reachable cycles:");
          Ada.Text_IO.New_Line;
          Global_Data.Cycles.Iterate (Print_Cycle'Access);
       end if;
@@ -1036,7 +1036,7 @@ package body Display is
         and then Global_Data.Unbounded_Frames
       then
          Ada.Text_IO.Put_Line
-           ("List of subprograms with dynamic unbounded frames:");
+           ("List of reachable subprograms with dynamic unbounded frames:");
          Ada.Text_IO.New_Line;
          Global_Data.List_Of_Subprograms.Iterate
            (Print_Unbounded'Access);
@@ -1054,7 +1054,7 @@ package body Display is
         and then Global_Data.External_Calls
       then
          Ada.Text_IO.Put_Line
-           ("List of external subprograms:");
+           ("List of reachable external subprograms:");
          Ada.Text_IO.New_Line;
          Global_Data.List_Of_Subprograms.Iterate (Print_External'Access);
          Ada.Text_IO.New_Line;
@@ -1070,7 +1070,7 @@ package body Display is
         and then Global_Data.Indirect_Calls
       then
          Ada.Text_IO.Put_Line
-           ("List of indirect (including dispatching) calls:");
+           ("List of reachable indirect (including dispatching) calls:");
          Ada.Text_IO.New_Line;
          Global_Data.List_Of_Subprograms.Iterate (Print_Indirect'Access);
          Ada.Text_IO.New_Line;
@@ -1502,7 +1502,12 @@ package body Display is
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
    begin
-      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class then
+      --  If the code is not directly reachable from any of the specified
+      --  entry points we do not display this node (although the subprogram may
+      --  be reachable via indirect calls).
+
+      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class
+        and then Node.Analysis_Finished then
          Ada.Text_IO.Put ("  ");
 
          Open_Tag ("external");
@@ -1510,14 +1515,6 @@ package body Display is
          Print_Name (Node);
 
          Close_Tag ("external");
-
-         --  If the code is not directly reachable from any of the specified
-         --  entry points we mark the subprogram as such. The subprogram may
-         --  be reachable via indirect calls
-
-         if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (not directly reachable)");
-         end if;
 
          Ada.Text_IO.New_Line;
       end if;
@@ -1585,7 +1582,11 @@ package body Display is
       end Print_Location;
 
    begin
-      if not Indirect_Calls.Is_Empty then
+      --  If the code is not directly reachable from any of the specified
+      --  entry points we do not display this node (although the subprogram may
+      --  be reachable via indirect calls).
+
+      if not Indirect_Calls.Is_Empty and then Node.Analysis_Finished then
          Ada.Text_IO.Put ("  ");
 
          Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
@@ -1595,14 +1596,6 @@ package body Display is
          Open_Tag ("indirect");
 
          Print_Name (Node);
-
-         --  If the code is not directly reachable from any of the specified
-         --  entry points we mark the subprogram as such. The subprogram may
-         --  be reachable via indirect calls
-
-         if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (not directly reachable)");
-         end if;
 
          Ada.Text_IO.New_Line;
 
@@ -1625,25 +1618,21 @@ package body Display is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
-      use type Static_Stack_Analysis.Stack_Usage;
+      use Static_Stack_Analysis;
 
    begin
-      if Static_Stack_Analysis.Get_Stack_Usage (Node.all).Frame_Type =
-         Static_Stack_Analysis.Unbounded
+      --  If the code is not directly reachable from any of the specified
+      --  entry points we do not display this node (although the subprogram may
+      --  be reachable via indirect calls).
+
+      if Get_Stack_Usage (Node.all).Frame_Type = Unbounded
+        and then Node.Analysis_Finished
       then
          Ada.Text_IO.Put ("  In ");
 
          Open_Tag ("unbounded");
 
          Print_Name (Node);
-
-         --  If the code is not directly reachable from any of the specified
-         --  entry points we mark the subprogram as such. The subprogram may
-         --  be reachable via indirect calls
-
-         if not Node.Analysis_Finished then
-            Ada.Text_IO.Put (" (not directly reachable)");
-         end if;
 
          Ada.Text_IO.New_Line;
 

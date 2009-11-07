@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -168,6 +168,8 @@ package body Call_Graphs is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
+      use Static_Stack_Analysis;
+
    begin
       --  Do nothing if this node has been fully analyzed. It means that all
       --  the cycles to which it belongs are already known.
@@ -185,6 +187,29 @@ package body Call_Graphs is
             --  Mark it under analysis
 
             Node.Under_Analysis := True;
+
+            --  Update accuracy information of the explored subprogram
+
+            --  Unbounded frame
+            if not Global_Data.Unbounded_Frames
+              and then Node.all in Explicit_Node'Class
+              and then
+                Explicit_Node (Node.all).Stack_Info.Frame_Type = Unbounded
+            then
+               Global_Data.Unbounded_Frames := True;
+
+            --  External call
+            elsif not Global_Data.External_Calls
+              and then Node.all in Unresolved_Node'Class
+            then
+               Global_Data.External_Calls := True;
+
+            --  Indirect call
+            elsif not Global_Data.Indirect_Calls
+              and then Node.all in Fake_Node'Class
+            then
+               Global_Data.Indirect_Calls := True;
+            end if;
 
             --  Explore all the possible target calls.
 
@@ -251,33 +276,10 @@ package body Call_Graphs is
          Node : constant Static_Stack_Analysis.Node_Class_Access :=
            Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
-         use Static_Stack_Analysis;
-
       begin
-         --  Update accuracy of the explored entry point
-
-         --  Unbounded frame
-         if not Global_Data.Unbounded_Frames
-           and then Node.all in Explicit_Node'Class
-           and then Explicit_Node (Node.all).Stack_Info.Frame_Type = Unbounded
-         then
-            Global_Data.Unbounded_Frames := True;
-
-         --  External call
-         elsif not Global_Data.External_Calls
-           and then Node.all in Unresolved_Node'Class
-         then
-            Global_Data.External_Calls := True;
-
-         --  Indirect call
-         elsif not Global_Data.Indirect_Calls
-           and then Node.all in Fake_Node'Class
-         then
-            Global_Data.Indirect_Calls := True;
-         end if;
-
          --  Analyze whether the subprogram is part of a cycle. We do it only
-         --  for reachable cycles.
+         --  for reachable cycles. During this analysis the reachable unbounded
+         --  frames, external calls, and indirect calls will also be extracted.
 
          if Is_Entry_Point (Node, Position) and then
            not Node.Analysis_Finished
