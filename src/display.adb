@@ -712,7 +712,7 @@ package body Display is
          Ada.Text_IO.Put
            (" (" &
             Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all &
-            ") ");
+            ")");
       end if;
 
       if Options.Verbose and then not Locations.Is_Empty then
