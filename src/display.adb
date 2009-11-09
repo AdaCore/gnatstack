@@ -865,25 +865,61 @@ package body Display is
    is
       Name : constant Static_Stack_Analysis.Name :=
         Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
+      --  Symbol corresponding to the subprogram
+
+      Name_First : Integer;
+      --  Index to point to the beginning of the subprogram name (removing the
+      --  file information).
 
       Matches : GNAT.Regpat.Match_Array (0 .. 1);
 
       use type GNAT.Regpat.Match_Location;
 
+      function Is_Ada
+        (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean;
+      --  This function returns True if the node represents an Ada subprogram
+
+      function Is_Ada
+        (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean
+      is
+         File : constant Static_Stack_Analysis.File_Name := Node.Ada_File_Name;
+
+         use type Static_Stack_Analysis.File_Name;
+
+      begin
+         --  Detected very conservatively by simply looking at the file
+         --  extension and considering it an Ada source file if its extension
+         --  is ".ad?".
+         return File /= null
+           and then File'Length >= 4
+           and then File (File'Last - 3 .. File'Last - 1) = ".ad";
+      end Is_Ada;
+
    begin
-      --  Print the symbol name (demangled), removing path information
+      --  Print the symbol name (demangled), removing file information. If it
+      --  is an Ada subprogram we demangle the subprogram name.
+
+      --  Remove file information (look for the ":" separator between file
+      --  name and subprogram name).
 
       GNAT.Regpat.Match ("(:)", Name.all, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
+         Name_First := Matches (1).Last + 1;
+      else
+         Name_First := Name'First;
+      end if;
+
+      --  Demangle if Ada subprogram
+
+      if Is_Ada (Node) then
          Ada.Text_IO.Put
            (File,
-            Demangle.Ada_Decode
-              (Name.all (Matches (1).Last + 1 .. Name.all'Last)));
-
+            Demangle.Ada_Decode (Name.all (Name_First .. Name.all'Last)));
       else
          Ada.Text_IO.Put
-           (File, Demangle.Ada_Decode (Name.all));
+           (File,
+            Name.all (Name_First .. Name.all'Last));
       end if;
    end Print_Ada_Name;
 

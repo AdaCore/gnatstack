@@ -72,6 +72,9 @@ package body Demangle is
       Buffer : String (1 .. Length * 2);
 
       Matches : GNAT.Regpat.Match_Array (0 .. 1);
+
+      Match_Operator : GNAT.Regpat.Match_Array (0 .. 2);
+
    begin
       --  Check for encoded indirect calls
 
@@ -157,26 +160,30 @@ package body Demangle is
          Length := Length - 1;
       end loop;
 
-      --   Checks for operator names
+      --   Checks for operator names. They appear always after a ".", and they
+      --   may be either the last part of the String, such as X.Oconcat (note
+      --   that overload markers have already been removed), or before block
+      --   information, such as X.Oconcat.B71b._clean.2759.
 
       for Index in Conversion_Table'Range loop
          GNAT.Regpat.Match
-           ("(" & Conversion_Table (Index).Source.all & ")",
+           ("\.(" & Conversion_Table (Index).Source.all & ")($|\.)",
             Buffer (1 .. Length),
-            Matches);
+            Match_Operator);
 
-         if Matches (0) /= GNAT.Regpat.No_Match then
-            Length := Length -
-              (Conversion_Table (Index).Source.all'Length -
-               Conversion_Table (Index).Target.all'Length);
+         if Match_Operator (0) /= GNAT.Regpat.No_Match then
+            declare
+               Old_Length : constant Integer := Length;
+            begin
+               Length := Length -
+                 (Conversion_Table (Index).Source.all'Length -
+                  Conversion_Table (Index).Target.all'Length);
 
-            --  ??? will skip trailing chars in some cases, e.g.
-            --  cxa4006__test_block__bs_40__Oconcat__B71b___clean
-            --  will be replaced by cxa4006.test_block.bs_40."&"
-
-            Buffer (1 .. Length) :=
-              Buffer (1 .. Matches (1).First - 1) &
-              Conversion_Table (Index).Target.all;
+               Buffer (1 .. Length) :=
+                 Buffer (1 .. Match_Operator (1).First - 1) &
+               Conversion_Table (Index).Target.all &
+               Buffer (Match_Operator (1).Last + 1 .. Old_Length);
+            end;
 
             exit;
          end if;

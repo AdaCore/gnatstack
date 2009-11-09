@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2006-2007, AdaCore                     --
+--                     Copyright (C) 2006-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -22,5 +22,7 @@
 package Demangle is
    function Ada_Decode (Symbol_Name : String) return String;
    --  Return the Ada name from the encoded form. It transforms a symbol name
-   --  (such as pck__proc) into its Ada counterpart (pck.proc).
+   --  (such as pck__proc) into its Ada counterpart (pck.proc). It also
+   --  handles library level subprogram, overloaded subprograms, task bodies,
+   --  and operators.
 end Demangle;
