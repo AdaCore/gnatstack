@@ -370,7 +370,7 @@ package body Call_Graphs is
          --  Its stack usage includes an unspecified part because of the cycle
          if Element.all in Explicit_Node'Class then
             Explicit_Node (Element.all).Stack_Info.Cycle_Usage :=
-              Unspecified_Value;
+              Static_Stack_Analysis.Frame_Size (Options.Default_Cycle);
          end if;
       end Mark_Nodes;
 

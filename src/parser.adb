@@ -457,7 +457,7 @@ package body Parser is
          loop
             case
               GNAT.Command_Line.Getopt
-                ("a aO: ca d: e: f: files= g h l: np o= p q r: u: v W! x " &
+                ("a aO: ca c: d: e: f: files= g h l: np o= p q r: u: v W! x " &
                  "-help -version")
             is
             when ASCII.NUL =>
@@ -516,6 +516,17 @@ package body Parser is
                --  -ca option
                if GNAT.Command_Line.Full_Switch = "ca" then
                   Options.Compute_All_Cycles := True;
+
+               --  -c size option
+               elsif GNAT.Command_Line.Full_Switch = "c" then
+                  declare
+                  begin
+                     Options.Default_Cycle :=
+                       Natural'Value (GNAT.Command_Line.Parameter);
+                  exception
+                     when Constraint_Error =>
+                        raise GNAT.Command_Line.Invalid_Parameter;
+                  end;
 
                --  Wrong option
                else
@@ -1788,6 +1799,7 @@ package body Parser is
       Put_Line ("  -a           use all subprograms as entry points");
       Put_Line ("  -aO dir      search for .ci files in dir");
       Put_Line ("  -ca          extract all cycles");
+      Put_Line ("  -c size      use size bytes frame for cycle entry");
       Put_Line ("  -d size      default for unbounded (dynamic) calls");
       Put_Line ("  -e <list>    use specific list of subprograms as entry " &
                                "points (e1,e2,...)");

@@ -303,6 +303,11 @@ Consider all subprograms as entry points.
 @cindex @option{-ca}
 Extract all possible cycles in the call graph.
 
+@item -c @var{n}
+@cindex @option{-c}
+Use @var{n} bytes frame for subprograms at the beginning of cycles.  This can
+be used to increase visibility of cycles in reports.
+
 @item -g
 @cindex  @option{-g}
 Generate internal debug information.

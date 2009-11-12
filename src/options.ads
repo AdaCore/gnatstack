@@ -95,4 +95,7 @@ package Options is
    Default_Unbounded : Integer := Static_Stack_Analysis.Unspecified_Value;
    --  Value used (in bytes) when there is an unbounded stack allocation for
    --  a given subprogram.
+
+   Default_Cycle : Integer := Static_Stack_Analysis.Unspecified_Value;
+   --  Value used (in bytes) for subprograms in a cycle.
 end Options;

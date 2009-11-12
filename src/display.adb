@@ -1281,7 +1281,8 @@ package body Display is
 
       Minimum_Size : constant Integer :=
         Integer (Stack_Info.Static_Usage  + Stack_Info.Dynamic_Usage +
-                 Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage);
+                   Stack_Info.Unknown_Usage);
+      --  Note: we do not add Cycle_Usage as it is an artificial value.
 
       Uncertain_Part : constant Boolean :=
         Stack_Info.Dynamic_Usage = Unspecified_Value or else
@@ -1325,7 +1326,7 @@ package body Display is
          if Stack_Info.Unknown_Usage /= Empty_Value then
 
             if Stack_Info.Dynamic_Usage /= Empty_Value then
-               Ada.Text_IO.Put (",");
+               Ada.Text_IO.Put (", ");
             end if;
 
             if Stack_Info.Unknown_Usage = Unspecified_Value then
@@ -1341,7 +1342,7 @@ package body Display is
             if Stack_Info.Dynamic_Usage /= Empty_Value or else
                Stack_Info.Unknown_Usage /= Empty_Value
             then
-               Ada.Text_IO.Put (",");
+               Ada.Text_IO.Put (", ");
             end if;
 
             Ada.Text_IO.Put ("cycle");
