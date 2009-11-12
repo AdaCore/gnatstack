@@ -981,6 +981,26 @@ package body Display is
    -----------------------
 
    procedure Generate_Warnings is
+      Has_Warning : Boolean := True;
+      --  If true the warning switch is set.
+
+      Has_Clarify : Boolean := False;
+      --  If true, a clarify information was already displayed.
+
+      procedure Clarify (Msg : String);
+      --  Display message for clarification.  Open parenthesis or write a
+      --  comma before the message.
+
+      procedure Clarify (Msg : String) is
+      begin
+         if Has_Clarify then
+            Ada.Text_IO.Put (", ");
+         else
+            Has_Clarify := True;
+         end if;
+         Ada.Text_IO.Put (Msg);
+      end Clarify;
+
    begin
       --  XML section describing global application properties
 
@@ -1002,39 +1022,32 @@ package body Display is
          Ada.Text_IO.Put ("Worst case analysis is *not* accurate because of ");
 
          if not Global_Data.Cycles.Is_Empty then
-            Ada.Text_IO.Put ("cycles");
-
-            if Global_Data.Unbounded_Frames
-              or else Global_Data.External_Calls
-              or else Global_Data.Indirect_Calls
-            then
-               Ada.Text_IO.Put (", ");
-            end if;
+            Clarify ("cycles");
+            Has_Warning := Has_Warning and Options.Warnings (Options.Cycle);
          end if;
 
          if Global_Data.Unbounded_Frames then
-            Ada.Text_IO.Put ("unbounded frames");
-
-            if Global_Data.External_Calls
-              or else Global_Data.Indirect_Calls
-            then
-               Ada.Text_IO.Put (", ");
-            end if;
+            Clarify ("unbounded frames");
+            Has_Warning := Has_Warning
+              and Options.Warnings (Options.Unbounded);
          end if;
 
          if Global_Data.External_Calls then
-            Ada.Text_IO.Put ("external calls");
+            Clarify ("external calls");
+            Has_Warning := Has_Warning and Options.Warnings (Options.External);
 
-            if Global_Data.Indirect_Calls then
-               Ada.Text_IO.Put (", ");
-            end if;
          end if;
 
          if Global_Data.Indirect_Calls then
-               Ada.Text_IO.Put ("indirect calls");
+            Clarify ("indirect calls");
+            Has_Warning := Has_Warning and Options.Warnings (Options.Indirect);
          end if;
 
-         Ada.Text_IO.Put_Line (". Use -Wa for details.");
+         Ada.Text_IO.Put (".");
+         if not Has_Warning then
+            Ada.Text_IO.Put (" Use -Wa for details.");
+         end if;
+         Ada.Text_IO.New_Line;
          Ada.Text_IO.New_Line;
 
          --  XML output
