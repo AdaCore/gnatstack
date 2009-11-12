@@ -457,7 +457,7 @@ package body Parser is
          loop
             case
               GNAT.Command_Line.Getopt
-                ("a aO: ca d: e: f: files= g h l: np o= p r: u: v W! x " &
+                ("a aO: ca d: e: f: files= g h l: np o= p q r: u: v W! x " &
                  "-help -version")
             is
             when ASCII.NUL =>
@@ -619,6 +619,10 @@ package body Parser is
             --  Display call chain (paths) for the entry points
             when 'p' =>
                Options.Display_Call_Chains := True;
+
+            --  Do not display progress messages.
+            when 'q' =>
+               Options.Quiet := True;
 
             when 'n' =>
                --  Do not display call chain (paths) for the entry points
@@ -1798,6 +1802,7 @@ package body Parser is
       Put_Line ("      a        alphabetical");
       Put_Line ("      s        stack usage (default)");
       Put_Line ("  -p           display paths for entry points (default)");
+      Put_Line ("  -q           quiet: do not display progress messages");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
       Put_Line ("  -u size      default for unknown (external) calls");

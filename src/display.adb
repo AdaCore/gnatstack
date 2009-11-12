@@ -1348,21 +1348,23 @@ package body Display is
    begin
       Entities_Processed (Entity) := Entities_Processed (Entity) + 1;
 
-      case Entity is
-         when Subprogram | Call_To_Subprogram =>
-            Ada.Text_IO.Put
-              ("Parsing" &
-               Natural'Image (Entities_Processed (Subprogram)) &
-               " subprograms and" &
-               Natural'Image (Entities_Processed (Call_To_Subprogram)) &
-               " calls to subprogram" & ASCII.CR);
+      if not Options.Quiet then
+         case Entity is
+            when Subprogram | Call_To_Subprogram =>
+               Ada.Text_IO.Put
+                 ("Parsing" &
+                    Natural'Image (Entities_Processed (Subprogram)) &
+                    " subprograms and" &
+                    Natural'Image (Entities_Processed (Call_To_Subprogram)) &
+                    " calls to subprogram" & ASCII.CR);
 
-         when Cycle =>
-            Ada.Text_IO.Put
-              ("Detected" &
-               Natural'Image (Entities_Processed (Cycle)) &
-               " cycles" & ASCII.CR);
-      end case;
+            when Cycle =>
+               Ada.Text_IO.Put
+                 ("Detected" &
+                    Natural'Image (Entities_Processed (Cycle)) &
+                    " cycles" & ASCII.CR);
+         end case;
+      end if;
    end Increase_Count;
 
    ------------------------

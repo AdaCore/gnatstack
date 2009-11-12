@@ -355,6 +355,10 @@ Select alphabetical order.
 Print all the subprograms that make up the worst-case path for every
 entry point (the default mode).
 
+@item -q
+@cindex @option{-q}
+Be quiet: do not display progression messages.
+
 @item -np
 @cindex @option{-np}
 Do not print worst-case path for entry points.

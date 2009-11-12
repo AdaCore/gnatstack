@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -29,6 +29,9 @@ package Options is
 
    Debug : Boolean := False;
    --  Debug output
+
+   Quiet : Boolean := False;
+   --  No interractive output
 
    Generate_XML_Output : Boolean := False;
    --  XML output
