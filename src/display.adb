@@ -242,7 +242,12 @@ package body Display is
          GNAT.Strings.Free (Options.Output_XML);
       end if;
 
-      Ada.Text_IO.Close (Undefined_Descriptor);
+      --  Close the file for undefined data if it was created
+
+      if Global_Data.External_Calls or else Global_Data.Indirect_Calls then
+         Ada.Text_IO.Close (Undefined_Descriptor);
+      end if;
+
       GNAT.Strings.Free (Options.Output_Undefined);
 
       Ada.Text_IO.Close (VCG_Descriptor);
@@ -349,10 +354,15 @@ package body Display is
          pragma Assert (Success);
       end if;
 
-      Ada.Text_IO.Create
-        (Undefined_Descriptor,
-         Ada.Text_IO.Out_File,
-         Options.Output_Undefined.all);
+      --  Create the file for undefined data if there is any external or
+      --  indirect call to put in it.
+
+      if Global_Data.External_Calls or else Global_Data.Indirect_Calls then
+         Ada.Text_IO.Create
+           (Undefined_Descriptor,
+            Ada.Text_IO.Out_File,
+            Options.Output_Undefined.all);
+      end if;
 
       --  Create the file containing the XML output, if needed
 
