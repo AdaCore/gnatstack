@@ -103,6 +103,7 @@ A copy of the license is included in the section entitled
 * Getting Started with GNATstack ::
 * Additional Capabilities ::
 * Examples ::
+* Machine Specific Topics ::
 * GNU Free Documentation License::
 * Index ::
 
@@ -123,6 +124,8 @@ Getting Started with GNATstack
 Additional Capabilities
 
 Examples
+
+Machine Specific Topics
 
 Index
 @end detailmenu
@@ -202,8 +205,8 @@ Apart from the computation of worst-case stack requirements,
 
 @itemize @bullet
 @item
- Indirect (including dispatching) calls. The tool indicates the number
- of indirect calls made from any subprogram.
+Indirect (including dispatching) calls. The tool indicates the number
+of indirect calls made from any subprogram.
 @cindex Indirect calls
 @cindex Dispatching calls
 
@@ -915,6 +918,30 @@ the existence of cycles and unbounded frames.
 The call chain information provides more detailed information about
 the subprograms that are part of a cycle (@code{Q} and @code{R} in
 this case), and the dynamic size of the frame for subprogram @code{Q}.
+
+@c *********************************
+@node Machine Specific Topics
+@chapter Machine Specific Topics
+
+Because stack usage information is only generated for Ada or C code, if you
+interface with code written in assembly you may need extra details.
+
+@noindent
+@menu
+* AVR::
+@end menu
+
+@node AVR
+@section AVR
+
+The stack used by the @code{call}, @code{rcall}, @code{icall} or @code{eicall}
+instructions is counted in the callee.  That is all subprograms use at leat
+3 bytes on avr6 architecture (@code{atmega256x}) and 2 bytes or avr5
+architecture.
+
+If you link with libgcc (which is the default unless you use -nostdlib), add
+3 bytes (on avr6 architecture) to the maximum stack usage reported by
+@value{gnatstack} as there is some left subprograms written in assembly.
 
 @c **********************************
 @c * GNU Free Documentation License *
