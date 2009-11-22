@@ -1,7 +1,12 @@
 TARGET=
 RTS=
+CC=g++
 
+# Ada examples
 ALL_TARGETS = simple simple_project full_project problem_detection
+
+# C/C++ examples
+ALL_TARGETS += c++_simple
 
 ifneq ($(TARGET),)
 PREFIX=$(TARGET)-
@@ -18,7 +23,7 @@ endif
 all: $(ALL_TARGETS)
 
 $(ALL_TARGETS):
-	make -C $@ PREFIX=$(PREFIX) RUNTIME=$(RUNTIME)
+	make -C $@ PREFIX=$(PREFIX) RUNTIME=$(RUNTIME) CC=$(CC)
 
 clean:
 	$(foreach DIR,$(ALL_TARGETS), make -C $(DIR) clean;)
