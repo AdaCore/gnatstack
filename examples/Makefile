@@ -6,7 +6,7 @@ CC=g++
 ALL_TARGETS = simple simple_project full_project problem_detection
 
 # C/C++ examples
-ALL_TARGETS += c++_simple
+ALL_TARGETS += c++_simple c++_static_dispatching c++_dynamic_dispatching
 
 ifneq ($(TARGET),)
 PREFIX=$(TARGET)-
