@@ -120,6 +120,7 @@ Getting Started with GNATstack
 
 * Options for GNATstack::
 * Use of Project Files::
+* Information in Non-Loadable Section::
 
 Additional Capabilities
 
@@ -286,6 +287,7 @@ main : total 376 bytes
 @menu
 * Options for GNATstack:: 
 * Use of Project Files::
+* Information in Non-Loadable Section::
 @end menu
 
 @node Options for GNATstack
@@ -432,10 +434,26 @@ Turn on warnings for indirect (including dispatching) calls.
 @cindex @option{-x}
 Generate file @var{stack_usage.xml} with the information in XML format.
 
+@item -oc=@var{name}
+@cindex @option{-oc}
+Use the @var{objcopy} executable @var{name} to extract the @file{.ci}
+files from the object files. If may contain the prefix (such as
+@var{powerpc-elf-objcopy}) or the suffix (such as @var{objcopyppc}).
+
+@item -s=@var{section}
+@cindex @option{-s}
+Extract the @file{.ci} files from section named @var{section} in the
+object files.
+
+@item -k
+@cindex @option{-k}
+Keep the temporary files created by GNATstack (such as the @file{.ci}
+files extracted from the object files.
+
 @end table
 
 @node Use of Project Files
-@section  Use of Project Files
+@section Use of Project Files
 
 @noindent
 @command{gnatstack} can be invoked through the @command{gnat} driver
@@ -547,6 +565,53 @@ specified on the command line, it passes to the @command{gnatstack}
 tool the set of @file{.ci} files that correspond to the units that
 belong to the project. When adding the @option{-U} option all projects
 in the project tree will be taken into account.
+
+@node Information in Non-Loadable Section
+@section Information in Non-Loadable Section
+
+@noindent
+The @file{.ci} file generated for every compilation unit can be written
+into the generated object as a non-loadable section. For example, it can
+be written into a section named @var{callgraph} doing:
+
+@smallexample
+$ gcc -c -fcallgraph-info=su main_unit.adb
+$ objcopy --add-section callgraph=main_unit.ci main_unit.o
+$ gnatstack main_unit.o
+@end smallexample
+
+@noindent
+This section is not downloaded into the target so it does not affect the
+execution. The advantage is that it may facilitate the retrieval of the
+required @file{.ci} files (we simply need the list of object files that
+make up the application), and it may help guaranteeing the coherence
+between the call-graph and stack usage information and the corresponding
+object files.
+
+@value{gnatstack} can later extract this section from the object files
+and use the information for the rest of the analysis. @value{gnatstack}
+uses the @code{objcopy} tool to extract the @file{.ci} files.
+
+By default, @value{gnatstack} uses the native @code{objcopy} executable.
+It can be changed using the  @option{-oc} option (see @ref{Options for
+GNATstack}).
+
+@smallexample
+$ powerpc-elf-gcc -c -fcallgraph-info=su main_unit.adb
+$ powerpc-elf-objcopy --add-section callgraph=main_unit.ci main_unit.o
+$ gnatstack -oc=powerpc-elf-objcopy main_unit.o
+@end smallexample
+
+@noindent
+The section where the @file{.ci} files are stored can also be changed, and
+@value{gnatstack} provides an option (@option{-s}, see @ref{Options for
+GNATstack}) to specify this section.
+
+@smallexample
+$ gcc -c -fcallgraph-info=su main_unit.adb
+$ objcopy --add-section my_section=main_unit.ci main_unit.o
+$ gnatstack -s=my_section main_unit.o
+@end smallexample
 
 @c *********************************
 @node Additional Capabilities

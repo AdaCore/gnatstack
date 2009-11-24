@@ -98,4 +98,17 @@ package Options is
 
    Default_Cycle : Integer := Static_Stack_Analysis.Unspecified_Value;
    --  Value used (in bytes) for subprograms in a cycle.
+
+   Objcopy_Cmd : GNAT.Strings.String_Access := new String'("objcopy");
+   --  Name of the objcopy (including the prefix/suffix) to be used to extract
+   --  .ci info from objects. This command can be changed with the -oc option.
+
+   Remove_Temporary_Files : Boolean := True;
+   --  Indicates whether we remove the temporary files created by GNATstack
+   --  (if any) or not. This option can be changed with the -k option.
+
+   Section_Name : GNAT.Strings.String_Access := new String'("callgraph");
+   --  Name of the section where the .ci information is stored in the object
+   --  file. This value can be changed with the -s option.
+
 end Options;
