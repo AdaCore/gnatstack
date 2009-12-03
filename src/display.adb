@@ -927,9 +927,11 @@ package body Display is
            (File,
             Demangle.Ada_Decode (Name.all (Name_First .. Name.all'Last)));
       else
+         --  If not Ada code, try to decode it assuming it is C++
+
          Ada.Text_IO.Put
            (File,
-            Name.all (Name_First .. Name.all'Last));
+            Demangle.Cplus_Decode (Name.all (Name_First .. Name.all'Last)));
       end if;
    end Print_Ada_Name;
 

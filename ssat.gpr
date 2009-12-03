@@ -9,6 +9,10 @@ project Ssat is
       for Default_Switches ("ada") use ("-gnatf", "-g", "-gnata", "-gnatg", "-gnat05");
    end Compiler;
 
+   package Linker is
+      for Default_Switches ("ada") use ("-liberty");
+   end Linker;
+
    package Builder is
       for Default_Switches ("ada") use ("-g");
    end Builder;

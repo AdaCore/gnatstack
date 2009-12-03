@@ -25,4 +25,10 @@ package Demangle is
    --  (such as pck__proc) into its Ada counterpart (pck.proc). It also
    --  handles library level subprogram, overloaded subprograms, task bodies,
    --  and operators.
+
+   function Cplus_Decode (Symbol_Name : String) return String;
+   --  Return the demangled name corresponding to the symbol name for C++. It
+   --  transforms a symbol name (such as _Z4proci) into its corresponding C++
+   --  (proc(int)).
+
 end Demangle;

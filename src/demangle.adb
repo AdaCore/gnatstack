@@ -27,6 +27,8 @@ with Static_Stack_Analysis;
 with GNAT.Regpat;
 --  Used for Match
 
+with Interfaces.C.Strings;
+
 package body Demangle is
 
    use type GNAT.Regpat.Match_Location;
@@ -193,5 +195,38 @@ package body Demangle is
 
       return Buffer (1 .. Length);
    end Ada_Decode;
+
+   function Cplus_Decode (Symbol_Name : String) return String is
+
+      function Cplus_Demangle
+        (Mangled : Interfaces.C.char_array; Options : Integer)
+         return Interfaces.C.Strings.chars_ptr;
+      pragma Import (C, Cplus_Demangle, "cplus_demangle");
+      --  Function provided by libiberty
+
+      DMGL_PARAMS  : constant := 2**0; -- Include function args
+      DMGL_ANSI    : constant := 2**1; -- Include const, volatile, etc.
+      DMGL_VERBOSE : constant := 2**3; -- Include implementation details
+
+      Options      : constant := DMGL_PARAMS + DMGL_ANSI + DMGL_VERBOSE;
+      --  Options from demangle.h
+
+      Demangled : Interfaces.C.Strings.chars_ptr;
+
+      use type Interfaces.C.Strings.chars_ptr;
+
+   begin
+      --  Try to demangle the symbol name
+
+      Demangled := Cplus_Demangle (Interfaces.C.To_C (Symbol_Name), Options);
+
+      if Demangled = Interfaces.C.Strings.Null_Ptr then
+         --  Return the symbol name because it could not be demangled
+
+         return Symbol_Name;
+      else
+         return Interfaces.C.Strings.Value (Demangled);
+      end if;
+   end Cplus_Decode;
 
 end Demangle;
