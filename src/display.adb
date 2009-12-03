@@ -94,12 +94,12 @@ package body Display is
    --  active verbosity it will print only the Ada name or it will print also
    --  the symbol name and its location.
 
-   procedure Print_Ada_Name
+   procedure Print_Source_Name
      (Node : Static_Stack_Analysis.Node_Class_Access;
       File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output);
    --  Print the subprogram name associated to the node. It will use the
-   --  demangled Ada name, if possible, remove path information, and use task
-   --  names for task entries.
+   --  demangled Ada/C++ name, if possible, remove path information, and use
+   --  task names for task entries.
 
    procedure Expand_Location
      (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
@@ -715,7 +715,7 @@ package body Display is
    begin
       --  Print subprogram name
 
-      Print_Ada_Name (Node);
+      Print_Source_Name (Node);
 
       --  Print symbol name in debug mode
       if Options.Debug then
@@ -738,7 +738,7 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Ada_Name (Node, XML_Descriptor);
+         Print_Source_Name (Node, XML_Descriptor);
          Ada.Text_IO.Put_Line
            (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
@@ -865,11 +865,11 @@ package body Display is
       Ada.Text_IO.New_Line;
    end Print_Node;
 
-   --------------------
-   -- Print_Ada_Name --
-   --------------------
+   -----------------------
+   -- Print_Source_Name --
+   -----------------------
 
-   procedure Print_Ada_Name
+   procedure Print_Source_Name
      (Node : Static_Stack_Analysis.Node_Class_Access;
       File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output)
    is
@@ -933,7 +933,7 @@ package body Display is
            (File,
             Demangle.Cplus_Decode (Name.all (Name_First .. Name.all'Last)));
       end if;
-   end Print_Ada_Name;
+   end Print_Source_Name;
 
    ----------------------
    -- Generate_Results --
@@ -1255,7 +1255,7 @@ package body Display is
 
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Ada_Name (Node, XML_Descriptor);
+         Print_Source_Name (Node, XML_Descriptor);
          Ada.Text_IO.Put_Line
            (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
@@ -1443,7 +1443,7 @@ package body Display is
          Ada.Text_IO.Put ("Task ");
       end if;
 
-      Print_Ada_Name (Root);
+      Print_Source_Name (Root);
 
       Ada.Text_IO.Put (" : total ");
 
@@ -1475,7 +1475,7 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Ada_Name (Root, XML_Descriptor);
+         Print_Source_Name (Root, XML_Descriptor);
          Ada.Text_IO.Put_Line
            (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
@@ -1523,7 +1523,7 @@ package body Display is
 
       Ada.Text_IO.Put (" ");
 
-      Print_Ada_Name
+      Print_Source_Name
         (Static_Stack_Analysis.List_Of_Nodes.Element
            (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
 
@@ -1729,7 +1729,7 @@ package body Display is
 
       Open_Tag ("prefixname type=""strings""");
       Report_XML (Message => "<value>", New_Line => False);
-      Print_Ada_Name (Target, XML_Descriptor);
+      Print_Source_Name (Target, XML_Descriptor);
       Ada.Text_IO.Put_Line
         (XML_Descriptor, "</value>");
       Close_Tag ("prefixname");
