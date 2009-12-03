@@ -3,7 +3,7 @@ RTS=
 CC=g++
 
 # Ada examples
-ADA_TARGETS = simple simple_project full_project problem_detection
+ADA_TARGETS = simple simple_project full_project problem_detection tasking
 
 # C/C++ examples
 CPLUSPLUS_TARGETS = c++_simple c++_static_function \
