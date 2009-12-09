@@ -24,6 +24,7 @@ with System.OS_Lib;
 with Ada.Containers.Vectors;
 with Ada.Directories;
 with Ada.Strings.Fixed;
+with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 with Ada.Exceptions;
 
@@ -181,9 +182,21 @@ package body Parser is
    --  The information that is mandatory for an edge is the symbols associated
    --  to the subprograms acting as caller and callee.
 
+   Class_Regexp : constant String :=
+     "^class {" &
+     " classname: ""([^""]*)""" &
+     " label: ""([^""]*)""" &
+     "( parent: ""[^""]*"")??" &
+     " virtuals: ""([^""]*)""" &
+     "\s*}";
+   --  The information that is mandatory for a class is its name, location,
+   --  set of virtual functions (we represent only the hierarchy of
+   --  polymorphic classes and bases), and the list of parents (if any).
+
    Header_Regexp : constant String :=
      "^graph: { title: ""([^""]*)""";
-   --  It indicates that it is a compiler-generated file
+   --  It indicates that it is a compiler-generated file, and not one created
+   --  by the user.
 
    Allowed_Lines_Regexp : constant String :=
      "^\s*(}|--|$)";
@@ -1074,9 +1087,9 @@ package body Parser is
 
    end Parse_Entry_Points;
 
-   ----------------
-   -- Parse_Line --
-   ----------------
+   ----------------------
+   -- Parse_Input_Line --
+   ----------------------
 
    procedure Parse_Input_Line (Input : String) is
    begin
@@ -1087,6 +1100,11 @@ package body Parser is
       --  Parsing call
       elsif GNAT.Regpat.Match (Edge_Regexp, Input) then
          Parse_Edge (Input);
+
+      --  Parsing class representation
+      elsif GNAT.Regpat.Match (Class_Regexp, Input) then
+         --  ??? Nothing for the moment
+         null;
 
       --  Get the Ada file name associated to the file being parsed
       elsif GNAT.Regpat.Match (Header_Regexp, Input) then
@@ -1891,10 +1909,54 @@ package body Parser is
       Ada.Text_IO.Open
         (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
 
-      --  Parse information line by line
+      --  Parse information line by line. Note that we can find lines which
+      --  are split, so we merge them here. The lines that may need
+      --  reconstruction are:
+      --    - node: { ... }
+      --    - edge: { ... }
+      --    - class { ... }
 
       while not Ada.Text_IO.End_Of_File (Descriptor) loop
-         Parse_Input_Line (Ada.Text_IO.Get_Line (Descriptor));
+         Outer_Loop : declare
+            Complete_Line : GNAT.Strings.String_Access :=
+              new String'(Ada.Text_IO.Get_Line (Descriptor));
+
+            Reconstructed_Line : Ada.Strings.Unbounded.Unbounded_String :=
+              Ada.Strings.Unbounded.Null_Unbounded_String;
+
+         begin
+            --  Look for non-terminated node/edge/class lines. In that case
+            --  we merge the following lines until we find the end "}".
+            if GNAT.Regpat.Match
+              ("^(node:|edge:|class) {([^}]*)$", Complete_Line.all)
+            then
+               Reconstructed_Line :=
+                 Ada.Strings.Unbounded.To_Unbounded_String (Complete_Line.all);
+
+               while not Ada.Text_IO.End_Of_File (Descriptor) loop
+                  Inner_Loop : declare
+                     Next_Line : constant String :=
+                       Ada.Text_IO.Get_Line (Descriptor);
+
+                  begin
+                     --  Append a new line until we find the ending "}"
+                     Ada.Strings.Unbounded.Append
+                       (Reconstructed_Line, Next_Line);
+
+                     exit when GNAT.Regpat.Match ("}\s*(--.*)??$", Next_Line);
+                  end Inner_Loop;
+               end loop;
+
+               GNAT.Strings.Free (Complete_Line);
+
+               Complete_Line := new String'
+                 (Ada.Strings.Unbounded.To_String (Reconstructed_Line));
+            end if;
+
+            Parse_Input_Line (Complete_Line.all);
+
+            GNAT.Strings.Free (Complete_Line);
+         end Outer_Loop;
       end loop;
 
       Ada.Text_IO.Close (Descriptor);
