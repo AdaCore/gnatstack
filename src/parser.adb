@@ -27,6 +27,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;
 with Ada.Exceptions;
+with Ada.Characters.Handling;
 
 with GNAT.Regpat;
 with GNAT.Command_Line;
@@ -38,6 +39,7 @@ with Static_Stack_Analysis;
 with Options;
 with Display;
 with Version;
+with Demangle;
 
 package body Parser is
 
@@ -330,15 +332,26 @@ package body Parser is
    begin
       --  If the referenced node describes a subprogram containing the pattern
       --  defined in Options.Entry_Point_Pattern we add this subprogram to the
-      --  list of potential entry points.
+      --  list of potential entry points. We avoid the problem of upper/lower
+      --  case by transforming into lower case values.
 
       GNAT.Regpat.Match
-        (Options.Entry_Point_Pattern.all,
-         Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all,
+        (Ada.Characters.Handling.To_Lower (Options.Entry_Point_Pattern.all),
+         Ada.Characters.Handling.To_Lower
+           (Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all),
          Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
          Global_Data.Entry_Points.Append (Position);
+      else
+         --  Use demangled names instead
+
+         GNAT.Regpat.Match
+           (Ada.Characters.Handling.To_Lower (Options.Entry_Point_Pattern.all),
+            Ada.Characters.Handling.To_Lower
+              (Static_Stack_Analysis.Get_Demangled_Name
+                 (Explored_Node.all).all),
+            Matches);
       end if;
    end Add_Pattern_Entry;
 
@@ -1057,7 +1070,7 @@ package body Parser is
       GNAT.Regpat.Match (Entry_Regexp, Input, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         Found_Id := Static_Stack_Analysis.Get_Node
+         Found_Id := Static_Stack_Analysis.Get_Match
            (Input (Matches (1).First .. Matches (1).Last));
 
          if Static_Stack_Analysis.List_Of_Nodes.Has_Element (Found_Id) then
@@ -1261,9 +1274,12 @@ package body Parser is
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
+                  Demangled               =>
+                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
+                  Is_Reachable            => False,
                   Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
@@ -1293,11 +1309,14 @@ package body Parser is
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
+                  Demangled               =>
+                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
                   Dynamic_Objects         => Dynamic_Objects,
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
+                  Is_Reachable            => False,
                   Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
@@ -1346,11 +1365,15 @@ package body Parser is
                      Accumulated_Stack_Usage => Unknown_Stack_Usage,
                      Location_List           => Locations_Set,
                      Subprogram              => Symbol_Name,
+                     Demangled               =>
+                        new String'
+                          (Demangle.Decode (Symbol_Name, Ada_File_Name)),
                      Dynamic_Objects         => Dynamic_Objects,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
                      Analysis_Finished       => False,
                      Is_Called               => Found_Node.Is_Called,
+                     Is_Reachable            => False,
                      Cycles                  => List_Of_Cycles.Empty_Set);
 
                   --  Merge the location list
@@ -1644,6 +1667,8 @@ package body Parser is
 
       New_Node     : Boolean := False;
 
+      Symbol_Name  : Name;
+
       procedure Mark_As_Called
         (Target : Static_Stack_Analysis.Node_Class_Access);
       --  Mark the subprogram as being called by someone else
@@ -1670,17 +1695,23 @@ package body Parser is
 
          Source_Id := Get_Node (Input (Matches (1).First .. Matches (1).Last));
 
+         Symbol_Name :=
+           new String'(Input (Matches (1).First .. Matches (1).Last));
+
          if not List_Of_Nodes.Has_Element (Source_Id) then
+
             Source_Ptr := new Unresolved_Node'
               (Ada_File_Name           => Ada_File_Name,
                Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
-               Subprogram              =>
-                 new String'(Input (Matches (1).First .. Matches (1).Last)),
+               Subprogram              => Symbol_Name,
+               Demangled               =>
+                  new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => False,
+               Is_Reachable            => False,
                Cycles                  => List_Of_Cycles.Empty_Set);
 
             Global_Data.List_Of_Subprograms.Insert
@@ -1707,6 +1738,7 @@ package body Parser is
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => True,
+               Is_Reachable            => False,
                Cycles                  => List_Of_Cycles.Empty_Set);
 
             Global_Data.List_Of_Subprograms.Insert
@@ -1732,16 +1764,21 @@ package body Parser is
             --  This node is considered unresolved for the moment. It can be
             --  later modified if we find more information.
             else
+               Symbol_Name :=
+                 new String'(Input (Matches (2).First .. Matches (2).Last));
+
                Target_Ptr := new Unresolved_Node'
                  (Ada_File_Name           => Ada_File_Name,
                   Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => List_Of_Locations.Empty_Set,
-                  Subprogram              =>
-                    new String'(Input (Matches (2).First .. Matches (2).Last)),
+                  Subprogram              => Symbol_Name,
+                  Demangled               =>
+                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => True,
+                  Is_Reachable            => False,
                   Cycles                  => List_Of_Cycles.Empty_Set);
 
                Global_Data.List_Of_Subprograms.Insert

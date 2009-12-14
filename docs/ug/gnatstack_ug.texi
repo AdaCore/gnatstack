@@ -323,7 +323,8 @@ Load @file{.ci} files from @var{dir}.
 
 @item -e @var{entry_point[,...]}
 @cindex @option{-e}
-Name of symbols to be used as entry points for the analysis.
+Name of symbols to be used as entry points for the analysis. It accepts both
+symbol and demangled names, and it performs a case-insensitive search.
 
 @item -files=@var{file}
 @cindex @option{-files}
@@ -380,7 +381,9 @@ Write the generated graph (VCG format) into @var{file}.
 @item -r @var{regexp}
 @cindex @option{-r}
 Any symbol matching the regular expression @var{regexp} will be
-considered as an entry point for the analysis.
+considered as an entry point for the analysis. It accepts both
+symbol and demangled names, and it performs a case-insensitive
+pattern matching.
 
 @item -d @var{n}
 @cindex @option{-d}

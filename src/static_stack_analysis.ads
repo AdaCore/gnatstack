@@ -173,6 +173,14 @@ package Static_Stack_Analysis is
    --  representing this subprogram (if it already exists). If the subprogram
    --  has not been registered within the list then it returns No_Element.
 
+   function Get_Match (Subprogram : String) return Node_Id;
+   --  This function returns the identifier for the name of the symbol (or
+   --  demangled name) representing this subprogram (if it already exists).
+   --  It performs a case-insensitive search taking into account both the
+   --  symbol name and the demangled name.
+   --  If the subprogram has not been registered within the list then it
+   --  returns No_Element.
+
    ------------------------------
    -- Edges (subprogram calls) --
    ------------------------------
@@ -308,6 +316,10 @@ package Static_Stack_Analysis is
          --  Indicates whether this subprogram is directly accessible from any
          --  other.
 
+         Is_Reachable : Boolean;
+         --  Indicates whether this subprogram can be reached from at least
+         --  one entry point.
+
          Cycles : List_Of_Cycles.Set;
          --  A node may be part of different cycles in the call graph, and
          --  this field contains the set of cycles to which this node belongs.
@@ -348,6 +360,11 @@ package Static_Stack_Analysis is
    --  This function returns the name of the subprogram associated to the
    --  specified node.
 
+   function Get_Demangled_Name
+     (Target : Node) return Name is abstract;
+   --  This function returns the demangled name of the subprogram associated
+   --  to the specified node.
+
    function Get_Location_List
      (Target : Node) return List_Of_Locations.Set is abstract;
    --  This function returns the list of locations (file, demangled, line,
@@ -384,6 +401,9 @@ package Static_Stack_Analysis is
 
          Subprogram    : Name;
          --  Name of the symbol representing this subprogram
+
+         Demangled     : Name;
+         --  Demangled name (Ada/C++) corresponding the symbol name
       end record;
    --  Node representing  real nodes (explicit and unresolved). We need to
    --  store the list of candidate target nodes that may correspond to this
@@ -393,6 +413,11 @@ package Static_Stack_Analysis is
      (Target : Real_Node) return Name;
    --  This function returns the name of the subprogram associated to an
    --  real (explicit or unresolved) node.
+
+   overriding function Get_Demangled_Name
+     (Target : Real_Node) return Name;
+   --  This function returns the demangled name of the subprogram associated
+   --  to an real (explicit or unresolved) node.
 
    overriding function Get_Location_List
      (Target : Real_Node) return List_Of_Locations.Set;
@@ -478,6 +503,11 @@ package Static_Stack_Analysis is
      (Target : Fake_Node) return Name;
    --  This function returns the name of the subprogram associated to a fake
    --  node.
+
+   overriding function Get_Demangled_Name
+     (Target : Fake_Node) return Name;
+   --  This function returns the demangled name of the subprogram associated
+   --  to a fake node.
 
    overriding function Get_Location_List
      (Target : Fake_Node) return List_Of_Locations.Set;

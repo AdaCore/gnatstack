@@ -19,6 +19,8 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
+with Static_Stack_Analysis;
+
 package Demangle is
    function Ada_Decode (Symbol_Name : String) return String;
    --  Return the Ada name from the encoded form. It transforms a symbol name
@@ -31,4 +33,11 @@ package Demangle is
    --  transforms a symbol name (such as _Z4proci) into its corresponding C++
    --  (proc(int)).
 
+   function Is_Ada (File : Static_Stack_Analysis.File_Name) return Boolean;
+   --  This function returns True if the node represents an Ada subprogram
+
+   function Decode
+     (Symbol_Name : Static_Stack_Analysis.Name;
+      File : Static_Stack_Analysis.File_Name) return String;
+   --  Return the Ada/C++ name from the encoded form
 end Demangle;

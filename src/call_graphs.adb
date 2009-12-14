@@ -184,6 +184,10 @@ package body Call_Graphs is
             Analyze_Detected_Cycle (Position);
 
          else
+            --  Mark node as reachable
+
+            Node.Is_Reachable := True;
+
             --  Mark it under analysis
 
             Node.Under_Analysis := True;
@@ -268,7 +272,8 @@ package body Call_Graphs is
         (Position : Static_Stack_Analysis.Node_Id);
       --  Depending on the selected flags, this procedure will extract all the
       --  cycles that can be reached from the specified entry point, as well as
-      --  undefined references, indirect calls and unbounded frames.
+      --  undefined references, indirect calls and unbounded frames. It will
+      --  also mark all reachable subprograms.
 
       procedure Analyze_Subprogram
         (Position : Static_Stack_Analysis.Node_Id)

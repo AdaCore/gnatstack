@@ -21,9 +21,6 @@
 
 --  The information about Ada encodings is extracted from exp_dbug.ads
 
-with Static_Stack_Analysis;
---  Used for Indirect_Call
-
 with GNAT.Regpat;
 --  Used for Match
 
@@ -196,6 +193,10 @@ package body Demangle is
       return Buffer (1 .. Length);
    end Ada_Decode;
 
+   ------------------
+   -- Cplus_Decode --
+   ------------------
+
    function Cplus_Decode (Symbol_Name : String) return String is
 
       function Cplus_Demangle
@@ -229,4 +230,56 @@ package body Demangle is
       end if;
    end Cplus_Decode;
 
+   ------------
+   -- Decode --
+   ------------
+
+   function Decode
+     (Symbol_Name : Static_Stack_Analysis.Name;
+      File : Static_Stack_Analysis.File_Name) return String
+   is
+      Name_First : Integer;
+      --  Index to point to the beginning of the subprogram name (removing the
+      --  file information).
+
+      Matches : GNAT.Regpat.Match_Array (0 .. 1);
+
+   begin
+      --  Remove file information (look for the ":" separator between file
+      --  name and subprogram name).
+
+      GNAT.Regpat.Match ("(:)", Symbol_Name.all, Matches);
+
+      if Matches (0) /= GNAT.Regpat.No_Match then
+         Name_First := Matches (1).Last + 1;
+      else
+         Name_First := Symbol_Name'First;
+      end if;
+
+      if Is_Ada (File) then
+         return Demangle.Ada_Decode
+           (Symbol_Name (Name_First .. Symbol_Name.all'Last));
+      else
+         --  If not Ada code, try to decode it assuming it is C++
+
+         return Demangle.Cplus_Decode
+           (Symbol_Name (Name_First .. Symbol_Name.all'Last));
+      end if;
+   end Decode;
+
+   ------------
+   -- Is_Ada --
+   ------------
+
+   function Is_Ada (File : Static_Stack_Analysis.File_Name) return Boolean is
+      use type Static_Stack_Analysis.File_Name;
+
+   begin
+      --  Detected very conservatively by simply looking at the file
+      --  extension and considering it an Ada source file if its extension
+      --  is ".ad?".
+      return File /= null
+        and then File'Length >= 4
+        and then File (File'Last - 3 .. File'Last - 1) = ".ad";
+   end Is_Ada;
 end Demangle;
