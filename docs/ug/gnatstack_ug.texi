@@ -181,11 +181,11 @@ indicates that the result is accurate then the computed bound can
 never overflow. The tool does not rely on empiric run-time
 information.
 
-The main output of the tool is the worst-case stack requirements for  
-every entry point, together with the paths that lead to these stack  
-needs. The list of entry points can be automatically computed (all  
-the tasks, including the environment task) or can be specified by the  
-user (a list of entry points or all the subprograms matching a  
+The main output of the tool is the worst-case stack requirements for
+every entry point, together with the paths that lead to these stack
+needs. The list of entry points can be automatically computed (all
+the tasks, including the environment task) or can be specified by the
+user (a list of entry points or all the subprograms matching a
 certain regular expression).
 
 Note that if the linker performs a partial link (this is the case of
@@ -212,15 +212,15 @@ of indirect calls made from any subprogram.
 @cindex Dispatching calls
 
 @item
-External calls. The tool displays all subprograms that are  
-reachable from any entry point for which we do not have any stack or  
+External calls. The tool displays all subprograms that are
+reachable from any entry point for which we do not have any stack or
 call graph information.
 @cindex External calls
 
 @item
-Unbounded frames. The tool displays all subprograms that are  
-reachable from any entry point with unbounded stack requirements.  
-The required stack size depends on the arguments passed to the  
+Unbounded frames. The tool displays all subprograms that are
+reachable from any entry point with unbounded stack requirements.
+The required stack size depends on the arguments passed to the
 subprogram.
 @cindex Unbounded frames
 
@@ -285,7 +285,7 @@ main : total 376 bytes
 
 @noindent
 @menu
-* Options for GNATstack:: 
+* Options for GNATstack::
 * Use of Project Files::
 * Information in Non-Loadable Section::
 @end menu
@@ -310,11 +310,11 @@ Extract all possible cycles in the call graph.
 
 @item -c @var{n}
 @cindex @option{-c}
-Use @var{n} bytes frame for subprograms at the beginning of cycles.  This can
+Use @var{n} bytes frame for subprograms at the beginning of cycles. This can
 be used to increase visibility of cycles in reports.
 
 @item -g
-@cindex  @option{-g}
+@cindex @option{-g}
 Generate internal debug information.
 
 @item -aO @var{dir}
@@ -387,7 +387,7 @@ pattern matching.
 
 @item -d @var{n}
 @cindex @option{-d}
-Set default stack size for unbounded (dynamic) frames to @var{n} bytes. 
+Set default stack size for unbounded (dynamic) frames to @var{n} bytes.
 
 @item -u @var{n}
 @cindex @option{-u}
@@ -556,7 +556,7 @@ end Prj;
 
 @noindent
 The following command will parse the project file @file{prj.gpr} and
-call @command{gnatstack} with the specified options. 
+call @command{gnatstack} with the specified options.
 
 @smallexample
 $ gnat stack -P prj.gpr
@@ -575,11 +575,11 @@ in the project tree will be taken into account.
 @noindent
 The @file{.ci} file generated for every compilation unit can be written
 into the generated object as a non-loadable section. For example, it can
-be written into a section named @var{callgraph} doing:
+be written into a section named @var{.GNU.callgraph} doing:
 
 @smallexample
 $ gcc -c -fcallgraph-info=su main_unit.adb
-$ objcopy --add-section callgraph=main_unit.ci main_unit.o
+$ objcopy --add-section .GNU.callgraph=main_unit.ci main_unit.o
 $ gnatstack main_unit.o
 @end smallexample
 
@@ -591,17 +591,21 @@ make up the application), and it may help guaranteeing the coherence
 between the call-graph and stack usage information and the corresponding
 object files.
 
+The linker would merge (concatenate) the @file{.ci} sections corresponding
+to the object files being linked into the final executable (including those
+coming from library files).
+
 @value{gnatstack} can later extract this section from the object files
 and use the information for the rest of the analysis. @value{gnatstack}
 uses the @code{objcopy} tool to extract the @file{.ci} files.
 
 By default, @value{gnatstack} uses the native @code{objcopy} executable.
-It can be changed using the  @option{-oc} option (see @ref{Options for
+It can be changed using the @option{-oc} option (see @ref{Options for
 GNATstack}).
 
 @smallexample
 $ powerpc-elf-gcc -c -fcallgraph-info=su main_unit.adb
-$ powerpc-elf-objcopy --add-section callgraph=main_unit.ci main_unit.o
+$ powerpc-elf-objcopy --add-section .GNU.callgraph=main_unit.ci main_unit.o
 $ gnatstack -oc=powerpc-elf-objcopy main_unit.o
 @end smallexample
 
@@ -707,7 +711,7 @@ node: @{ title: "ext_proc" label: "Ext_Proc\n/path/file.ads:1:2\nXXX bytes" @}
 
 @noindent
 User-defined values can be specified in a @file{.ci} file by simply
-replacing the @code{XXX} by the estimated value. 
+replacing the @code{XXX} by the estimated value.
 
 For indirect calls, the @file{undefined.ciu} file contains entries
 like:
@@ -1003,7 +1007,7 @@ interface with code written in assembly you may need extra details.
 @section AVR
 
 The stack used by the @code{call}, @code{rcall}, @code{icall} or @code{eicall}
-instructions is counted in the callee.  That is all subprograms use at leat
+instructions is counted in the callee. That is all subprograms use at leat
 3 bytes on avr6 architecture (@code{atmega256x}) and 2 bytes or avr5
 architecture.
 
