@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2009, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -541,6 +541,129 @@ package Static_Stack_Analysis is
    --  Indirect calls are the result of dereferences of access-to-subprogram
    --  values, and hence their target depend on the values stored in the
    --  pointer.
+
+   -----------
+   -- Class --
+   -----------
+
+   type Class;
+   type Class_Access is access all Class;
+
+   function Alphabetical_Order (Left, Right : Class_Access) return Boolean;
+   --  Returns True if Left is alphabetically before Right, False otherwise.
+   --  It is used for ordering sets of classes alphabetically.
+
+   function Equal (Left, Right : Class_Access) return Boolean;
+   --  Equality operation between two classes. They are equal if they contain
+   --  the same information (name, methods, etc.).
+
+   package List_Of_Classes is new
+     Ada.Containers.Ordered_Sets (Class_Access, Alphabetical_Order, Equal);
+   --  Types used to represent classes (tagged types)
+
+   type Method;
+   type Method_Class_Access is access all Method'Class;
+   --  Root class to represent dispatching methods. There are either virtual
+   --  or inherited methods.
+
+   type Virtual;
+   type Virtual_Class_Access is access all Virtual'Class;
+
+   package List_Of_Virtual_Methods is new
+     Ada.Containers.Vectors (Natural, Virtual_Class_Access);
+
+   type Inherited;
+   type Inherited_Class_Access is access all Inherited'Class;
+
+   type Dispatcher;
+   type Dispatcher_Access is access all Dispatcher;
+   package List_Of_Dispatchers is new
+     Ada.Containers.Vectors (Natural, Dispatcher_Access);
+   --  Types used to represent a virtual node, artificially created by the
+   --  tool to represent the notion of a node that may call the set of
+   --  reachable overridden candidate for a dispatching call.
+
+   type Slot_Number is new Natural;
+   --  Type which represents the position in the dispatching table of the
+   --  different virtual methods.
+
+   type Method is abstract tagged
+      record
+         Method_Name : Name;
+         --  Name of the method
+
+         Dispatcher  : Dispatcher_Access;
+         --  Pointer to the virtual node which represents all possible
+         --  instantiations of the method.
+      end record;
+
+   type Virtual is new Method with
+      record
+         Symbol_Name : Name;
+         --  Associated symbol (in the object code) for the method
+
+         Owner_Class  : Class_Access;
+         --  Class (tagged type) that defines the method
+
+         Slot         : Slot_Number;
+         --  Position in the dispatching table of the method
+
+         Redefines    : Virtual_Class_Access;
+         --  Method of the ancestor being overridden by this method. Null if
+         --  this is not an overridden method.
+
+         Redefined_By : List_Of_Virtual_Methods.Vector;
+         --  List of methods which override this one. This is used to
+         --  determine the set of potential targets for a dispatching call.
+      end record;
+   --  Types used to represent virtual functions (primitive operations of a
+   --  tagged type).
+
+   type Inherited is new Method with
+      record
+         Inherits : Virtual_Class_Access;
+         --  Method inherited from the ancestor
+      end record;
+
+   package List_Of_Inherited_Methods is new
+     Ada.Containers.Vectors (Natural, Inherited_Class_Access);
+
+   type Class is
+      record
+         Class_Name : Name;
+         --  Name of the class (tagged type)
+
+         Parents    : List_Of_Classes.Set;
+         --  List of direct parents.
+
+         Derived    : List_Of_Classes.Set;
+         --  List of all classes derived from this one. It does not contain
+         --  only the direct descencent (children), but derived through the
+         --  complete hierarchy (include grandchildren, ...).
+
+         Virtual    : List_Of_Virtual_Methods.Vector;
+         --  List of virtual methods defined by the class (both new methods
+         --  and overriding ones).
+
+         Inherited  : List_Of_Inherited_Methods.Vector;
+         --  List of methods inherited by the class. This is not an exhaustive
+         --  list. It does not necesarily contain all methods inherited by the
+         --  class, but all those which have been targeted by a dispatching
+         --  call.
+      end record;
+
+   type Dispatcher is
+      record
+         Method : Name;
+         --  Corresponding method name
+
+         Methods : List_Of_Virtual_Methods.Vector;
+         --  List of potential targets of the dispatching call represented
+
+         Node : Node_Id;
+         --  Virtual node which is used to represent the list of potential
+         --  calls which correspond to a dispatching call.
+      end record;
 
 private
 

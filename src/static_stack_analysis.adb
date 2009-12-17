@@ -238,6 +238,19 @@ package body Static_Stack_Analysis is
       end if;
    end Alphabetical_Order;
 
+   function Alphabetical_Order (Left, Right : Class_Access) return Boolean is
+   begin
+      if Left = null then
+         return Right /= null;
+
+      elsif Right = null then
+         return False;
+
+      else
+         return Left.Class_Name.all < Right.Class_Name.all;
+      end if;
+   end Alphabetical_Order;
+
    -----------
    -- Equal --
    -----------
@@ -257,6 +270,14 @@ package body Static_Stack_Analysis is
    begin
       return Left.Source_Node = Right.Source_Node
         and then Left.Call_To = Right.Call_To;
+   end Equal;
+
+   function Equal (Left, Right : Class_Access) return Boolean is
+   begin
+      return (Left = null and then Right = null)
+        or else (Left /= null
+                 and then Right /= null
+                 and then Left.all = Right.all);
    end Equal;
 
    ---------------------------------
