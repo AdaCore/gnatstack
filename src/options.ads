@@ -107,7 +107,7 @@ package Options is
    --  Indicates whether we remove the temporary files created by GNATstack
    --  (if any) or not. This option can be changed with the -k option.
 
-   Section_Name : GNAT.Strings.String_Access := new String'("callgraph");
+   Section_Name : GNAT.Strings.String_Access := new String'(".GNU.callgraph");
    --  Name of the section where the .ci information is stored in the object
    --  file. This value can be changed with the -s option.
 
