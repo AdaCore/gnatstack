@@ -31,9 +31,6 @@ with Ada.Strings.Fixed;
 
 with GNAT.OS_Lib;
 with GNAT.Strings;
-with GNAT.Regpat;
-
-with Demangle;
 
 package body Display is
 
@@ -517,7 +514,7 @@ package body Display is
          --  entry points we mark the subprogram as such. The subprogram may
          --  be reachable via indirect calls
 
-         if not Node.Analysis_Finished then
+         if not Node.Is_Reachable then
             Ada.Text_IO.Put (" (not directly reachable)");
          end if;
 
@@ -873,66 +870,12 @@ package body Display is
      (Node : Static_Stack_Analysis.Node_Class_Access;
       File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output)
    is
-      Name : constant Static_Stack_Analysis.Name :=
-        Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
-      --  Symbol corresponding to the subprogram
-
-      Name_First : Integer;
-      --  Index to point to the beginning of the subprogram name (removing the
-      --  file information).
-
-      Matches : GNAT.Regpat.Match_Array (0 .. 1);
-
-      use type GNAT.Regpat.Match_Location;
-
-      function Is_Ada
-        (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean;
-      --  This function returns True if the node represents an Ada subprogram
-
-      function Is_Ada
-        (Node : Static_Stack_Analysis.Node_Class_Access) return Boolean
-      is
-         File : constant Static_Stack_Analysis.File_Name := Node.Ada_File_Name;
-
-         use type Static_Stack_Analysis.File_Name;
-
-      begin
-         --  Detected very conservatively by simply looking at the file
-         --  extension and considering it an Ada source file if its extension
-         --  is ".ad?".
-         return File /= null
-           and then File'Length >= 4
-           and then File (File'Last - 3 .. File'Last - 1) = ".ad";
-      end Is_Ada;
-
    begin
       --  Print the symbol name (demangled), removing file information. If it
-      --  is an Ada subprogram we demangle the subprogram name.
+      --  is an Ada/C++ subprogram we demangle the subprogram name.
 
-      --  Remove file information (look for the ":" separator between file
-      --  name and subprogram name).
-
-      GNAT.Regpat.Match ("(:)", Name.all, Matches);
-
-      if Matches (0) /= GNAT.Regpat.No_Match then
-         Name_First := Matches (1).Last + 1;
-      else
-         Name_First := Name'First;
-      end if;
-
-      --  Demangle if Ada subprogram
-
-      if Is_Ada (Node) then
-         Ada.Text_IO.Put
-           (File,
-            Demangle.Ada_Decode (Name.all (Name_First .. Name.all'Last)));
-      else
-         --  If not Ada code, try to decode it assuming it is C++
-
-         Ada.Text_IO.Put
-           (File,
-            Demangle.Cplus_Decode (Name.all (Name_First .. Name.all'Last)));
-      end if;
+      Ada.Text_IO.Put
+        (File, Static_Stack_Analysis.Get_Demangled_Name (Node.all).all);
    end Print_Source_Name;
 
    ----------------------
@@ -1221,7 +1164,10 @@ package body Display is
          Unresolved              => Unresolved,
          To_Undefined_File       => False);
 
-      if Unresolved then
+      --  In the undefined.ciu file we put the information only if the node
+      --  is reachable.
+
+      if Unresolved and then Node.Is_Reachable then
          Ada.Text_IO.Set_Output (Undefined_Descriptor);
 
          Print_Node
@@ -1239,7 +1185,12 @@ package body Display is
       Static_Stack_Analysis.List_Of_Edges.Iterate
         (Node.Target_Calls, Expand_Edge'Access);
 
-      if Indirect_Call_Status = Unknown_Indirect_Call then
+      --  In the undefined.ciu file we put the information only if the node
+      --  is reachable.
+
+      if Indirect_Call_Status = Unknown_Indirect_Call and then
+        Node.Is_Reachable
+      then
          Print_Edge
            (Source => Caller,
             Target => "XXX",
@@ -1571,7 +1522,7 @@ package body Display is
       --  be reachable via indirect calls).
 
       if Node.all in Static_Stack_Analysis.Unresolved_Node'Class
-        and then Node.Analysis_Finished then
+        and then Node.Is_Reachable then
          Ada.Text_IO.Put ("  ");
 
          Open_Tag ("external");
@@ -1650,7 +1601,7 @@ package body Display is
       --  entry points we do not display this node (although the subprogram may
       --  be reachable via indirect calls).
 
-      if not Indirect_Calls.Is_Empty and then Node.Analysis_Finished then
+      if not Indirect_Calls.Is_Empty and then Node.Is_Reachable then
          Ada.Text_IO.Put ("  ");
 
          Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
@@ -1690,7 +1641,7 @@ package body Display is
       --  be reachable via indirect calls).
 
       if Get_Stack_Usage (Node.all).Frame_Type = Unbounded
-        and then Node.Analysis_Finished
+        and then Node.Is_Reachable
       then
          Ada.Text_IO.Put ("  In ");
 
