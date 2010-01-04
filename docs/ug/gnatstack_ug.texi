@@ -936,19 +936,19 @@ and per-subprogram stack requirements:
 $ gnatstack -Wa -v -p *.ci
 [...]
 
-List of cycles:
+List of reachable cycles:
 
 <c1> p.q
  +-> p.q at Q:p.adb:11:14 : 144+? bytes (unbounded,cycle) (<c1>)
  +-> p.r at R:p.adb:9:14 : 104+? bytes (cycle) (<c1>)
  +-> p.q at Q:p.adb:11:14 : 144+? bytes (unbounded,cycle) (<c1>)
 
-List of subprograms with dynamic unbounded frames:
+List of reachable subprograms with dynamic unbounded frames:
 
-  In p.q at Q:p.adb:11:14 (not directly reachable)
+  In p.q at Q:p.adb:11:14
     Data at p.adb:12
 
-List of external subprograms:
+List of reachable external subprograms:
 
   ext.get_size at Get_Size:ext.ads:3:13
 
