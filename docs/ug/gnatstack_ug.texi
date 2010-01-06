@@ -196,10 +196,8 @@ point will need to be specified using the @option{-e} option (see
 
 @value{gnatstack} also generates a @emph{Visualization of Compiler Graphs}
 (VCG) file containing the complete call tree for the application,
-decorated with both local and accumulated stack usage
-information. The VCG graph description language (see
-@url{http://rw4.cs.uni-sb.de/users/sander/html/gsvcg1.html}) is used
-in GCC for other graph outputs.
+decorated with both local and accumulated stack usage information.
+The VCG graph description language is used in GCC for other graph outputs.
 
 Apart from the computation of worst-case stack requirements,
 @value{gnatstack} can also perform four additional types of analysis:
