@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -52,6 +52,20 @@ package body Static_Stack_Analysis is
    package Demangled_Keys is new
      List_Of_Nodes.Generic_Keys (String, Demangled_Key);
    --  Package used to find a subprogram by its demangled name
+
+   function Class_Name_Key (Element : Class_Access) return String;
+   --  Returns the mangled name of the class
+
+   package Class_Keys is new
+     List_Of_Classes.Generic_Keys (String, Class_Name_Key);
+   --  Package used to find a class by its mangled name
+
+   function Method_Name_Key (Element : Virtual_Class_Access) return String;
+   --  Returns the mangled name of the method
+
+   package Method_Keys is new
+     List_Of_Virtual_Methods.Generic_Keys (String, Method_Name_Key);
+   --  Package used to find a method by its mangled name
 
    ---------
    -- "+" --
@@ -251,6 +265,20 @@ package body Static_Stack_Analysis is
       end if;
    end Alphabetical_Order;
 
+   function Alphabetical_Order
+     (Left, Right : Virtual_Class_Access) return Boolean is
+   begin
+      if Left = null then
+         return Right /= null;
+
+      elsif Right = null then
+         return False;
+
+      else
+         return Left.Symbol_Name.all < Right.Symbol_Name.all;
+      end if;
+   end Alphabetical_Order;
+
    -----------
    -- Equal --
    -----------
@@ -280,6 +308,14 @@ package body Static_Stack_Analysis is
                  and then Left.all = Right.all);
    end Equal;
 
+   function Equal (Left, Right : Virtual_Class_Access) return Boolean is
+   begin
+      return (Left = null and then Right = null)
+        or else (Left /= null
+                 and then Right /= null
+                 and then Left.all = Right.all);
+   end Equal;
+
    ---------------------------------
    -- Get_Accumulated_Stack_Usage --
    ---------------------------------
@@ -289,6 +325,22 @@ package body Static_Stack_Analysis is
    begin
       return Target.Accumulated_Stack_Usage;
    end Get_Accumulated_Stack_Usage;
+
+   ---------------
+   -- Get_Class --
+   ---------------
+
+   function Get_Class (Class_Name : String) return Class_Access is
+   begin
+      --  Use the mangled name as the key to find in the list
+
+      if Class_Keys.Contains (Global_Data.List_Of_Classes, Class_Name) then
+         return Class_Keys.Element
+           (Global_Data.List_Of_Classes, Class_Name);
+      else
+         return null;
+      end if;
+   end Get_Class;
 
    -------------------------
    -- Get_Dynamic_Objects --
@@ -412,6 +464,22 @@ package body Static_Stack_Analysis is
       end if;
    end Get_Match;
 
+   ---------------
+   -- Get_Method --
+   ---------------
+
+   function Get_Method (Symbol : String) return Virtual_Class_Access is
+   begin
+      --  Use the mangled name as the key to find in the list
+
+      if Method_Keys.Contains (Global_Data.List_Of_Methods, Symbol) then
+         return Method_Keys.Element
+           (Global_Data.List_Of_Methods, Symbol);
+      else
+         return null;
+      end if;
+   end Get_Method;
+
    ---------------------
    -- Get_Stack_Usage --
    ---------------------
@@ -480,6 +548,112 @@ package body Static_Stack_Analysis is
       return Indirect_Call;
    end Get_Demangled_Name;
 
+   ------------------
+   -- Insert_Class --
+   ------------------
+
+   function Insert_Class
+     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
+      return Class_Access
+   is
+      This_Class : Class_Access := Get_Class (Symbol);
+
+   begin
+      if This_Class = null then
+         --  Create the object to store the class information
+
+         This_Class := new Class'
+           (Class_Name => new String'(Symbol),
+            Class_Loc  => Loc,
+            Parents    => List_Of_Classes.Empty_Set,
+            Derived    => List_Of_Classes.Empty_Set,
+            Virtual    => List_Of_Virtual_Methods.Empty_Set,
+            Inherited  => List_Of_Inherited_Methods.Empty_Vector);
+
+         --  Insert in the list
+
+         List_Of_Classes.Insert
+           (Global_Data.List_Of_Classes, This_Class);
+
+      else
+         --  The class has already been registered. If the class in being
+         --  defined now (Defined = True) then it should contain only the
+         --  class name information (otherwise it would mean that there is
+         --  duplicated information).
+
+         pragma Assert
+           (not Defined or else
+              (This_Class.Class_Name.all = Symbol and then
+               This_Class.Class_Loc = Null_Location and then
+               List_Of_Classes.Is_Empty (This_Class.Parents) and then
+               List_Of_Classes.Is_Empty (This_Class.Derived) and then
+               List_Of_Virtual_Methods.Is_Empty (This_Class.Virtual) and then
+               List_Of_Inherited_Methods.Is_Empty (This_Class.Inherited)));
+
+         null;
+      end if;
+
+      return This_Class;
+   end Insert_Class;
+
+   -------------------
+   -- Insert_Method --
+   -------------------
+
+   function Insert_Method
+     (Symbol : String; Slot : Slot_Number; Owner_Class : Class_Access)
+     return Virtual_Class_Access
+   is
+      Method : Virtual_Class_Access := Get_Method (Symbol);
+
+   begin
+      if Method = null then
+         --  The method is not yet in the list so we create it
+
+         Method := new Virtual'
+           (Method_Name => null,
+            Dispatcher => null,
+            Symbol_Name => new String'(Symbol),
+            Owner_Class => Owner_Class,
+            Slot => Slot,
+            Redefines_Class => null,
+            Redefines_Slot => Null_Slot,
+            Redefined_By => List_Of_Virtual_Methods.Empty_Set);
+
+         --  Insert in the list
+
+         List_Of_Virtual_Methods.Insert
+           (Global_Data.List_Of_Methods, Method);
+
+      else
+         --  The method has already been registered. It should contain
+         --  only the method name and slot information (otherwise it
+         --  would mean that there is duplicated information).
+
+         pragma Assert
+           (Method.Method_Name = null
+            and then
+            Method.Dispatcher = null
+            and then
+            Virtual (Method.all).Symbol_Name.all = Symbol
+            and then
+            Virtual (Method.all).Owner_Class = null
+            and then
+            Virtual (Method.all).Slot = Slot
+            and then
+            Virtual (Method.all).Redefines_Class = null
+            and then
+            Virtual (Method.all).Redefines_Slot = Null_Slot
+            and then
+            List_Of_Virtual_Methods.Is_Empty
+              (Virtual (Method.all).Redefined_By));
+
+         null;
+      end if;
+
+      return Method;
+   end Insert_Method;
+
    --------------
    -- Node_Key --
    --------------
@@ -517,6 +691,24 @@ package body Static_Stack_Analysis is
       return Ada.Characters.Handling.To_Lower
         (Get_Demangled_Name (Element.all).all);
    end Demangled_Key;
+
+   --------------------
+   -- Class_Name_Key --
+   --------------------
+
+   function Class_Name_Key (Element : Class_Access) return String is
+   begin
+      return Element.Class_Name.all;
+   end Class_Name_Key;
+
+   ---------------------
+   -- Method_Name_Key --
+   ---------------------
+
+   function Method_Name_Key (Element : Virtual_Class_Access) return String is
+   begin
+      return Element.Symbol_Name.all;
+   end Method_Name_Key;
 
    ---------------
    -- Normalize --

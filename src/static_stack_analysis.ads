@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -557,6 +557,19 @@ package Static_Stack_Analysis is
    --  Equality operation between two classes. They are equal if they contain
    --  the same information (name, methods, etc.).
 
+   function Get_Class (Class_Name : String) return Class_Access;
+   --  Retrieve a class using its encoded (mangled) name. Return null if the
+   --  class is not yet in the list.
+
+   function Insert_Class
+     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
+      return Class_Access;
+   --  Insert the class. It creates the descriptor for the class if it has
+   --  not yet been registered, or return the existing one. Defined is True
+   --  when the class is being defined (therefore we expect more information
+   --  to be present) and False when it is only being referenced by another
+   --  class.
+
    package List_Of_Classes is new
      Ada.Containers.Ordered_Sets (Class_Access, Alphabetical_Order, Equal);
    --  Types used to represent classes (tagged types)
@@ -569,8 +582,18 @@ package Static_Stack_Analysis is
    type Virtual;
    type Virtual_Class_Access is access all Virtual'Class;
 
+   function Alphabetical_Order
+     (Left, Right : Virtual_Class_Access) return Boolean;
+   --  Returns True if Left is alphabetically before Right, False otherwise.
+   --  It is used for ordering sets of classes alphabetically.
+
+   function Equal (Left, Right : Virtual_Class_Access) return Boolean;
+   --  Equality operation between two virtual methods. They are equal if they
+   --  contain the same information (name, slot, etc.).
+
    package List_Of_Virtual_Methods is new
-     Ada.Containers.Vectors (Natural, Virtual_Class_Access);
+     Ada.Containers.Ordered_Sets
+       (Virtual_Class_Access, Alphabetical_Order, Equal);
 
    type Inherited;
    type Inherited_Class_Access is access all Inherited'Class;
@@ -583,9 +606,12 @@ package Static_Stack_Analysis is
    --  tool to represent the notion of a node that may call the set of
    --  reachable overridden candidate for a dispatching call.
 
-   type Slot_Number is new Natural;
+   type Slot_Number is new Integer range -1 .. Integer'Last;
    --  Type which represents the position in the dispatching table of the
    --  different virtual methods.
+
+   Null_Slot : constant Slot_Number := -1;
+   --  Constant defining a non valid slot
 
    type Method is abstract tagged
       record
@@ -608,11 +634,15 @@ package Static_Stack_Analysis is
          Slot         : Slot_Number;
          --  Position in the dispatching table of the method
 
-         Redefines    : Virtual_Class_Access;
-         --  Method of the ancestor being overridden by this method. Null if
-         --  this is not an overridden method.
+         Redefines_Class : Class_Access;
+         --  Class from which this method is overridden. Null if this is not
+         --  an overridden method.
 
-         Redefined_By : List_Of_Virtual_Methods.Vector;
+         Redefines_Slot  : Slot_Number;
+         --  Slot being overridden by this method. Null_Slot if this is not
+         --  an overridden method.
+
+         Redefined_By : List_Of_Virtual_Methods.Set;
          --  List of methods which override this one. This is used to
          --  determine the set of potential targets for a dispatching call.
       end record;
@@ -628,10 +658,22 @@ package Static_Stack_Analysis is
    package List_Of_Inherited_Methods is new
      Ada.Containers.Vectors (Natural, Inherited_Class_Access);
 
+   function Get_Method (Symbol : String) return Virtual_Class_Access;
+   --  Return the method by its symbol name
+
+   function Insert_Method
+     (Symbol : String; Slot : Slot_Number; Owner_Class : Class_Access)
+      return Virtual_Class_Access;
+   --  Insert the method. It creates the descriptor for the method if it has
+   --  not yet been registered, or return the existing one.
+
    type Class is
       record
          Class_Name : Name;
          --  Name of the class (tagged type)
+
+         Class_Loc  : Location;
+         --  Demangled name and file location for the class
 
          Parents    : List_Of_Classes.Set;
          --  List of direct parents.
@@ -641,7 +683,7 @@ package Static_Stack_Analysis is
          --  only the direct descencent (children), but derived through the
          --  complete hierarchy (include grandchildren, ...).
 
-         Virtual    : List_Of_Virtual_Methods.Vector;
+         Virtual    : List_Of_Virtual_Methods.Set;
          --  List of virtual methods defined by the class (both new methods
          --  and overriding ones).
 
@@ -657,7 +699,7 @@ package Static_Stack_Analysis is
          Method : Name;
          --  Corresponding method name
 
-         Methods : List_Of_Virtual_Methods.Vector;
+         Methods : List_Of_Virtual_Methods.Set;
          --  List of potential targets of the dispatching call represented
 
          Node : Node_Id;

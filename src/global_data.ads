@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -58,6 +58,21 @@ package Global_Data is
      Static_Stack_Analysis.List_Of_Nodes.Empty_Set;
    --  List of all nodes under analysis
 
+   -------------
+   -- Classes --
+   -------------
+
+   List_Of_Classes : Static_Stack_Analysis.List_Of_Classes.Set :=
+     Static_Stack_Analysis.List_Of_Classes.Empty_Set;
+   --  List of all classes under analysis
+
+   -------------
+   -- Methods --
+   -------------
+
+   List_Of_Methods : Static_Stack_Analysis.List_Of_Virtual_Methods.Set :=
+     Static_Stack_Analysis.List_Of_Virtual_Methods.Empty_Set;
+   --  List of all virtual methods under analysis
    -------------
    -- Tasking --
    -------------

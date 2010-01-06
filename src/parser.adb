@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -180,7 +180,7 @@ package body Parser is
      "^class {" &
      " classname: ""([^""]*)""" &
      " label: ""([^""]*)""" &
-     "( parent: ""[^""]*"")??" &
+     "( parent: ""([^""]*)"")??" &
      " virtuals: ""([^""]*)""" &
      "\s*}";
    --  The information that is mandatory for a class is its name, location,
@@ -224,6 +224,10 @@ package body Parser is
    Edge_Label_Regexp : constant String :=
      "^ label: """ & Location_Regexp & """$";
    --  Extra information about an edge
+
+   Class_Label_Regexp : constant String :=
+     "([^\\]+)\\n([^:]+):([0-9]+)(:[0-9]+)??$";
+   --  Demangled name and location information in classes
 
    Subprogram_Location_Regexp : constant String :=
      "^(" & Location_Regexp & ")(,.+)*$";
@@ -287,7 +291,7 @@ package body Parser is
       Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of locations in source files.
-   --  Format: [filename:line:[column][,filename:line[:column]]
+   --  Format: [filename:line[:column][,filename:line[:column]]
 
    procedure Parse_Stack_Usage
      (Input : String; Stack : out Static_Stack_Analysis.Stack_Usage_Info);
@@ -310,6 +314,17 @@ package body Parser is
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of data locations in source files.
    --  Format: [\n name filename:line[\n name filename:line]]
+
+   procedure Parse_Class (Input : String);
+   --  Extract the information related to classes and related methods
+   --  Format:
+   --  class {
+   --   classname: "name"
+   --   label: "demangled_name\nfilename:line[:column]"
+   --   [parent: "classname_parent1[, classname_parent2]"]
+   --   virtuals: "slot_number:symbol_name[,slot_number:overrides_classname]
+   --   [\n slot_number:symbol_name[,slot_number:overrides_classname]]"
+   --  }
 
    -----------------------
    -- Add_Pattern_Entry --
@@ -1101,8 +1116,7 @@ package body Parser is
 
       --  Parsing class representation
       elsif GNAT.Regpat.Match (Class_Regexp, Input) then
-         --  ??? Nothing for the moment
-         null;
+         Parse_Class (Input);
 
       --  Get the Ada file name associated to the file being parsed
       elsif GNAT.Regpat.Match (Header_Regexp, Input) then
@@ -1918,6 +1932,287 @@ package body Parser is
          raise Parser_Error;
       end if;
    end Parse_Edge;
+
+   -----------------
+   -- Parse_Class --
+   -----------------
+
+   procedure Parse_Class (Input : String) is
+      use Static_Stack_Analysis;
+
+      Match_Class_Info : GNAT.Regpat.Match_Array (0 .. 5);
+
+      Match_Label      : GNAT.Regpat.Match_Array (0 .. 4);
+
+      This_Class       : Class_Access;
+
+      CName            : Name;
+
+      CLocation        : Location;
+
+      procedure Get_Parents (Input : String);
+      --  Get the list of parents class stored in the comma-separated list
+      --  passed as input.
+
+      procedure Get_Virtuals (Input : String);
+      --  Get the list of virtual methods for the class
+
+      procedure Get_Parents (Input : String) is
+         Name_Regexp   : constant String := "([^,]+)(, .*)??$";
+
+         Match_Parents : GNAT.Regpat.Match_Array (0 .. 2);
+
+         Parent        : Class_Access;
+
+      begin
+         GNAT.Regpat.Match (Name_Regexp, Input, Match_Parents);
+
+         if Match_Parents (0) /= GNAT.Regpat.No_Match and then
+           Match_Parents (1) /= GNAT.Regpat.No_Match
+         then
+            --  Look for the class in the list or insert it if not there yet
+
+            Parent :=
+              Insert_Class
+                (Symbol  =>
+                     Input (Match_Parents (1).First .. Match_Parents (1).Last),
+                 Defined => False,
+                 Loc     => Null_Location);
+
+            --  Insert the parent in the list of parents for the class being
+            --  processed.
+
+            This_Class.Parents.Insert (Parent);
+
+         else
+            raise Parser_Error with
+              "Cannot find class in parent list" & Input;
+         end if;
+
+         if Match_Parents (2) /= GNAT.Regpat.No_Match then
+            --  Continue extracting parents. Skip the ", ".
+
+            Get_Parents
+              (Input (Match_Parents (2).First + 2 .. Match_Parents (2).Last));
+         end if;
+      end Get_Parents;
+
+      procedure Get_Virtuals (Input : String) is
+         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n .+)??$";
+
+         Virtual_Info_Regexp : constant String :=
+           "([0-9]+):([^,:]+)(,([0-9]+):([^,:]+))??$";
+
+         Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
+
+         Match_Info          : GNAT.Regpat.Match_Array (0 .. 5);
+
+         Method              : Virtual_Class_Access := null;
+
+      begin
+         GNAT.Regpat.Match (Virtual_Set_Regexp, Input, Match_Virtual);
+
+         if Match_Virtual (0) /= GNAT.Regpat.No_Match and then
+           Match_Virtual (1) /= GNAT.Regpat.No_Match
+         then
+            --  Get the information (slot, symbol name, and possibly virtual
+            --  base) for the method.
+
+            GNAT.Regpat.Match
+              (Virtual_Info_Regexp,
+               Input (Match_Virtual (1).First .. Match_Virtual (1).Last),
+               Match_Info);
+
+            if Match_Info (0) /= GNAT.Regpat.No_Match then
+
+               pragma Assert
+                 (Match_Info (1) /= GNAT.Regpat.No_Match and then
+                  Match_Info (2) /= GNAT.Regpat.No_Match);
+
+               --  Look for the method in the list and create it if it is not
+               --  registered yet.
+
+               Method :=
+                 Insert_Method
+                   (Input (Match_Info (2).First .. Match_Info (2).Last),
+                    Slot_Number'Value
+                      (Input (Match_Info (1).First .. Match_Info (1).Last)),
+                    This_Class);
+
+               --  Virtual bases are not mandatory, because they appear only
+               --  when we are overriding.
+
+               if Match_Info (3) /= GNAT.Regpat.No_Match then
+                  --  This is the virtual base corresponding to this method.
+                  --  We need to add this to the list of virtual bases.
+
+                  pragma Assert
+                    (Match_Info (4) /= GNAT.Regpat.No_Match and then
+                     Match_Info (5) /= GNAT.Regpat.No_Match);
+
+                  --  Look for the ancestor class and create it if it is not
+                  --  registered yet.
+
+                  Method.Redefines_Class :=
+                    Insert_Class
+                      (Symbol =>
+                           Input (Match_Info (5).First .. Match_Info (5).Last),
+                       Defined => False,
+                       Loc => Null_Location);
+
+                  --  Then we need to specify the slot number. This information
+                  --  will be later use to look for the concrete method defined
+                  --  by the slot number.
+
+                  Method.Redefines_Slot :=
+                    Slot_Number'Value
+                      (Input (Match_Info (4).First .. Match_Info (4).Last));
+               end if;
+
+            else
+               raise Parser_Error with
+              "Cannot parse the virtual method: " & Input;
+            end if;
+
+         else
+            raise Parser_Error with
+              "Cannot parse virtual methods in: " & Input;
+         end if;
+
+         if Match_Virtual (2) /= GNAT.Regpat.No_Match then
+            --  Continue extracting virtual methods. Skip the "\n ".
+
+            Get_Virtuals
+              (Input (Match_Virtual (2).First + 3 .. Match_Virtual (2).Last));
+         end if;
+      end Get_Virtuals;
+
+   --  Start of processing for Parse_Class
+
+   begin
+      --  The pattern of the input line is:
+      --  class {
+      --   classname: "name"
+      --   label: "demangled_name\nfilename:line[:column]"
+      --   [parent: "classname_parent1[, classname_parent2]"]
+      --   virtuals: "slot_number:symbol_name[,slot_number:overrides_classname]
+      --   [\n slot_number:symbol_name[,slot_number:overrides_classname]]"
+      --  }
+      --
+      --  The name is the internal encoded (mangled) name of the class. This
+      --  is an unique identifier for the class.
+      --
+      --  The label contains the demangled name of the class plus its file
+      --  location.
+      --
+      --  The line with parent will appear only if the class is derived from
+      --  others. In this case, the list of parents (their internal encoded
+      --  (mangled) name) will be passed here as a comma-separated list.
+      --
+      --  The field virtuals contains the information about virtual functions
+      --  defined by the task. It is a list of methods, separated by \n, for
+      --  which we specify their corresponding position in the primary virtual
+      --  table, the symbol name corresponding to the method, and in the case
+      --  of being overriding a method, we identify the overridden method
+      --  specifying the class identifier to which the overridden method
+      --  belongs and its slot in the virtual table.
+
+      GNAT.Regpat.Match (Class_Regexp, Input, Match_Class_Info);
+
+      if Match_Class_Info (0) /= GNAT.Regpat.No_Match then
+         --  Get the name of the class and create the element to describe
+         --  the class
+
+         pragma Assert (Match_Class_Info (1) /= GNAT.Regpat.No_Match);
+
+         CName := new String'
+           (Input (Match_Class_Info (1).First .. Match_Class_Info (1).Last));
+
+         --  Get demangled name and file location
+
+         pragma Assert (Match_Class_Info (2) /= GNAT.Regpat.No_Match);
+
+         GNAT.Regpat.Match
+           (Class_Label_Regexp,
+            Input (Match_Class_Info (2).First .. Match_Class_Info (2).Last),
+            Match_Label);
+
+         if Match_Label (0) /= GNAT.Regpat.No_Match then
+            pragma Assert (Match_Label (1) /= GNAT.Regpat.No_Match);
+
+            CLocation.Demangled :=
+              new String'
+                (Input (Match_Label (1).First .. Match_Label (1).Last));
+
+            pragma Assert (Match_Label (2) /= GNAT.Regpat.No_Match);
+
+            CLocation.File :=
+              new String'
+                (Input (Match_Label (2).First .. Match_Label (2).Last));
+
+            pragma Assert (Match_Label (3) /= GNAT.Regpat.No_Match);
+
+            CLocation.Line_Number :=
+              Integer'Value
+                (Input (Match_Label (3).First .. Match_Label (3).Last));
+
+            --  The column number is not always there
+
+            if Match_Label (4) /= GNAT.Regpat.No_Match then
+               --  'First + 1 to skip the ":"
+
+               CLocation.Column_Number :=
+                 Integer'Value
+                   (Input (Match_Label (4).First + 1 .. Match_Label (4).Last));
+            else
+               CLocation.Column_Number := 0;
+            end if;
+
+         else
+            --  The label is malformed. This information is not required for
+            --  computing stack usage (it is only helpful to present the
+            --  results).
+
+            CLocation := Null_Location;
+
+            if Options.Debug then
+               Ada.Text_IO.Put_Line
+                 ("Could not parse label: " &
+                  Input
+                    (Match_Class_Info (2).First .. Match_Class_Info (2).Last));
+            end if;
+         end if;
+
+         --  Look for the class and create it if it is not registered yet
+
+         This_Class :=
+           Insert_Class
+             (Symbol => CName.all, Defined => True, Loc => CLocation);
+
+         --  Populate the list of parents, if any
+
+         if Match_Class_Info (3) /= GNAT.Regpat.No_Match then
+            --  This is a comma-separated list of class names
+
+            pragma Assert (Match_Class_Info (4) /= GNAT.Regpat.No_Match);
+
+            Get_Parents
+              (Input
+                 (Match_Class_Info (4).First .. Match_Class_Info (4).Last));
+         end if;
+
+         --  Get the list of virtual methods
+
+         pragma Assert (Match_Class_Info (5) /= GNAT.Regpat.No_Match);
+
+         Get_Virtuals
+           (Input (Match_Class_Info (5).First .. Match_Class_Info (5).Last));
+
+      else
+         raise Parser_Error with
+              "Cannot parse class" & Input;
+      end if;
+   end Parse_Class;
 
    ----------------------
    -- Parse_Input_File --
