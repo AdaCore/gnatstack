@@ -215,7 +215,7 @@ package body Parser is
    Node_Label_Regexp : constant String :=
      "^ label: " &
      """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?" &
-     "[a-zA-Z0-9_ \(\):,\*\&<>\[\]=~]*)??(\\n)??" &
+     "[a-zA-Z0-9_ \(\):,\*\&<>\[\]=~\+\-\|]*)??(\\n)??" &
      "(" & Location_Regexp & ",??)*" & "(\\n)??" &
      "(" & Stack_Regexp & ")??" &
      "(\\n[0-9]+ dynamic objects(\\n .*)??)??""$";
