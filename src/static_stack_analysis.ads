@@ -584,8 +584,8 @@ package Static_Stack_Analysis is
 
    function Alphabetical_Order
      (Left, Right : Virtual_Class_Access) return Boolean;
-   --  Returns True if Left is alphabetically before Right, False otherwise.
-   --  It is used for ordering sets of classes alphabetically.
+   --  Order by the name of the owner class, and then by the slot number
+   --  It is used for ordering sets of virtual methods alphabetically.
 
    function Equal (Left, Right : Virtual_Class_Access) return Boolean;
    --  Equality operation between two virtual methods. They are equal if they
@@ -613,6 +613,19 @@ package Static_Stack_Analysis is
    Null_Slot : constant Slot_Number := -1;
    --  Constant defining a non valid slot
 
+   type Vtable_Loc is
+      record
+         Class : Class_Access;
+         Slot  : Slot_Number;
+      end record;
+   --  Type used to identify virtual methods. It contains the class that
+   --  defines it (and hence the vtable) and its slot in the vtable.
+
+   Null_Vtable_Loc : constant Vtable_Loc := Vtable_Loc'(null, Null_Slot);
+   --  Constant defining a non valid pair class:slot
+
+   function "<" (Left, Right : Vtable_Loc) return Boolean;
+
    type Method is abstract tagged
       record
          Method_Name : Name;
@@ -625,22 +638,16 @@ package Static_Stack_Analysis is
 
    type Virtual is new Method with
       record
-         Symbol_Name : Name;
+         Symbol_Name  : Name;
          --  Associated symbol (in the object code) for the method
 
-         Owner_Class  : Class_Access;
-         --  Class (tagged type) that defines the method
+         Vtable_Entry : Vtable_Loc;
+         --  Class (tagged type) and position in the dispatching table that
+         --  define the method.
 
-         Slot         : Slot_Number;
-         --  Position in the dispatching table of the method
-
-         Redefines_Class : Class_Access;
-         --  Class from which this method is overridden. Null if this is not
-         --  an overridden method.
-
-         Redefines_Slot  : Slot_Number;
-         --  Slot being overridden by this method. Null_Slot if this is not
-         --  an overridden method.
+         Redefines    : Vtable_Loc;
+         --  Class and slot which this method is overriding. Null if this is
+         --  not an overridden method.
 
          Redefined_By : List_Of_Virtual_Methods.Set;
          --  List of methods which override this one. This is used to
@@ -658,12 +665,11 @@ package Static_Stack_Analysis is
    package List_Of_Inherited_Methods is new
      Ada.Containers.Vectors (Natural, Inherited_Class_Access);
 
-   function Get_Method (Symbol : String) return Virtual_Class_Access;
-   --  Return the method by its symbol name
+   function Get_Method (Id : Vtable_Loc) return Virtual_Class_Access;
+   --  Return the method by its class:slot information
 
    function Insert_Method
-     (Symbol : String; Slot : Slot_Number; Owner_Class : Class_Access)
-      return Virtual_Class_Access;
+     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access;
    --  Insert the method. It creates the descriptor for the method if it has
    --  not yet been registered, or return the existing one.
 

@@ -515,7 +515,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2009, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2010, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
@@ -2034,10 +2034,13 @@ package body Parser is
 
                Method :=
                  Insert_Method
-                   (Input (Match_Info (2).First .. Match_Info (2).Last),
-                    Slot_Number'Value
-                      (Input (Match_Info (1).First .. Match_Info (1).Last)),
-                    This_Class);
+                   (Id => Vtable_Loc'
+                             (This_Class,
+                              Slot_Number'Value
+                                 (Input (Match_Info (1).First ..
+                                         Match_Info (1).Last))),
+                    Symbol =>
+                      Input (Match_Info (2).First .. Match_Info (2).Last));
 
                --  Virtual bases are not mandatory, because they appear only
                --  when we are overriding.
@@ -2050,23 +2053,21 @@ package body Parser is
                     (Match_Info (4) /= GNAT.Regpat.No_Match and then
                      Match_Info (5) /= GNAT.Regpat.No_Match);
 
-                  --  Look for the ancestor class and create it if it is not
+                  --  Store the pair class:slot for the virtual base. Look
+                  --  for the ancestor class and create it if it is not
                   --  registered yet.
 
-                  Method.Redefines_Class :=
-                    Insert_Class
-                      (Symbol =>
-                           Input (Match_Info (5).First .. Match_Info (5).Last),
-                       Defined => False,
-                       Loc => Null_Location);
-
-                  --  Then we need to specify the slot number. This information
-                  --  will be later use to look for the concrete method defined
-                  --  by the slot number.
-
-                  Method.Redefines_Slot :=
-                    Slot_Number'Value
-                      (Input (Match_Info (4).First .. Match_Info (4).Last));
+                  Method.Redefines :=
+                    Vtable_Loc'
+                      (Insert_Class
+                         (Symbol =>
+                            Input (Match_Info (5).First ..
+                                   Match_Info (5).Last),
+                          Defined => False,
+                          Loc => Null_Location),
+                       Slot_Number'Value
+                         (Input (Match_Info (4).First ..
+                                 Match_Info (4).Last)));
                end if;
 
             else

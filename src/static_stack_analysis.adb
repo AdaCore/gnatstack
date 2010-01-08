@@ -60,12 +60,12 @@ package body Static_Stack_Analysis is
      List_Of_Classes.Generic_Keys (String, Class_Name_Key);
    --  Package used to find a class by its mangled name
 
-   function Method_Name_Key (Element : Virtual_Class_Access) return String;
-   --  Returns the mangled name of the method
+   function Vtable_Key (Element : Virtual_Class_Access) return Vtable_Loc;
+   --  Returns the pair class:slot of the method
 
    package Method_Keys is new
-     List_Of_Virtual_Methods.Generic_Keys (String, Method_Name_Key);
-   --  Package used to find a method by its mangled name
+     List_Of_Virtual_Methods.Generic_Keys (Vtable_Loc, Vtable_Key);
+   --  Package used to find a method by its pair class:slot
 
    ---------
    -- "+" --
@@ -122,6 +122,33 @@ package body Static_Stack_Analysis is
              Left.Unknown_Usage + Left.Cycle_Usage <
              Right.Static_Usage + Right.Dynamic_Usage +
              Right.Unknown_Usage + Right.Cycle_Usage;
+   end "<";
+
+   function "<" (Left, Right : Vtable_Loc) return Boolean is
+   begin
+      if Left.Class = null then
+         return Right.Class /= null;
+
+      elsif Right.Class = null then
+         return False;
+
+      elsif Left.Class.Class_Name = null then
+         return Right.Class.Class_Name /= null;
+
+      elsif Right.Class.Class_Name = null then
+         return False;
+
+      --  Order by the name of the class defining the method
+
+      elsif Left.Class.Class_Name.all /= Right.Class.Class_Name.all then
+         return Left.Class.Class_Name.all < Right.Class.Class_Name.all;
+
+      --  For methods defined by the same class, we use the slot number to
+      --  determine the order.
+
+      else
+         return Left.Slot < Right.Slot;
+      end if;
    end "<";
 
    ---------
@@ -274,8 +301,10 @@ package body Static_Stack_Analysis is
       elsif Right = null then
          return False;
 
+      --  Use the class:slot pair for ordering
+
       else
-         return Left.Symbol_Name.all < Right.Symbol_Name.all;
+         return Left.Vtable_Entry < Right.Vtable_Entry;
       end if;
    end Alphabetical_Order;
 
@@ -468,13 +497,12 @@ package body Static_Stack_Analysis is
    -- Get_Method --
    ---------------
 
-   function Get_Method (Symbol : String) return Virtual_Class_Access is
+   function Get_Method (Id : Vtable_Loc) return Virtual_Class_Access is
    begin
-      --  Use the mangled name as the key to find in the list
+      --  Use the class:slot pair as the key to find in the list
 
-      if Method_Keys.Contains (Global_Data.List_Of_Methods, Symbol) then
-         return Method_Keys.Element
-           (Global_Data.List_Of_Methods, Symbol);
+      if Method_Keys.Contains (Global_Data.List_Of_Methods, Id) then
+         return Method_Keys.Element (Global_Data.List_Of_Methods, Id);
       else
          return null;
       end if;
@@ -578,19 +606,21 @@ package body Static_Stack_Analysis is
       else
          --  The class has already been registered. If the class in being
          --  defined now (Defined = True) then it should contain only the
-         --  class name information (otherwise it would mean that there is
-         --  duplicated information).
+         --  class name information, and the location must either be null
+         --  or the same as we are inserting.
 
          pragma Assert
            (not Defined or else
               (This_Class.Class_Name.all = Symbol and then
-               This_Class.Class_Loc = Null_Location and then
-               List_Of_Classes.Is_Empty (This_Class.Parents) and then
-               List_Of_Classes.Is_Empty (This_Class.Derived) and then
-               List_Of_Virtual_Methods.Is_Empty (This_Class.Virtual) and then
-               List_Of_Inherited_Methods.Is_Empty (This_Class.Inherited)));
+                 (This_Class.Class_Loc = Null_Location or else
+                  This_Class.Class_Loc = Loc)));
 
-         null;
+         --  Update the location if needed
+
+         if This_Class.Class_Loc = Null_Location then
+            This_Class.Class_Loc := Loc;
+         end if;
+
       end if;
 
       return This_Class;
@@ -601,23 +631,20 @@ package body Static_Stack_Analysis is
    -------------------
 
    function Insert_Method
-     (Symbol : String; Slot : Slot_Number; Owner_Class : Class_Access)
-     return Virtual_Class_Access
+     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access
    is
-      Method : Virtual_Class_Access := Get_Method (Symbol);
+      Method : Virtual_Class_Access := Get_Method (Id);
 
    begin
       if Method = null then
          --  The method is not yet in the list so we create it
 
          Method := new Virtual'
-           (Method_Name => null,
-            Dispatcher => null,
-            Symbol_Name => new String'(Symbol),
-            Owner_Class => Owner_Class,
-            Slot => Slot,
-            Redefines_Class => null,
-            Redefines_Slot => Null_Slot,
+           (Method_Name  => null,
+            Dispatcher   => null,
+            Symbol_Name  => new String'(Symbol),
+            Vtable_Entry => Id,
+            Redefines    => Null_Vtable_Loc,
             Redefined_By => List_Of_Virtual_Methods.Empty_Set);
 
          --  Insert in the list
@@ -627,28 +654,20 @@ package body Static_Stack_Analysis is
 
       else
          --  The method has already been registered. It should contain
-         --  only the method name and slot information (otherwise it
-         --  would mean that there is duplicated information).
+         --  at least the owner class and slot number. The symbol name must be
+         --  either void or the same as we are inserting.
 
          pragma Assert
-           (Method.Method_Name = null
-            and then
-            Method.Dispatcher = null
-            and then
-            Virtual (Method.all).Symbol_Name.all = Symbol
-            and then
-            Virtual (Method.all).Owner_Class = null
-            and then
-            Virtual (Method.all).Slot = Slot
-            and then
-            Virtual (Method.all).Redefines_Class = null
-            and then
-            Virtual (Method.all).Redefines_Slot = Null_Slot
-            and then
-            List_Of_Virtual_Methods.Is_Empty
-              (Virtual (Method.all).Redefined_By));
+           (Method.Vtable_Entry = Id and then
+              (Method.Symbol_Name = null or else
+               Method.Symbol_Name.all = Symbol));
 
-         null;
+         --  Update the symbol name if needed
+
+         if Method.Symbol_Name = null then
+            Method.Symbol_Name := new String'(Symbol);
+         end if;
+
       end if;
 
       return Method;
@@ -701,14 +720,14 @@ package body Static_Stack_Analysis is
       return Element.Class_Name.all;
    end Class_Name_Key;
 
-   ---------------------
-   -- Method_Name_Key --
-   ---------------------
+   ----------------
+   -- Vtable_Key --
+   ----------------
 
-   function Method_Name_Key (Element : Virtual_Class_Access) return String is
+   function Vtable_Key (Element : Virtual_Class_Access) return Vtable_Loc is
    begin
-      return Element.Symbol_Name.all;
-   end Method_Name_Key;
+      return Element.Vtable_Entry;
+   end Vtable_Key;
 
    ---------------
    -- Normalize --
