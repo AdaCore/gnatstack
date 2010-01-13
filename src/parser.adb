@@ -234,7 +234,7 @@ package body Parser is
    --  Comma-separated list of locations
 
    Data_Location_Regexp : constant String :=
-     "^\\n ([a-zA-Z0-9 \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
+     "^\\n ([a-zA-Z0-9_ \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
    --  Location of an unbounded object
 
    Entry_Regexp : constant String :=
