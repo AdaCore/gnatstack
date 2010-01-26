@@ -161,8 +161,8 @@ package body Parser is
    Node_Regexp : constant String :=
      "^node: {" &
      " title: ""([^""]+)""" &
-     "( label: ""[^""]*"")??" &
-     "( shape : \w*)??" &
+     "( label: ""[^""]*"")?" &
+     "( shape : \w*)?" &
      "\s*}";
    --  The information that is mandatory for a node is the title which
    --  represents the subprogram symbol.
@@ -171,7 +171,7 @@ package body Parser is
      "^edge: {" &
      "\s*sourcename: ""([^""]*)""" &
      "\s*targetname: ""([^""]*)""" &
-     "(\s*label: "".*""| priority: .*)??" &
+     "(\s*label: "".*""| priority: .*)?" &
      "\s*}";
    --  The information that is mandatory for an edge is the symbols associated
    --  to the subprograms acting as caller and callee.
@@ -180,7 +180,7 @@ package body Parser is
      "^class {" &
      "\s*classname: ""([^""]*)""" &
      "\s*label: ""([^""]*)""" &
-     "(\s*parent: ""([^""]*)"")??" &
+     "(\s*parent: ""([^""]*)"")?" &
      "\s*virtuals: ""([^""]*)""" &
      "\s*}";
    --  The information that is mandatory for a class is its name, location,
@@ -199,26 +199,26 @@ package body Parser is
    Location_Regexp : constant String :=
      "(<no location>)|" &
      "(<built-in>)|" &
-     "((([a-zA-Z0-9_/ \.~\-\+]+)|" &  -- Unix-style
-     "([a-zA-Z]:[\\/][a-zA-Z0-9_\\/ \.~\-\+]+)|" &  -- UNC-style
-     "(\\\\[a-zA-Z0-9_\\ \.~\-\+]+))" &  -- cygwin-style
-     ":([0-9]+)(:[0-9]+)??)";
+     "((([\w/ \.~\-\+]+)|" &  -- Unix-style
+     "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
+     "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
+     ":(\d+)(:\d+)?)";
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
    --  cygwin-style (drive_letter:/path). There is also .extension for the
    --  file, and file location (:line[:column]).
 
    Stack_Regexp : constant String :=
-     "([0-9]+)+ bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))??";
+     "(\d+) bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))?";
    --  At least the size in bytes
 
    Node_Label_Regexp : constant String :=
      "^ label: " &
-     """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?" &
-     "[a-zA-Z0-9_ \(\):,\*\&<>\[\]=~\+\-\|]*)??(\\n)??" &
-     "(" & Location_Regexp & ",??)*" & "(\\n)??" &
-     "(" & Stack_Regexp & ")??" &
-     "(\\n[0-9]+ dynamic objects(\\n .*)??)??""$";
+     """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?" &  -- Unary operators
+     "[\w \(\):,\*\&<>\[\]=~\+\-\|]*)?(\\n)?" &
+     "(" & Location_Regexp & ",?)*" & "(\\n)?" &
+     "(" & Stack_Regexp & ")?" &
+     "(\\n\d+ dynamic objects(\\n .*)?)?""$";
    --  Extra information about a node
 
    Edge_Label_Regexp : constant String :=
@@ -226,7 +226,7 @@ package body Parser is
    --  Extra information about an edge
 
    Class_Label_Regexp : constant String :=
-     "([^\\]+)\\n([^:]+):([0-9]+)(:[0-9]+)??$";
+     "([^\\]+)\\n([^:]+):(\d+)(:\d+)?$";
    --  Demangled name and location information in classes
 
    Subprogram_Location_Regexp : constant String :=
@@ -234,7 +234,7 @@ package body Parser is
    --  Comma-separated list of locations
 
    Data_Location_Regexp : constant String :=
-     "^\\n ([a-zA-Z0-9_ \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
+     "^\\n ([\w \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
    --  Location of an unbounded object
 
    Entry_Regexp : constant String :=
@@ -247,7 +247,7 @@ package body Parser is
    --  Subprograms called to create tasks
 
    Dispatching_Regexp : constant String :=
-     "([\-]??[0-9]+):([^:,]+),([^:]+)";
+     "([\-]?\d+):([^:,]+),([^:]+)";
    --  Look for triple slot:base_class,static_class
 
    ------------------------
@@ -2064,7 +2064,7 @@ package body Parser is
       --  Get the list of virtual methods for the class
 
       procedure Get_Parents (Input : String) is
-         Name_Regexp   : constant String := "([^,]+)(, .*)??$";
+         Name_Regexp   : constant String := "([^,]+)(, .*)?$";
 
          Match_Parents : GNAT.Regpat.Match_Array (0 .. 2);
 
@@ -2105,10 +2105,10 @@ package body Parser is
       end Get_Parents;
 
       procedure Get_Virtuals (Input : String) is
-         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)??$";
+         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)?$";
 
          Virtual_Info_Regexp : constant String :=
-           "([\-]??[0-9]+):([^,:]+)(,([0-9]+):([^,:]+))??$";
+           "([\-]?\d+):([^,:]+)(,(\d+):([^,:]+))?$";
 
          Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
 
