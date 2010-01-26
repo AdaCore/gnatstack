@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2008, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,6 +20,7 @@
 ------------------------------------------------------------------------------
 
 with Global_Data;
+with Dispatching_Calls;
 
 package body Worst_Case_Analyzer is
 
@@ -70,6 +71,8 @@ package body Worst_Case_Analyzer is
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
+      use Static_Stack_Analysis;
+
    begin
       --  Check against cycles
 
@@ -88,7 +91,19 @@ package body Worst_Case_Analyzer is
             --  calls (getting their accumulated stack usage) and then order
             --  these calls according to to the previously computed value.
 
-            --  Iterate
+            --  If the node is an artificial dispatching node, we need to
+            --  verify whether we have all the potential targets. If the
+            --  information is not there yet we compute and store it.
+
+            if Explored_Node.all in Dispatching_Node'Class and then
+              List_Of_Edges.Is_Empty (Explored_Node.Target_Calls)
+            then
+               Explored_Node.Target_Calls :=
+                 Dispatching_Calls.Get_Overriding_Methods
+                   (Dispatching_Node (Explored_Node.all));
+            end if;
+
+            --  Iterate over every call from this node
 
             Static_Stack_Analysis.List_Of_Edges.Iterate
               (Explored_Node.Target_Calls, Worst_Case_For_Call'Access);

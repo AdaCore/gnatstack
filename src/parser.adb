@@ -169,19 +169,19 @@ package body Parser is
 
    Edge_Regexp : constant String :=
      "^edge: {" &
-     " sourcename: ""([^""]*)""" &
-     " targetname: ""([^""]*)""" &
-     "( label: "".*""| priority: .*)??" &
+     "\s*sourcename: ""([^""]*)""" &
+     "\s*targetname: ""([^""]*)""" &
+     "(\s*label: "".*""| priority: .*)??" &
      "\s*}";
    --  The information that is mandatory for an edge is the symbols associated
    --  to the subprograms acting as caller and callee.
 
    Class_Regexp : constant String :=
      "^class {" &
-     " classname: ""([^""]*)""" &
-     " label: ""([^""]*)""" &
-     "( parent: ""([^""]*)"")??" &
-     " virtuals: ""([^""]*)""" &
+     "\s*classname: ""([^""]*)""" &
+     "\s*label: ""([^""]*)""" &
+     "(\s*parent: ""([^""]*)"")??" &
+     "\s*virtuals: ""([^""]*)""" &
      "\s*}";
    --  The information that is mandatory for a class is its name, location,
    --  set of virtual functions (we represent only the hierarchy of
@@ -222,7 +222,7 @@ package body Parser is
    --  Extra information about a node
 
    Edge_Label_Regexp : constant String :=
-     "^ label: """ & Location_Regexp & """$";
+     "^\s*label: """ & Location_Regexp & """$";
    --  Extra information about an edge
 
    Class_Label_Regexp : constant String :=
@@ -245,6 +245,10 @@ package body Parser is
    Create_Ravenscar_Task : constant String :=
      "system__tasking__restricted__stages__create_restricted_task";
    --  Subprograms called to create tasks
+
+   Dispatching_Regexp : constant String :=
+     "([\-]??[0-9]+):([^:,]+),([^:]+)";
+   --  Look for triple slot:base_class,static_class
 
    ------------------------
    -- Parsing operations --
@@ -306,7 +310,8 @@ package body Parser is
    procedure Parse_Edge (Input : String);
    --  Get caller and callee in a subprogram call. It may also contain the
    --  location of the call. Format :
-   --  ^edge: { sourcename: "symbol_name" targetname: "symbol_name"
+   --  ^edge: { sourcename: "symbol_name"
+   --  targetname: "symbol_name|vtable_entry"
    --  [label: "location" ] }
 
    procedure Parse_Dynamic_Objects
@@ -1652,21 +1657,22 @@ package body Parser is
    procedure Parse_Edge (Input : String) is
       use Static_Stack_Analysis;
 
-      Matches      : GNAT.Regpat.Match_Array (0 .. 3);
-      Loc_Matches  : GNAT.Regpat.Match_Array (0 .. 9);
+      Matches          : GNAT.Regpat.Match_Array (0 .. 3);
+      Loc_Matches      : GNAT.Regpat.Match_Array (0 .. 9);
+      Dispatch_Matches : GNAT.Regpat.Match_Array (0 .. 3);
 
-      Source_Id    : Static_Stack_Analysis.Node_Id;
-      Target_Id    : Static_Stack_Analysis.Node_Id;
+      Source_Id        : Static_Stack_Analysis.Node_Id;
+      Target_Id        : Static_Stack_Analysis.Node_Id;
 
-      Source_Ptr   : Static_Stack_Analysis.Node_Class_Access;
-      Target_Ptr   : Static_Stack_Analysis.Node_Class_Access;
+      Source_Ptr       : Static_Stack_Analysis.Node_Class_Access;
+      Target_Ptr       : Static_Stack_Analysis.Node_Class_Access;
 
-      Tmp_Location : Static_Stack_Analysis.Location :=
+      Tmp_Location     : Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.Null_Location;
 
-      New_Node     : Boolean := False;
+      New_Node         : Boolean := False;
 
-      Symbol_Name  : Name;
+      Symbol_Name      : Name;
 
       procedure Mark_As_Called
         (Target : Static_Stack_Analysis.Node_Class_Access);
@@ -1684,113 +1690,11 @@ package body Parser is
       --  edge: { sourcename: "([^"]*)" targetname: "([^"]*)"
       --  ( label: ".*"| priority: .*)?? }
 
-      --  Get source and target
+      --  Get source, target and location
 
       GNAT.Regpat.Match (Edge_Regexp, Input, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         --  Look for the source node in the list, or create the node if it
-         --  does not exist yet.
-
-         Source_Id := Get_Node (Input (Matches (1).First .. Matches (1).Last));
-
-         Symbol_Name :=
-           new String'(Input (Matches (1).First .. Matches (1).Last));
-
-         if not List_Of_Nodes.Has_Element (Source_Id) then
-
-            Source_Ptr := new Unresolved_Node'
-              (Ada_File_Name           => Ada_File_Name,
-               Target_Calls            => List_Of_Edges.Empty_Vector,
-               Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Location_List           => List_Of_Locations.Empty_Set,
-               Subprogram              => Symbol_Name,
-               Demangled               =>
-                  new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
-               Under_Analysis          => False,
-               Analysis_Finished       => False,
-               Is_Called               => False,
-               Is_Reachable            => False,
-               Cycles                  => List_Of_Cycles.Empty_Set);
-
-            Global_Data.List_Of_Subprograms.Insert
-              (Source_Ptr, Source_Id, New_Node);
-
-            pragma Assert (New_Node);
-         else
-            --  Get the node so we can add the new information later on
-
-            Source_Ptr := List_Of_Nodes.Element (Source_Id);
-         end if;
-
-         --  Look for the target node in the list, or create the node if it
-         --  does not exist yet.
-
-         --  Create an indirect node for an indirect call
-         if
-           Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
-         then
-            Target_Ptr := new Indirect_Node'
-              (Ada_File_Name           => Ada_File_Name,
-               Target_Calls            => List_Of_Edges.Empty_Vector,
-               Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Under_Analysis          => False,
-               Analysis_Finished       => False,
-               Is_Called               => True,
-               Is_Reachable            => False,
-               Cycles                  => List_Of_Cycles.Empty_Set);
-
-            Global_Data.List_Of_Subprograms.Insert
-              (Target_Ptr, Target_Id, New_Node);
-
-            --  ??? For the moment we create the same indirect node for all
-            --  indirect calls. We should create different ones, but there
-            --  is no means yet to distinguish them. It will be possible when
-            --  we add the location to the calls.
-
-            --  pragma Assert (New_Node);
-
-         else
-            Target_Id :=
-              Get_Node (Input (Matches (2).First .. Matches (2).Last));
-
-            if List_Of_Nodes.Has_Element (Target_Id) then
-               --  Mark the subprogram as called by another
-
-               Static_Stack_Analysis.List_Of_Nodes.Query_Element
-                 (Target_Id, Mark_As_Called'Access);
-
-            --  This node is considered unresolved for the moment. It can be
-            --  later modified if we find more information.
-            else
-               Symbol_Name :=
-                 new String'(Input (Matches (2).First .. Matches (2).Last));
-
-               Target_Ptr := new Unresolved_Node'
-                 (Ada_File_Name           => Ada_File_Name,
-                  Target_Calls            => List_Of_Edges.Empty_Vector,
-                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                  Location_List           => List_Of_Locations.Empty_Set,
-                  Subprogram              => Symbol_Name,
-                  Demangled               =>
-                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
-                  Under_Analysis          => False,
-                  Analysis_Finished       => False,
-                  Is_Called               => True,
-                  Is_Reachable            => False,
-                  Cycles                  => List_Of_Cycles.Empty_Set);
-
-               Global_Data.List_Of_Subprograms.Insert
-                 (Target_Ptr, Target_Id, New_Node);
-
-               pragma Assert (New_Node);
-            end if;
-         end if;
-
-         if New_Node then
-            Display.Increase_Count (Global_Data.Subprogram);
-         end if;
-
          --  Get the location of this call
 
          if Matches (3) /= GNAT.Regpat.No_Match and then
@@ -1858,6 +1762,206 @@ package body Parser is
                ": Could not parse the label");
          end if;
 
+         --  Look for the source node in the list, or create the node if it
+         --  does not exist yet.
+
+         Source_Id := Get_Node (Input (Matches (1).First .. Matches (1).Last));
+
+         Symbol_Name :=
+           new String'(Input (Matches (1).First .. Matches (1).Last));
+
+         if not List_Of_Nodes.Has_Element (Source_Id) then
+
+            Source_Ptr := new Unresolved_Node'
+              (Ada_File_Name           => Ada_File_Name,
+               Target_Calls            => List_Of_Edges.Empty_Vector,
+               Accumulated_Stack_Usage => Unknown_Stack_Usage,
+               Location_List           => List_Of_Locations.Empty_Set,
+               Subprogram              => Symbol_Name,
+               Demangled               =>
+                  new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+               Under_Analysis          => False,
+               Analysis_Finished       => False,
+               Is_Called               => False,
+               Is_Reachable            => False,
+               Cycles                  => List_Of_Cycles.Empty_Set);
+
+            Global_Data.List_Of_Subprograms.Insert
+              (Source_Ptr, Source_Id, New_Node);
+
+            pragma Assert (New_Node);
+         else
+            --  Get the node so we can add the new information later on
+
+            Source_Ptr := List_Of_Nodes.Element (Source_Id);
+         end if;
+
+         --  Look for the target node in the list, or create the node if it
+         --  does not exist yet.
+
+         --  The target node may be a regular subprogram, a general indirect
+         --  call, or a dispatching call with the format
+         --  slot:base_class:static_class.
+
+         GNAT.Regpat.Match
+           (Dispatching_Regexp,
+            Input (Matches (2).First .. Matches (2).Last),
+            Dispatch_Matches);
+
+         --  Target is a dispatching call
+         if Dispatch_Matches (0) /= GNAT.Regpat.No_Match then
+            declare
+               Base_Class_Name : String renames
+                 Input
+                   (Dispatch_Matches (2).First .. Dispatch_Matches (2).Last);
+
+               Static_Class_Name : String renames
+                 Input
+                   (Dispatch_Matches (3).First .. Dispatch_Matches (3).Last);
+
+               Slot_String : String renames
+                 Input
+                   (Dispatch_Matches (1).First .. Dispatch_Matches (1).Last);
+
+               Slot : constant Slot_Number := Slot_Number'Value (Slot_String);
+
+            begin
+               --  Check whether there is already a dispatching call node
+               --  with the same triple slot:base_class:static_class
+
+               Target_Id :=
+                 Get_Node (Base_Class_Name & Slot_String & Static_Class_Name);
+
+               if List_Of_Nodes.Has_Element (Target_Id) then
+                  Target_Ptr := List_Of_Nodes.Element (Target_Id);
+
+                  pragma Assert (Target_Ptr.all in Dispatching_Node);
+
+                  declare
+                     Node : Dispatching_Node renames
+                       Dispatching_Node (Target_Ptr.all);
+
+                  begin
+                     --  Add this location
+
+                     Node.Location_List.Include (Tmp_Location);
+
+                     --  Verify that the information that we have corresponds
+                     --  to the information that is stored.
+
+                     pragma Assert
+                       (Node.Slot = Slot
+                           and then
+                        Node.Base_Class.Class_Name.all = Base_Class_Name
+                           and then
+                        Node.Static_Class.Class_Name.all = Static_Class_Name);
+                  end;
+
+               else
+                  --  We need to create the node
+
+                  --  ??? Note that in the location we need to add a demangled
+                  --  name to identify the node representing the dispatching
+                  --  call. It is not clear how to represent a node which is
+                  --  defined by a triple slot:base_class:static_class. We
+                  --  leave the demangled field empty for now.
+
+                  Target_Ptr := new Dispatching_Node'
+                    (Ada_File_Name           => Ada_File_Name,
+                     Location_List           =>
+                       List_Of_Locations.To_Set (Tmp_Location),
+                     Target_Calls            => List_Of_Edges.Empty_Vector,
+                     Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                     Slot                    => Slot,
+                     Base_Class              =>
+                       Insert_Class (Symbol  => Base_Class_Name,
+                                     Defined => False,
+                                     Loc     => Null_Location),
+                     Static_Class            =>
+                       Insert_Class (Symbol  => Static_Class_Name,
+                                     Defined => False,
+                                     Loc     => Null_Location),
+                     Internal_Name           =>
+                     new String'
+                       (Base_Class_Name & Slot_String & Static_Class_Name),
+                     Under_Analysis          => False,
+                     Analysis_Finished       => False,
+                     Is_Called               => True,
+                     Is_Reachable            => False,
+                     Cycles                  => List_Of_Cycles.Empty_Set);
+
+                  Global_Data.List_Of_Subprograms.Insert
+                    (Target_Ptr, Target_Id, New_Node);
+
+                  pragma Assert (New_Node);
+               end if;
+            end;
+
+         --  Create an indirect node for an indirect call
+         elsif
+           Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
+         then
+            Target_Ptr := new Indirect_Node'
+              (Ada_File_Name           => Ada_File_Name,
+               Target_Calls            => List_Of_Edges.Empty_Vector,
+               Accumulated_Stack_Usage => Unknown_Stack_Usage,
+               Under_Analysis          => False,
+               Analysis_Finished       => False,
+               Is_Called               => True,
+               Is_Reachable            => False,
+               Cycles                  => List_Of_Cycles.Empty_Set);
+
+            Global_Data.List_Of_Subprograms.Insert
+              (Target_Ptr, Target_Id, New_Node);
+
+            --  ??? For the moment we create the same indirect node for all
+            --  indirect calls. We should create different ones, but there
+            --  is no means yet to distinguish them. It will be possible when
+            --  we add the location to the calls.
+
+            --  pragma Assert (New_Node);
+
+         else
+            Target_Id :=
+              Get_Node (Input (Matches (2).First .. Matches (2).Last));
+
+            if List_Of_Nodes.Has_Element (Target_Id) then
+               --  Mark the subprogram as called by another
+
+               Static_Stack_Analysis.List_Of_Nodes.Query_Element
+                 (Target_Id, Mark_As_Called'Access);
+
+            --  This node is considered unresolved for the moment. It can be
+            --  later modified if we find more information.
+            else
+               Symbol_Name :=
+                 new String'(Input (Matches (2).First .. Matches (2).Last));
+
+               Target_Ptr := new Unresolved_Node'
+                 (Ada_File_Name           => Ada_File_Name,
+                  Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Location_List           => List_Of_Locations.Empty_Set,
+                  Subprogram              => Symbol_Name,
+                  Demangled               =>
+                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                  Under_Analysis          => False,
+                  Analysis_Finished       => False,
+                  Is_Called               => True,
+                  Is_Reachable            => False,
+                  Cycles                  => List_Of_Cycles.Empty_Set);
+
+               Global_Data.List_Of_Subprograms.Insert
+                 (Target_Ptr, Target_Id, New_Node);
+
+               pragma Assert (New_Node);
+            end if;
+         end if;
+
+         if New_Node then
+            Display.Increase_Count (Global_Data.Subprogram);
+         end if;
+
          --  Now we need to check whether there is already an edge joining
          --  these two subprograms. We add the new location if the node exists,
          --  or create a new edge otherwise. For indirect calls we keep the
@@ -1915,6 +2019,8 @@ package body Parser is
             if not Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) then
                --  Create new edge with the information that we have about the
                --  source and the target.
+
+               pragma Assert (List_Of_Nodes.Has_Element (Target_Id));
 
                Static_Stack_Analysis.List_Of_Edges.Append
                  (Source_Ptr.Target_Calls,
@@ -1980,9 +2086,10 @@ package body Parser is
                  Loc     => Null_Location);
 
             --  Insert the parent in the list of parents for the class being
-            --  processed.
+            --  processed. Use Include instead of Insert because the class
+            --  may be in the set already.
 
-            This_Class.Parents.Insert (Parent);
+            This_Class.Parents.Include (Parent);
 
          else
             raise Parser_Error with
@@ -1998,10 +2105,10 @@ package body Parser is
       end Get_Parents;
 
       procedure Get_Virtuals (Input : String) is
-         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n .+)??$";
+         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)??$";
 
          Virtual_Info_Regexp : constant String :=
-           "([0-9]+):([^,:]+)(,([0-9]+):([^,:]+))??$";
+           "([\-]??[0-9]+):([^,:]+)(,([0-9]+):([^,:]+))??$";
 
          Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
 
@@ -2041,6 +2148,12 @@ package body Parser is
                                          Match_Info (1).Last))),
                     Symbol =>
                       Input (Match_Info (2).First .. Match_Info (2).Last));
+
+               --  Add this method to the list of methods belonging to the
+               --  class. Use Include instead of Insert because the method
+               --  may be in the set already.
+
+                  This_Class.Virtual.Include (Method);
 
                --  Virtual bases are not mandatory, because they appear only
                --  when we are overriding.
@@ -2089,7 +2202,6 @@ package body Parser is
       end Get_Virtuals;
 
    --  Start of processing for Parse_Class
-
    begin
       --  The pattern of the input line is:
       --  class {

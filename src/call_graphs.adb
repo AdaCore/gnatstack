@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -318,6 +318,7 @@ package body Call_Graphs is
          Cycle_Counter := Cycle_Counter + 1;
       end Tag_Cycle;
 
+   --  Start of processing for Analyze_Call_Graph
    begin
       --  Iterate over all the subprograms
 

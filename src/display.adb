@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2009, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -278,19 +278,21 @@ package body Display is
    begin
       --  Demangled name
 
-      Ada.Text_IO.Put (Location.Demangled.all);
+      if Location.Demangled /= null then
+         Ada.Text_IO.Put (Location.Demangled.all);
 
-      --  Separator between the Ada name and the file location
+         --  Separator between the Ada name and the file location
 
-      if Ada.Text_IO.Name (Ada.Text_IO.Current_Output) =
-        Ada.Text_IO.Name (Ada.Text_IO.Standard_Output)
-      then
-         --  Separator for the regular output
-         Ada.Text_IO.Put (":");
+         if Ada.Text_IO.Name (Ada.Text_IO.Current_Output) =
+           Ada.Text_IO.Name (Ada.Text_IO.Standard_Output)
+         then
+            --  Separator for the regular output
+            Ada.Text_IO.Put (":");
 
-      else
-         --  Separator for the VCG files
-         Ada.Text_IO.Put ("\n");
+         else
+            --  Separator for the VCG files
+            Ada.Text_IO.Put ("\n");
+         end if;
       end if;
 
       --  File location

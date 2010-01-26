@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -24,6 +24,7 @@ with Worst_Case_Analyzer;
 with Display;
 with Call_Graphs;
 with Global_Data;
+with Dispatching_Calls;
 
 with Ada.Text_IO;
 
@@ -33,6 +34,18 @@ begin
 
    Global_Data.Phase := Global_Data.Parse;
    Parser.Parse_Arguments;
+
+   --  Resolve information about dispatching calls
+
+   Global_Data.Phase := Global_Data.Dispatching_Calls;
+
+   --  Create the list of derived classes for every base class
+
+   Dispatching_Calls.Create_Class_Hierarchies;
+
+   --  Compute the list of methods which override every virtual method
+
+   Dispatching_Calls.Create_Method_Hierarchies;
 
    --  Do accuracy analysis of the graph and extract entry points
 

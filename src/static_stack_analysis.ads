@@ -284,6 +284,150 @@ package Static_Stack_Analysis is
    --  Package used for identifying collections of call graph cycles. Cycles
    --  are ordered alphabetically.
 
+   -----------
+   -- Class --
+   -----------
+
+   type Class;
+   type Class_Access is access all Class;
+
+   function Alphabetical_Order (Left, Right : Class_Access) return Boolean;
+   --  Returns True if Left is alphabetically before Right, False otherwise.
+   --  It is used for ordering sets of classes alphabetically.
+
+   function Equal (Left, Right : Class_Access) return Boolean;
+   --  Equality operation between two classes. They are equal if they contain
+   --  the same information (name, methods, etc.).
+
+   function Get_Class (Class_Name : String) return Class_Access;
+   --  Retrieve a class using its encoded (mangled) name. Return null if the
+   --  class is not yet in the list.
+
+   function Insert_Class
+     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
+      return Class_Access;
+   --  Insert the class. It creates the descriptor for the class if it has
+   --  not yet been registered, or return the existing one. Defined is True
+   --  when the class is being defined (therefore we expect more information
+   --  to be present) and False when it is only being referenced by another
+   --  class.
+
+   package List_Of_Classes is new
+     Ada.Containers.Ordered_Sets (Class_Access, Alphabetical_Order, Equal);
+   --  Types used to represent classes (tagged types)
+
+   type Method;
+   type Method_Class_Access is access all Method'Class;
+   --  Root class to represent dispatching methods. There are either virtual
+   --  or inherited methods.
+
+   type Virtual;
+   type Virtual_Class_Access is access all Virtual'Class;
+
+   function Alphabetical_Order
+     (Left, Right : Virtual_Class_Access) return Boolean;
+   --  Order by the name of the owner class, and then by the slot number
+   --  It is used for ordering sets of virtual methods alphabetically.
+
+   function Equal (Left, Right : Virtual_Class_Access) return Boolean;
+   --  Equality operation between two virtual methods. They are equal if they
+   --  contain the same information (name, slot, etc.).
+
+   package List_Of_Virtual_Methods is new
+     Ada.Containers.Ordered_Sets
+       (Virtual_Class_Access, Alphabetical_Order, Equal);
+
+   type Inherited;
+   type Inherited_Class_Access is access all Inherited'Class;
+
+   type Slot_Number is new Integer;
+   --  Type which represents the position in the dispatching table of the
+   --  different virtual methods.
+
+   Null_Slot : constant Slot_Number := Slot_Number'First;
+   --  Constant defining a non valid slot (the most negative value)
+
+   type Vtable_Loc is
+      record
+         Class : Class_Access;
+         Slot  : Slot_Number;
+      end record;
+   --  Type used to identify virtual methods. It contains the class that
+   --  defines it (and hence the vtable) and its slot in the vtable.
+
+   Null_Vtable_Loc : constant Vtable_Loc := Vtable_Loc'(null, Null_Slot);
+   --  Constant defining a non valid pair class:slot
+
+   function "<" (Left, Right : Vtable_Loc) return Boolean;
+
+   type Method is abstract tagged
+      record
+         Method_Name : Name;
+         --  Name of the method
+      end record;
+
+   type Virtual is new Method with
+      record
+         Symbol_Name  : Name;
+         --  Associated symbol (in the object code) for the method
+
+         Vtable_Entry : Vtable_Loc;
+         --  Class (tagged type) and position in the dispatching table that
+         --  define the method.
+
+         Redefines    : Vtable_Loc;
+         --  Class and slot which this method is overriding. Null if this is
+         --  not an overridden method. This may point either to the method
+         --  in the base class (the one that defines the vtable slot) or to
+         --  the method which is being directly overloaded.
+
+         Redefined_By : List_Of_Virtual_Methods.Set;
+         --  List of methods which override this one. This is used to
+         --  determine the set of potential targets for a dispatching call.
+         --  This list may be kept in every overloaded method or just in
+         --  the method defined in the base class.
+      end record;
+   --  Types used to represent virtual functions (primitive operations of a
+   --  tagged type).
+
+   type Inherited is new Method with
+      record
+         Inherits : Virtual_Class_Access;
+         --  Method inherited from the ancestor
+      end record;
+
+   package List_Of_Inherited_Methods is new
+     Ada.Containers.Vectors (Natural, Inherited_Class_Access);
+
+   function Get_Method (Id : Vtable_Loc) return Virtual_Class_Access;
+   --  Return the method by its class:slot information
+
+   function Insert_Method
+     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access;
+   --  Insert the method. It creates the descriptor for the method if it has
+   --  not yet been registered, or return the existing one.
+
+   type Class is
+      record
+         Class_Name : Name;
+         --  Name of the class (tagged type)
+
+         Class_Loc  : Location;
+         --  Demangled name and file location for the class
+
+         Parents    : List_Of_Classes.Set;
+         --  List of direct parents.
+
+         Derived    : List_Of_Classes.Set;
+         --  List of all classes derived from this one. It does not contain
+         --  only the direct descencent (children), but derived through the
+         --  complete hierarchy (include grandchildren, ...).
+
+         Virtual    : List_Of_Virtual_Methods.Set;
+         --  List of virtual methods defined by the class (both new methods
+         --  and overriding ones).
+      end record;
+
    -------------------
    -- Abstract node --
    -------------------
@@ -528,10 +672,54 @@ package Static_Stack_Analysis is
    -- Dispatching_Node --
    ----------------------
 
-   type Dispatching_Node is new Fake_Node with null record;
+   type Dispatching_Node is new Fake_Node with
+      record
+         Location_List : List_Of_Locations.Set;
+         --  List of places where the subprogram appears. This list of
+         --  locations will typically contain just one entry, and it will
+         --  contain a list of more than one location in the case of
+         --  instantiations of generic units.
+
+         Slot          : Slot_Number;
+         --  Slot used for dispatching
+
+         Base_Class    : Class_Access;
+         --  Base class being used for dispatching
+
+         Static_Class  : Class_Access;
+         --  Static view of the object
+
+         Internal_Name : Name;
+         --  Artificial name which is used as equivalent to the symbol name.
+         --  It is built concatenating the names of the base and static
+         --  classes and the slot number.
+      end record;
    --  Dispatching calls are those which cannot be uniquely determined at
    --  compile-time because it uses the dynamic dispatching capability
-   --  provided by class-wide types.
+   --  provided by class-wide types. These calls are identified by the
+   --  slot number in the vtable that is used for dispatching, the base
+   --  class for the dispatching call, and the static view of the object
+   --  used for dispatching.
+   --  Internal name is an artificial once created concatenating a string
+   --  representing the triple base_class:slot:static_class.
+
+   overriding function Get_Stack_Usage
+     (Target : Dispatching_Node) return Stack_Usage_Info;
+   --  This function returns the stack requirements for the any dispatching
+   --  node.
+
+   overriding function Get_Subprogram_Name
+     (Target : Dispatching_Node) return Name;
+   --  This function returns the name of the subprogram associated to a
+   --  dispatching node. We represent them by a string representing the
+   --  triple base_class:slot:static_class. One advantage of using this
+   --  representation is that every dispatching call with the same pattern
+   --  will be represented by the same node, simplifying the analysis.
+
+   overriding function Get_Demangled_Name
+     (Target : Dispatching_Node) return Name;
+   --  This function returns the demangled name of the subprogram associated
+   --  to a dispatching node.
 
    -------------------
    -- Indirect_Node --
@@ -541,177 +729,6 @@ package Static_Stack_Analysis is
    --  Indirect calls are the result of dereferences of access-to-subprogram
    --  values, and hence their target depend on the values stored in the
    --  pointer.
-
-   -----------
-   -- Class --
-   -----------
-
-   type Class;
-   type Class_Access is access all Class;
-
-   function Alphabetical_Order (Left, Right : Class_Access) return Boolean;
-   --  Returns True if Left is alphabetically before Right, False otherwise.
-   --  It is used for ordering sets of classes alphabetically.
-
-   function Equal (Left, Right : Class_Access) return Boolean;
-   --  Equality operation between two classes. They are equal if they contain
-   --  the same information (name, methods, etc.).
-
-   function Get_Class (Class_Name : String) return Class_Access;
-   --  Retrieve a class using its encoded (mangled) name. Return null if the
-   --  class is not yet in the list.
-
-   function Insert_Class
-     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
-      return Class_Access;
-   --  Insert the class. It creates the descriptor for the class if it has
-   --  not yet been registered, or return the existing one. Defined is True
-   --  when the class is being defined (therefore we expect more information
-   --  to be present) and False when it is only being referenced by another
-   --  class.
-
-   package List_Of_Classes is new
-     Ada.Containers.Ordered_Sets (Class_Access, Alphabetical_Order, Equal);
-   --  Types used to represent classes (tagged types)
-
-   type Method;
-   type Method_Class_Access is access all Method'Class;
-   --  Root class to represent dispatching methods. There are either virtual
-   --  or inherited methods.
-
-   type Virtual;
-   type Virtual_Class_Access is access all Virtual'Class;
-
-   function Alphabetical_Order
-     (Left, Right : Virtual_Class_Access) return Boolean;
-   --  Order by the name of the owner class, and then by the slot number
-   --  It is used for ordering sets of virtual methods alphabetically.
-
-   function Equal (Left, Right : Virtual_Class_Access) return Boolean;
-   --  Equality operation between two virtual methods. They are equal if they
-   --  contain the same information (name, slot, etc.).
-
-   package List_Of_Virtual_Methods is new
-     Ada.Containers.Ordered_Sets
-       (Virtual_Class_Access, Alphabetical_Order, Equal);
-
-   type Inherited;
-   type Inherited_Class_Access is access all Inherited'Class;
-
-   type Dispatcher;
-   type Dispatcher_Access is access all Dispatcher;
-   package List_Of_Dispatchers is new
-     Ada.Containers.Vectors (Natural, Dispatcher_Access);
-   --  Types used to represent a virtual node, artificially created by the
-   --  tool to represent the notion of a node that may call the set of
-   --  reachable overridden candidate for a dispatching call.
-
-   type Slot_Number is new Integer range -1 .. Integer'Last;
-   --  Type which represents the position in the dispatching table of the
-   --  different virtual methods.
-
-   Null_Slot : constant Slot_Number := -1;
-   --  Constant defining a non valid slot
-
-   type Vtable_Loc is
-      record
-         Class : Class_Access;
-         Slot  : Slot_Number;
-      end record;
-   --  Type used to identify virtual methods. It contains the class that
-   --  defines it (and hence the vtable) and its slot in the vtable.
-
-   Null_Vtable_Loc : constant Vtable_Loc := Vtable_Loc'(null, Null_Slot);
-   --  Constant defining a non valid pair class:slot
-
-   function "<" (Left, Right : Vtable_Loc) return Boolean;
-
-   type Method is abstract tagged
-      record
-         Method_Name : Name;
-         --  Name of the method
-
-         Dispatcher  : Dispatcher_Access;
-         --  Pointer to the virtual node which represents all possible
-         --  instantiations of the method.
-      end record;
-
-   type Virtual is new Method with
-      record
-         Symbol_Name  : Name;
-         --  Associated symbol (in the object code) for the method
-
-         Vtable_Entry : Vtable_Loc;
-         --  Class (tagged type) and position in the dispatching table that
-         --  define the method.
-
-         Redefines    : Vtable_Loc;
-         --  Class and slot which this method is overriding. Null if this is
-         --  not an overridden method.
-
-         Redefined_By : List_Of_Virtual_Methods.Set;
-         --  List of methods which override this one. This is used to
-         --  determine the set of potential targets for a dispatching call.
-      end record;
-   --  Types used to represent virtual functions (primitive operations of a
-   --  tagged type).
-
-   type Inherited is new Method with
-      record
-         Inherits : Virtual_Class_Access;
-         --  Method inherited from the ancestor
-      end record;
-
-   package List_Of_Inherited_Methods is new
-     Ada.Containers.Vectors (Natural, Inherited_Class_Access);
-
-   function Get_Method (Id : Vtable_Loc) return Virtual_Class_Access;
-   --  Return the method by its class:slot information
-
-   function Insert_Method
-     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access;
-   --  Insert the method. It creates the descriptor for the method if it has
-   --  not yet been registered, or return the existing one.
-
-   type Class is
-      record
-         Class_Name : Name;
-         --  Name of the class (tagged type)
-
-         Class_Loc  : Location;
-         --  Demangled name and file location for the class
-
-         Parents    : List_Of_Classes.Set;
-         --  List of direct parents.
-
-         Derived    : List_Of_Classes.Set;
-         --  List of all classes derived from this one. It does not contain
-         --  only the direct descencent (children), but derived through the
-         --  complete hierarchy (include grandchildren, ...).
-
-         Virtual    : List_Of_Virtual_Methods.Set;
-         --  List of virtual methods defined by the class (both new methods
-         --  and overriding ones).
-
-         Inherited  : List_Of_Inherited_Methods.Vector;
-         --  List of methods inherited by the class. This is not an exhaustive
-         --  list. It does not necesarily contain all methods inherited by the
-         --  class, but all those which have been targeted by a dispatching
-         --  call.
-      end record;
-
-   type Dispatcher is
-      record
-         Method : Name;
-         --  Corresponding method name
-
-         Methods : List_Of_Virtual_Methods.Set;
-         --  List of potential targets of the dispatching call represented
-
-         Node : Node_Id;
-         --  Virtual node which is used to represent the list of potential
-         --  calls which correspond to a dispatching call.
-      end record;
 
 private
 

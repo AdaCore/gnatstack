@@ -342,7 +342,7 @@ package body Static_Stack_Analysis is
       return (Left = null and then Right = null)
         or else (Left /= null
                  and then Right /= null
-                 and then Left.all = Right.all);
+                 and then Left.Vtable_Entry = Right.Vtable_Entry);
    end Equal;
 
    ---------------------------------
@@ -531,6 +531,21 @@ package body Static_Stack_Analysis is
    end Get_Stack_Usage;
 
    function Get_Stack_Usage
+     (Target : Dispatching_Node) return Stack_Usage_Info is
+      pragma Unreferenced (Target);
+   begin
+      --  For the artificial node representing a dispatching call the local
+      --  stack usage is 0.
+
+      return Stack_Usage_Info'
+        (Frame_Type    => Static,
+         Static_Usage  => 0,
+         Dynamic_Usage => Empty_Value,
+         Unknown_Usage => Empty_Value,
+         Cycle_Usage   => Empty_Value);
+   end Get_Stack_Usage;
+
+   function Get_Stack_Usage
      (Target : Unresolved_Node) return Stack_Usage_Info is
       pragma Unreferenced (Target);
    begin
@@ -559,6 +574,12 @@ package body Static_Stack_Analysis is
       return Indirect_Call;
    end Get_Subprogram_Name;
 
+   function Get_Subprogram_Name
+     (Target : Dispatching_Node) return Name is
+   begin
+      return Target.Internal_Name;
+   end Get_Subprogram_Name;
+
    ------------------------
    -- Get_Demangled_Name --
    ------------------------
@@ -574,6 +595,13 @@ package body Static_Stack_Analysis is
       pragma Unreferenced (Target);
    begin
       return Indirect_Call;
+   end Get_Demangled_Name;
+
+   function Get_Demangled_Name
+     (Target : Dispatching_Node) return Name is
+   begin
+      --  ??? We should return the demangled name of the classes.
+      return Target.Internal_Name;
    end Get_Demangled_Name;
 
    ------------------
@@ -595,8 +623,7 @@ package body Static_Stack_Analysis is
             Class_Loc  => Loc,
             Parents    => List_Of_Classes.Empty_Set,
             Derived    => List_Of_Classes.Empty_Set,
-            Virtual    => List_Of_Virtual_Methods.Empty_Set,
-            Inherited  => List_Of_Inherited_Methods.Empty_Vector);
+            Virtual    => List_Of_Virtual_Methods.Empty_Set);
 
          --  Insert in the list
 
@@ -641,7 +668,6 @@ package body Static_Stack_Analysis is
 
          Method := new Virtual'
            (Method_Name  => null,
-            Dispatcher   => null,
             Symbol_Name  => new String'(Symbol),
             Vtable_Entry => Id,
             Redefines    => Null_Vtable_Loc,
