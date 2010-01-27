@@ -202,7 +202,7 @@ package body Parser is
      "((([\w/ \.~\-\+]+)|" &  -- Unix-style
      "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
      "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
-     ":(\d+)(:\d+)?)";
+     ":(\d+)(:\d+)?)";  -- line and possibly column number
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
    --  cygwin-style (drive_letter:/path). There is also .extension for the
@@ -215,7 +215,7 @@ package body Parser is
    Node_Label_Regexp : constant String :=
      "^ label: " &
      """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?" &  -- Unary operators
-     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}]*)?(\\n)?" &
+     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$]*)?(\\n)?" &  -- Demangled name
      "(" & Location_Regexp & ",?)*" & "(\\n)?" &
      "(" & Stack_Regexp & ")?" &
      "(\\n\d+ dynamic objects(\\n .*)?)?""$";
