@@ -20,6 +20,8 @@
 ------------------------------------------------------------------------------
 
 with Ada.Characters.Handling;
+with Ada.Text_IO;
+with Ada.Strings.Fixed;
 
 with Global_Data;
 with Options;
@@ -637,15 +639,29 @@ package body Static_Stack_Analysis is
          --  or the same as we are inserting.
 
          pragma Assert
-           (not Defined or else
-              (This_Class.Class_Name.all = Symbol and then
-                 (This_Class.Class_Loc = Null_Location or else
-                  This_Class.Class_Loc = Loc)));
+           (not Defined or else This_Class.Class_Name.all = Symbol);
 
          --  Update the location if needed
 
          if This_Class.Class_Loc = Null_Location then
             This_Class.Class_Loc := Loc;
+
+         --  If we are defining the same class with different information
+         --  it means that there is an error, probably defining the same
+         --  class twice. Print error message and leave raising an exception.
+         elsif Defined and then This_Class.Class_Loc /= Loc then
+            Ada.Text_IO.Put_Line
+              ("Class " & Symbol & " at " &
+               Loc.File.all & ":" &
+               Ada.Strings.Fixed.Trim
+                 (Natural'Image (Loc.Line_Number), Ada.Strings.Both) &
+               " already defined at " &
+               This_Class.Class_Loc.File.all & ":" &
+               Ada.Strings.Fixed.Trim
+                 (Natural'Image (This_Class.Class_Loc.Line_Number),
+                  Ada.Strings.Both));
+
+            raise Parser_Error;
          end if;
 
       end if;

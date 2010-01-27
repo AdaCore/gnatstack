@@ -26,6 +26,13 @@ with GNAT.Strings;
 
 package Static_Stack_Analysis is
 
+   ------------
+   -- Errors --
+   ------------
+
+   Parser_Error : exception;
+   --  Exception to be raised when unexpected data is found
+
    ---------------
    -- Locations --
    ---------------

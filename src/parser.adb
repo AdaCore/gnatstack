@@ -52,7 +52,7 @@ package body Parser is
    -- Local data --
    ----------------
 
-   Parser_Error : exception;
+   Parser_Error : exception renames Static_Stack_Analysis.Parser_Error;
    --  Exception to be raised when unexpected data is found
 
    Ada_File_Name : Static_Stack_Analysis.File_Name := null;
