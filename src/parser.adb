@@ -2188,6 +2188,12 @@ package body Parser is
               "Cannot parse the virtual method: " & Input;
             end if;
 
+         --  It may be the case that the class does not define any virtual
+         --  method. In this case, the string is empty.
+         elsif Input = "" then
+            null;
+
+         --  Otherwise there is a problem in the format
          else
             raise Parser_Error with
               "Cannot parse virtual methods in: " & Input;
