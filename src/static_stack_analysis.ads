@@ -180,14 +180,6 @@ package Static_Stack_Analysis is
    --  representing this subprogram (if it already exists). If the subprogram
    --  has not been registered within the list then it returns No_Element.
 
-   function Get_Match (Subprogram : String) return Node_Id;
-   --  This function returns the identifier for the name of the symbol (or
-   --  demangled name) representing this subprogram (if it already exists).
-   --  It performs a case-insensitive search taking into account both the
-   --  symbol name and the demangled name.
-   --  If the subprogram has not been registered within the list then it
-   --  returns No_Element.
-
    ------------------------------
    -- Edges (subprogram calls) --
    ------------------------------

@@ -70,6 +70,15 @@ package body Parser is
    procedure Usage;
    --  Print how to use the tool
 
+   function Pattern_In_Node
+     (Pattern  : String; Position : Static_Stack_Analysis.Node_Id)
+      return Boolean;
+   --  Look for the pattern in the list of subprograms, including both
+   --  mangled and demangled symbol names, in a case-insensitive manner.
+   --  Return True if the referenced node describes a subprogram containing
+   --  the specified pattern. We avoid the problem of upper/lower case by
+   --  transforming both the pattern and the string into lower case values.
+
    procedure Add_Pattern_Entry (Position : Static_Stack_Analysis.Node_Id);
    --  Add the node to the list of entry points to analyze if its symbol name
    --  contains the pattern specified in Options.Entry_Point_Pattern.
@@ -237,10 +246,6 @@ package body Parser is
      "^\\n ([\w \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
    --  Location of an unbounded object
 
-   Entry_Regexp : constant String :=
-     "^([^:,]+),*(.+)*$";
-   --  List of potential entry points is a comma-separated list of symbols
-
    Create_Task : constant String := "system__tasking__stages__create_task";
    Create_Ravenscar_Task : constant String :=
      "system__tasking__restricted__stages__create_restricted_task";
@@ -257,10 +262,6 @@ package body Parser is
    procedure Parse_File_Name (Input : String);
    --  Get the name of the file from which the stack usage information is
    --  derived.
-
-   procedure Parse_Entry_Points (Input : String);
-   --  Get the list of entry points to be analyzed. The format of the input
-   --  String is: [e1[,e2]]
 
    procedure Parse_Input_File (File : File_Id);
    --  Extract the information from the specified file by parsing every line
@@ -336,34 +337,15 @@ package body Parser is
    -----------------------
 
    procedure Add_Pattern_Entry (Position : Static_Stack_Analysis.Node_Id) is
-      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
-        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
-
-      Matches : GNAT.Regpat.Match_Array (0 .. 1);
-
    begin
       --  If the referenced node describes a subprogram containing the pattern
       --  defined in Options.Entry_Point_Pattern we add this subprogram to the
-      --  list of potential entry points. We avoid the problem of upper/lower
-      --  case by transforming into lower case values.
+      --  list of potential entry points.
 
-      GNAT.Regpat.Match
-        (Ada.Characters.Handling.To_Lower (Options.Entry_Point_Pattern.all),
-         Ada.Characters.Handling.To_Lower
-           (Static_Stack_Analysis.Get_Subprogram_Name (Explored_Node.all).all),
-         Matches);
+      if Pattern_In_Node (Options.Entry_Point_Pattern.all, Position) then
+         --  If we have found the entry point we add it to the list
 
-      if Matches (0) /= GNAT.Regpat.No_Match then
          Global_Data.Entry_Points.Append (Position);
-      else
-         --  Use demangled names instead
-
-         GNAT.Regpat.Match
-           (Ada.Characters.Handling.To_Lower (Options.Entry_Point_Pattern.all),
-            Ada.Characters.Handling.To_Lower
-              (Static_Stack_Analysis.Get_Demangled_Name
-                 (Explored_Node.all).all),
-            Matches);
       end if;
    end Add_Pattern_Entry;
 
@@ -512,6 +494,9 @@ package body Parser is
 
    procedure Parse_Arguments is
       use type GNAT.Strings.String_Access;
+
+      Entries : Integer;
+      --  Number of entry points defined in the command line
 
       procedure Print_Version;
       --  Print version number and copyright notice
@@ -932,19 +917,121 @@ package body Parser is
       --  Get the list of subprograms to be considered as entry points
 
       --  Add the entry points that have been specified in the command line
+
       if Options.List_Of_Entry_Points /= null then
-         Parse_Entry_Points (Options.List_Of_Entry_Points.all);
+         --  Create a list of strings containing the separated entry points
+         --  that we are looking for.
 
-         --  Verify that at least one entry point matching the pattern has
-         --  been found.
+         --  Get the number of these entries to create an array to store
+         --  them separately.
 
-         if Global_Data.Entry_Points.Is_Empty then
-            Ada.Text_IO.Put_Line
-              ("Could not find any entry point from the list " &
-               Options.List_Of_Entry_Points.all);
+         Entries := 1;
 
-            raise Parser_Error with "No entry point found";
-         end if;
+         for Index in Options.List_Of_Entry_Points'Range loop
+            if Options.List_Of_Entry_Points (Index) = ',' then
+               Entries := Entries + 1;
+            end if;
+         end loop;
+
+         declare
+            Entry_List : array (1 .. Entries) of GNAT.Strings.String_Access;
+
+            Starting_Point : Integer;
+            --  Temporal pointer to the beginning of an entry point in the
+            --  string which appears in the command line.
+
+            Entry_Number : Integer;
+            --  Number of entry which is being handled
+
+            procedure Add_Entry_Point
+              (Position : Static_Stack_Analysis.Node_Id);
+            --  Add the node to the list of entry points to analyze if its
+            --  symbol name corresponds to one of those specified in
+            --  Options.List_Of_Entry_Points.
+
+            procedure Add_Entry_Point
+              (Position : Static_Stack_Analysis.Node_Id)
+            is
+            begin
+               --  If the referenced node describes a subprogram containing
+               --  the pattern defined in Options.List_Of_Entry_Points we add
+               --  this subprogram to the list of potential entry points.
+
+               for Index in Entry_List'Range loop
+                  if Entry_List (Index) /= null and then
+                    Pattern_In_Node (Entry_List (Index).all, Position)
+                  then
+                     --  If we have found the entry point we add it to the
+                     --  list, remove the entry which we are looking for
+                     --  (because it has already been found), and exit.
+
+                     GNAT.Strings.Free (Entry_List (Index));
+                     Global_Data.Entry_Points.Append (Position);
+                     exit;
+                  end if;
+               end loop;
+            end Add_Entry_Point;
+
+         begin
+            --  Split the list of entry points
+
+            Starting_Point := Options.List_Of_Entry_Points'First;
+            Entry_Number := Entry_List'First;
+
+            for Index in Options.List_Of_Entry_Points'Range loop
+               --  Add a "^ ... $" to the regexp to look for the symbol
+               --  name, and not for a part of it.
+
+               if Options.List_Of_Entry_Points (Index) = ',' then
+                  Entry_List (Entry_Number) :=
+                    new String'
+                      ("^" &
+                       Options.List_Of_Entry_Points
+                         (Starting_Point .. Index - 1) &
+                       "$");
+                  Entry_Number := Entry_Number + 1;
+                  Starting_Point := Index + 1;
+
+               elsif Index = Options.List_Of_Entry_Points'Last then
+                  Entry_List (Entry_Number) :=
+                    new String'
+                      ("^" &
+                       Options.List_Of_Entry_Points (Starting_Point .. Index) &
+                       "$");
+               end if;
+            end loop;
+
+            pragma Assert (Entry_Number = Entry_List'Last);
+
+            --  Look for the entry points
+
+            Static_Stack_Analysis.List_Of_Nodes.Iterate
+              (Global_Data.List_Of_Subprograms, Add_Entry_Point'Access);
+
+            --  Verify whether all entry points were found. Destroy the list
+            --  of String once used
+
+            for Index in Entry_List'Range loop
+               if Entry_List (Index) /= null then
+                  Ada.Text_IO.Put_Line
+                    ("Could not find the entry point " &
+                     Entry_List (Index)(Entry_List (Index)'First + 1 ..
+                                        Entry_List (Index)'Last - 1));
+                  GNAT.Strings.Free (Entry_List (Index));
+               end if;
+            end loop;
+
+            --  Verify that at least one entry point matching the pattern has
+            --  been found.
+
+            if Global_Data.Entry_Points.Is_Empty then
+               Ada.Text_IO.Put_Line
+                 ("Could not find any entry point from the list " &
+                  Options.List_Of_Entry_Points.all);
+
+               raise Parser_Error with "No entry point found";
+            end if;
+         end;
 
          --  Destroy the String once used
 
@@ -1061,49 +1148,6 @@ package body Parser is
          raise Parser_Error;
       end if;
    end Parse_Dynamic_Objects;
-
-   ------------------------
-   -- Parse_Entry_Points --
-   ------------------------
-
-   procedure Parse_Entry_Points (Input : String) is
-      Matches    : GNAT.Regpat.Match_Array (0 .. 2);
-
-      Found_Id : Static_Stack_Analysis.Node_Id;
-
-   begin
-      GNAT.Regpat.Match (Entry_Regexp, Input, Matches);
-
-      if Matches (0) /= GNAT.Regpat.No_Match then
-         Found_Id := Static_Stack_Analysis.Get_Match
-           (Input (Matches (1).First .. Matches (1).Last));
-
-         if Static_Stack_Analysis.List_Of_Nodes.Has_Element (Found_Id) then
-            --  Add the entry point to the list
-
-            Global_Data.Entry_Points.Append (Found_Id);
-
-         else
-            --  The entry point does not exist
-
-            Ada.Text_IO.Put_Line
-              ("Could not find the entry point " &
-               Input (Matches (1).First .. Matches (1).Last));
-
-            raise Parser_Error with "The entry point does not exist";
-         end if;
-
-         --  Get next entry point
-
-         if Matches (2) /= GNAT.Regpat.No_Match then
-            Parse_Entry_Points (Input (Matches (2).First .. Matches (2).Last));
-         end if;
-
-      else
-         raise Parser_Error;
-      end if;
-
-   end Parse_Entry_Points;
 
    ----------------------
    -- Parse_Input_Line --
@@ -2407,6 +2451,34 @@ package body Parser is
 
          raise;
    end Parse_Input_File;
+
+   ---------------------
+   -- Pattern_In_Node --
+   ---------------------
+
+   function Pattern_In_Node
+     (Pattern  : String; Position : Static_Stack_Analysis.Node_Id)
+      return Boolean
+   is
+      Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+        Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+      use Static_Stack_Analysis;
+
+   begin
+      --  Use both the symbol name and the demangled name
+
+      return
+        GNAT.Regpat.Match
+          (Ada.Characters.Handling.To_Lower (Pattern),
+           Ada.Characters.Handling.To_Lower
+             (Get_Subprogram_Name (Explored_Node.all).all))
+           or else
+         GNAT.Regpat.Match
+           (Ada.Characters.Handling.To_Lower (Pattern),
+            Ada.Characters.Handling.To_Lower
+              (Get_Demangled_Name (Explored_Node.all).all));
+   end Pattern_In_Node;
 
    --------------------------
    -- Print_Usage_And_Exit --

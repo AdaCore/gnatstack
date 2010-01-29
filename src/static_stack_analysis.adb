@@ -19,7 +19,6 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
-with Ada.Characters.Handling;
 with Ada.Text_IO;
 with Ada.Strings.Fixed;
 
@@ -38,22 +37,6 @@ package body Static_Stack_Analysis is
    package Node_Keys is new
      List_Of_Nodes.Generic_Keys (String, Node_Key);
    --  Package used to find a subprogram by its symbol name
-
-   function Subprogram_Key (Element : Node_Class_Access) return String;
-   --  Returns the name of the subprogram associated to the specified node
-   --  in lower case.
-
-   package Subprogram_Keys is new
-     List_Of_Nodes.Generic_Keys (String, Subprogram_Key);
-   --  Package used to find a subprogram by its symbol name
-
-   function Demangled_Key (Element : Node_Class_Access) return String;
-   --  Returns the demangled name of the subprogram associated to the
-   --  specified node in lower case.
-
-   package Demangled_Keys is new
-     List_Of_Nodes.Generic_Keys (String, Demangled_Key);
-   --  Package used to find a subprogram by its demangled name
 
    function Class_Name_Key (Element : Class_Access) return String;
    --  Returns the mangled name of the class
@@ -468,34 +451,6 @@ package body Static_Stack_Analysis is
    end Get_Node;
 
    ---------------
-   -- Get_Match --
-   ---------------
-
-   function Get_Match (Subprogram : String) return Node_Id is
-      Found : Node_Id;
-
-   begin
-      --  Use the symbol name as the key to find in the list
-
-      Found :=
-        Subprogram_Keys.Find
-          (Global_Data.List_Of_Subprograms,
-           Ada.Characters.Handling.To_Lower (Subprogram));
-
-      if List_Of_Nodes.Has_Element (Found) then
-         return Found;
-
-      else
-         --  Try to match the demangled name
-
-         return
-           Demangled_Keys.Find
-             (Global_Data.List_Of_Subprograms,
-              Ada.Characters.Handling.To_Lower (Subprogram));
-      end if;
-   end Get_Match;
-
-   ---------------
    -- Get_Method --
    ---------------
 
@@ -721,37 +676,8 @@ package body Static_Stack_Analysis is
 
    function Node_Key (Element : Node_Class_Access) return String is
    begin
-      --  We avoid the problem of upper/lower case by transforming into lower
-      --  case values.
-
       return Get_Subprogram_Name (Element.all).all;
    end Node_Key;
-
-   --------------------
-   -- Subprogram_Key --
-   --------------------
-
-   function Subprogram_Key (Element : Node_Class_Access) return String is
-   begin
-      --  We avoid the problem of upper/lower case by transforming into lower
-      --  case values.
-
-      return Ada.Characters.Handling.To_Lower
-        (Get_Subprogram_Name (Element.all).all);
-   end Subprogram_Key;
-
-   -------------------
-   -- Demangled_Key --
-   -------------------
-
-   function Demangled_Key (Element : Node_Class_Access) return String is
-   begin
-      --  We avoid the problem of upper/lower case by transforming into lower
-      --  case values.
-
-      return Ada.Characters.Handling.To_Lower
-        (Get_Demangled_Name (Element.all).all);
-   end Demangled_Key;
 
    --------------------
    -- Class_Name_Key --
