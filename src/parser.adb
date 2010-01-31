@@ -2152,7 +2152,7 @@ package body Parser is
          Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)?$";
 
          Virtual_Info_Regexp : constant String :=
-           "([\-]?\d+):([^,:]+)(,(\d+):([^,:]+))?$";
+           "([\-]?\d+):([^,]+)(,(\d+):([^,]+))?$";
 
          Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
 
