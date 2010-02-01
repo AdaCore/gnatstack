@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2006-2009, AdaCore                     --
+--                     Copyright (C) 2006-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -72,6 +72,8 @@ package body Demangle is
 
       Matches : GNAT.Regpat.Match_Array (0 .. 1);
 
+      Match_Lead_File : GNAT.Regpat.Match_Array (0 .. 1);
+
       Match_Operator : GNAT.Regpat.Match_Array (0 .. 2);
 
    begin
@@ -82,6 +84,20 @@ package body Demangle is
       end if;
 
       Buffer (1 .. Length) := Symbol_Name;
+
+      --  Remove the leading file information when is there. It may happen
+      --  in the case of local (static) subprograms. The file name is
+      --  separated by ':' such as "file.ext:symbol_name".
+
+      GNAT.Regpat.Match ("^.*:(.*)$", Buffer (1 .. Length), Match_Lead_File);
+
+      if Match_Lead_File (0) /= GNAT.Regpat.No_Match then
+         --  Keep only the local symbol name
+
+         Length := Match_Lead_File (1).Last - Match_Lead_File (1).First + 1;
+         Buffer (1 .. Length) :=
+           Buffer (Match_Lead_File (1).First .. Match_Lead_File (1).Last);
+      end if;
 
       --  Check for library level subprogram
 
