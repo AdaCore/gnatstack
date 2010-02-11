@@ -207,7 +207,7 @@ package body Parser is
 
    Location_Regexp : constant String :=
      "(<no location>)|" &
-     "(<built-in>)|" &
+     "(<built-in>.*)|" &  -- Location for built-in functions
      "((([\w/ \.~\-\+]+)|" &  -- Unix-style
      "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
      "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
@@ -1485,7 +1485,26 @@ package body Parser is
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
 
       if Matches (0) = GNAT.Regpat.No_Match then
-         raise Parser_Error;
+         --  The label cannot be parsed. This is not a major issue, it simply
+         --  means that we cannot extract the demangled name, source location
+         --  and stack usage information for this subprogram.
+
+         Demangled := null;
+
+         Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+
+         Stack := Static_Stack_Analysis.Unknown_Stack_Usage;
+         Stack.Unknown_Usage :=
+           Static_Stack_Analysis.Frame_Size (Options.Default_Unknown);
+
+         Dynamic_Objects :=
+           Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+
+         --  Emit a warning if required
+
+         if Options.Debug then
+            Ada.Text_IO.Put_Line ("Could not parse the label: " & Input);
+         end if;
 
       else
          --  The following are optional fields
@@ -1739,7 +1758,8 @@ package body Parser is
       GNAT.Regpat.Match (Edge_Regexp, Input, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         --  Get the location of this call
+         --  Get the location of this call. If this information is not found
+         --  it is not considered a major issue and processing continues.
 
          if Matches (3) /= GNAT.Regpat.No_Match and then
            GNAT.Regpat.Match
