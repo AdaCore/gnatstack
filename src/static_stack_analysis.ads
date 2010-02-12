@@ -367,18 +367,28 @@ package Static_Stack_Analysis is
 
    type Virtual is new Method with
       record
-         Symbol_Name  : Name;
+         Symbol_Name : Name;
          --  Associated symbol (in the object code) for the method
 
          Vtable_Entry : Vtable_Loc;
          --  Class (tagged type) and position in the dispatching table that
          --  define the method.
 
-         Redefines    : Vtable_Loc;
+         Redefines : Vtable_Loc;
          --  Class and slot which this method is overriding. Null if this is
          --  not an overridden method. This may point either to the method
          --  in the base class (the one that defines the vtable slot) or to
          --  the method which is being directly overloaded.
+
+         Redefines_Multiple : Vtable_Loc;
+         --  When a class has multiple base classes, it has multiple vtables.
+         --  When a method is overridden (that does not come from a primary
+         --  base), an entry is added to the secondary vtable (corresponding
+         --  to the non-primary base) and this entry is added as well to the
+         --  primary vtable. Redefines_Multiple will contain the location
+         --  in the primary vtable (Redefines will store the location in the
+         --  secondary vtable). Null if this is not an overridden method from
+         --  a non-primary base.
 
          Redefined_By : List_Of_Virtual_Methods.Set;
          --  List of methods which override this one. This is used to

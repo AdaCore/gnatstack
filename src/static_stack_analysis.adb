@@ -638,11 +638,12 @@ package body Static_Stack_Analysis is
          --  The method is not yet in the list so we create it
 
          Method := new Virtual'
-           (Method_Name  => null,
-            Symbol_Name  => new String'(Symbol),
-            Vtable_Entry => Id,
-            Redefines    => Null_Vtable_Loc,
-            Redefined_By => List_Of_Virtual_Methods.Empty_Set);
+           (Method_Name        => null,
+            Symbol_Name        => new String'(Symbol),
+            Vtable_Entry       => Id,
+            Redefines          => Null_Vtable_Loc,
+            Redefines_Multiple => Null_Vtable_Loc,
+            Redefined_By       => List_Of_Virtual_Methods.Empty_Set);
 
          --  Insert in the list
 

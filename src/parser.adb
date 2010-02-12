@@ -2170,13 +2170,16 @@ package body Parser is
 
       procedure Get_Virtuals (Input : String) is
          Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)?$";
+         --  The information for each virtual method is separated by \n
 
          Virtual_Info_Regexp : constant String :=
-           "([\-]?\d+):([^,]+)(,(\d+):([^,]+))?$";
+           "([\-]?\d+):([^,]+)(,(\d+):([^,]+))?(,(\d+):([^,]+))?$";
+         --  For a given virtual method we have the slot_number:symbol_name,
+         --  and possibly the primary and secondary vtables that it overrides.
 
          Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
 
-         Match_Info          : GNAT.Regpat.Match_Array (0 .. 5);
+         Match_Info          : GNAT.Regpat.Match_Array (0 .. 8);
 
          Method              : Virtual_Class_Access := null;
 
@@ -2187,7 +2190,7 @@ package body Parser is
            Match_Virtual (1) /= GNAT.Regpat.No_Match
          then
             --  Get the information (slot, symbol name, and possibly virtual
-            --  base) for the method.
+            --  bases) for the method.
 
             GNAT.Regpat.Match
               (Virtual_Info_Regexp,
@@ -2245,6 +2248,37 @@ package body Parser is
                        Slot_Number'Value
                          (Input (Match_Info (4).First ..
                                  Match_Info (4).Last)));
+               end if;
+
+               --  This second vtable entry will only appear when a class
+               --  has multiple base classes, and therefore multiple vtables,
+               --  and when the method that is overridden does not come from
+               --  the primary base. Redefines_Multiple will contain the
+               --  location in the primary vtable.
+
+               if Match_Info (6) /= GNAT.Regpat.No_Match then
+                  --  This is the virtual base corresponding to this method.
+                  --  We need to add this to the list of virtual bases.
+
+                  pragma Assert
+                    (Match_Info (7) /= GNAT.Regpat.No_Match and then
+                     Match_Info (8) /= GNAT.Regpat.No_Match);
+
+                  --  Store the pair class:slot for the virtual base. Look
+                  --  for the ancestor class and create it if it is not
+                  --  registered yet.
+
+                  Method.Redefines_Multiple :=
+                    Vtable_Loc'
+                      (Insert_Class
+                         (Symbol =>
+                            Input (Match_Info (8).First ..
+                                   Match_Info (8).Last),
+                          Defined => False,
+                          Loc => Null_Location),
+                       Slot_Number'Value
+                         (Input (Match_Info (7).First ..
+                                 Match_Info (7).Last)));
                end if;
 
             else
