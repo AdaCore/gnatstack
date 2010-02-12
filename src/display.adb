@@ -811,6 +811,10 @@ package body Display is
       Ada.Text_IO.Put_Line (" }");
    end Print_Node;
 
+   Dispatching_Call_Mark : Boolean := False;
+   --  Mark used to determine whether a call is the result of a dispatching
+   --  call.
+
    procedure Print_Node (Node : Static_Stack_Analysis.Node_Class_Access) is
       Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
         Static_Stack_Analysis.Get_Stack_Usage (Node.all);
@@ -818,50 +822,68 @@ package body Display is
       use type Global_Data.Phase_Type;
 
    begin
-      Open_Tag ("subprogram");
+      --  If this is an artificial node created for dispatching calls we
+      --  do not print it, but we mark that the following call is the result
+      --  of a dispatching call.
 
-      --  Indentation
+      if Node.all in Static_Stack_Analysis.Dispatching_Node'Class then
+         Dispatching_Call_Mark := True;
 
-      Ada.Text_IO.Put (" +-> ");
+      --  Normal node
+      else
+         Open_Tag ("subprogram");
 
-      --  Subprogram name
+         --  Indentation
 
-      Print_Name (Node);
+         Ada.Text_IO.Put (" +-> ");
 
-      --  Print local stack usage
+         --  Dispatching indication if needed
 
-      if Options.Verbose then
-         Ada.Text_IO.Put (" : ");
-
-         Expand_Stack_Usage (Stack_Info);
-
-         --  Information about cycles
-
-         if
-           not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles)
-         then
-            Ada.Text_IO.Put (" (");
-
-            Node.Cycles.Iterate (Print_Cycle_Id'Access);
-
-            Ada.Text_IO.Put (")");
+         if Dispatching_Call_Mark then
+            Ada.Text_IO.Put ("dispatching to ");
+            Dispatching_Call_Mark := False;
          end if;
 
-      elsif Global_Data.Phase = Global_Data.Print_Results
-        and then
-      (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.Empty_Value or else
-       Stack_Info.Unknown_Usage /= Static_Stack_Analysis.Empty_Value or else
-       Stack_Info.Cycle_Usage /= Static_Stack_Analysis.Empty_Value)
-      then
-         --  In non-verbose mode we just put a mark indicating that the
-         --  resulting value is not accurate when we are printing the paths.
+         --  Subprogram name
 
-         Ada.Text_IO.Put (" *");
+         Print_Name (Node);
+
+         --  Print local stack usage
+
+         if Options.Verbose then
+            Ada.Text_IO.Put (" : ");
+
+            Expand_Stack_Usage (Stack_Info);
+
+            --  Information about cycles
+
+            if
+            not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles)
+            then
+               Ada.Text_IO.Put (" (");
+
+               Node.Cycles.Iterate (Print_Cycle_Id'Access);
+
+               Ada.Text_IO.Put (")");
+            end if;
+
+         elsif Global_Data.Phase = Global_Data.Print_Results and then
+             (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.Empty_Value
+                 or else
+              Stack_Info.Unknown_Usage /= Static_Stack_Analysis.Empty_Value
+                 or else
+              Stack_Info.Cycle_Usage /= Static_Stack_Analysis.Empty_Value)
+         then
+            --  In non-verbose mode we just put a mark indicating that the
+            --  resulting value is not accurate when we are printing the paths.
+
+            Ada.Text_IO.Put (" *");
+         end if;
+
+         Close_Tag ("subprogram");
+
+         Ada.Text_IO.New_Line;
       end if;
-
-      Close_Tag ("subprogram");
-
-      Ada.Text_IO.New_Line;
    end Print_Node;
 
    -----------------------
@@ -1152,6 +1174,7 @@ package body Display is
 
       end Expand_Edge;
 
+   --  Start of processing for Expand_Node
    begin
       --  Print both to the VCG file containing the call graph and to the file
       --  that will be later filled by the user.
