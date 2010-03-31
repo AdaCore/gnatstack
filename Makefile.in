@@ -3,7 +3,7 @@ EXEEXT=@EXEEXT@
 
 MAYBE_DOC=@maybe_doc@
 
-bin/gnatstack$(EXEEXT):
+bin/gnatstack$(EXEEXT): force
 	gnatmake -Pssat.gpr
 
 all: bin/gnatstack$(EXEEXT) $(MAYBE_DOC)
@@ -42,3 +42,4 @@ install: all
 	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.txt; \
 	fi
 
+.PHONY: force
