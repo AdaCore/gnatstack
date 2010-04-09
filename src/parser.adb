@@ -235,7 +235,7 @@ package body Parser is
    --  Extra information about an edge
 
    Class_Label_Regexp : constant String :=
-     "([^\\]+)\\n([^:]+):(\d+)(:\d+)?$";
+     "([^\\]+)\\n(" & Location_Regexp & ")$";
    --  Demangled name and location information in classes
 
    Subprogram_Location_Regexp : constant String :=
@@ -2154,7 +2154,7 @@ package body Parser is
 
       Match_Class_Info : GNAT.Regpat.Match_Array (0 .. 5);
 
-      Match_Label      : GNAT.Regpat.Match_Array (0 .. 4);
+      Match_Label      : GNAT.Regpat.Match_Array (0 .. 11);
 
       This_Class       : Class_Access;
 
@@ -2403,26 +2403,30 @@ package body Parser is
               new String'
                 (Input (Match_Label (1).First .. Match_Label (1).Last));
 
-            pragma Assert (Match_Label (2) /= GNAT.Regpat.No_Match);
+            pragma Assert
+              (Match_Label (2) /= GNAT.Regpat.No_Match and then
+               Match_Label (5) /= GNAT.Regpat.No_Match and then
+               Match_Label (6) /= GNAT.Regpat.No_Match);
 
             CLocation.File :=
               new String'
-                (Input (Match_Label (2).First .. Match_Label (2).Last));
+                (Input (Match_Label (6).First .. Match_Label (6).Last));
 
-            pragma Assert (Match_Label (3) /= GNAT.Regpat.No_Match);
+            pragma Assert (Match_Label (10) /= GNAT.Regpat.No_Match);
 
             CLocation.Line_Number :=
               Integer'Value
-                (Input (Match_Label (3).First .. Match_Label (3).Last));
+                (Input (Match_Label (10).First .. Match_Label (10).Last));
 
             --  The column number is not always there
 
-            if Match_Label (4) /= GNAT.Regpat.No_Match then
+            if Match_Label (11) /= GNAT.Regpat.No_Match then
                --  'First + 1 to skip the ":"
 
                CLocation.Column_Number :=
                  Integer'Value
-                   (Input (Match_Label (4).First + 1 .. Match_Label (4).Last));
+                   (Input
+                        (Match_Label (11).First + 1 .. Match_Label (11).Last));
             else
                CLocation.Column_Number := 0;
             end if;
@@ -2506,8 +2510,17 @@ package body Parser is
             if GNAT.Regpat.Match
               ("^(node:|edge:|class) {([^}]*)$", Complete_Line.all)
             then
-               Reconstructed_Line :=
-                 Ada.Strings.Unbounded.To_Unbounded_String (Complete_Line.all);
+               --  Remove Windows CR character
+               if Complete_Line (Complete_Line'Last) = ASCII.CR then
+                  Reconstructed_Line :=
+                    Ada.Strings.Unbounded.To_Unbounded_String
+                      (Complete_Line
+                           (Complete_Line'First .. Complete_Line'Last - 1));
+               else
+                  Reconstructed_Line :=
+                    Ada.Strings.Unbounded.To_Unbounded_String
+                      (Complete_Line.all);
+               end if;
 
                while not Ada.Text_IO.End_Of_File (Descriptor) loop
                   Inner_Loop : declare
@@ -2515,9 +2528,16 @@ package body Parser is
                        Ada.Text_IO.Get_Line (Descriptor);
 
                   begin
-                     --  Append a new line until we find the ending "}"
-                     Ada.Strings.Unbounded.Append
-                       (Reconstructed_Line, Next_Line);
+                     --  Append a new line until we find the ending "}".
+                     --  Remove Windows CR character.
+                     if Next_Line (Next_Line'Last) = ASCII.CR then
+                        Ada.Strings.Unbounded.Append
+                          (Reconstructed_Line,
+                           Next_Line (Next_Line'First .. Next_Line'Last - 1));
+                     else
+                        Ada.Strings.Unbounded.Append
+                          (Reconstructed_Line, Next_Line);
+                     end if;
 
                      exit when GNAT.Regpat.Match ("}\s*(--.*)??$", Next_Line);
                   end Inner_Loop;
