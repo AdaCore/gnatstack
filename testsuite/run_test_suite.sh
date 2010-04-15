@@ -64,8 +64,17 @@ for file in $files; do
 	*)
 	    EXTRA_FLAGS="";;
     esac
+
+    # Extract source code
    
     $GNATCHOP -w -c -q ../../tests/$file;
+
+    # Extract other files associated to the test, if they exist
+
+    if [ -s ../../tests/$name.tgz ]; then
+	tar xzf ../../tests/$name.tgz
+    fi;
+
     $GNATMAKE -fcallgraph-info=su,da --RTS=zfp -gnatd.Z \
        -I$testsuite_dir/support \
        -I$testsuite_dir/support/target-support/$TARGET \
