@@ -485,7 +485,9 @@ package body Parser is
       GNAT.Regpat.Match (Header_Regexp, Input, Matches);
 
       if Matches (1) /= GNAT.Regpat.No_Match then
-         GNAT.Strings.Free (GNAT.Strings.String_Access (Ada_File_Name));
+         --  Do not deallocate the previous pointer Ada_File_Name. It will
+         --  probably have been copied in nodes and edges to indicate where
+         --  they appear.
 
          Ada_File_Name :=
            new String'(Input (Matches (1).First .. Matches (1).Last));
@@ -2078,9 +2080,6 @@ package body Parser is
 
             Call   : Static_Stack_Analysis.Edge;
 
-            Ignore : Static_Stack_Analysis.List_Of_Locations.Cursor;
-
-            New_Location : Boolean := False;
          begin
             --  For indirect calls we created a new node, and hence we will
             --  create a new edge.
@@ -2101,16 +2100,8 @@ package body Parser is
                   --  Add new location.
 
                   if Tmp_Location /= Static_Stack_Analysis.Null_Location then
-                     Call.Point_Of_Call.Insert
-                       (Tmp_Location, Ignore, New_Location);
-
-                     if not New_Location then
-                        --  Destroy the String that was previously allocated
-                        --  if it is no longer needed.
-
-                        GNAT.Strings.Free
-                          (GNAT.Strings.String_Access (Tmp_Location.File));
-                     end if;
+                     --  Do not destroy the contents of Tmp_Location
+                     Call.Point_Of_Call.Include (Tmp_Location);
                   end if;
 
                   --  We found the edge so that we leave
@@ -2483,8 +2474,11 @@ package body Parser is
 
    procedure Parse_Input_File (File : File_Id) is
    begin
-      --  We do not know yet the originating Ada file
-      GNAT.Strings.Free (GNAT.Strings.String_Access (Ada_File_Name));
+      --  We do not know yet the originating Ada file. We cannot deallocate
+      --  this name because its value will probably have been copied in
+      --  nodes and edges associated to it.
+
+      Ada_File_Name := null;
 
       Ada.Text_IO.Open
         (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
