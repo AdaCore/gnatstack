@@ -19,8 +19,6 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
-with Static_Stack_Analysis; use Static_Stack_Analysis;
-
 package Dispatching_Calls is
 
    procedure Create_Class_Hierarchies;
@@ -35,11 +33,8 @@ package Dispatching_Calls is
    --  potential overriding methods that may be called by any given
    --  dispatching call.
 
-   function Get_Overriding_Methods
-     (Node : Dispatching_Node) return List_Of_Edges.Vector;
-   --  This function returns the list of potential targets for a dispatching
-   --  call. The dispatching call is specified using the index in a vtable
-   --  used for dispatch, the type whose vtable is used, and the static type
-   --  of the expression.
+   procedure Resolve_Dispatching_Calls;
+   --  Compute the list of potential targets for every dispatching call in
+   --  the partition.
 
 end Dispatching_Calls;

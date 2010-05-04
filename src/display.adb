@@ -69,6 +69,14 @@ package body Display is
 
    Indent_String : constant String := "  ";
 
+   First_Dispatching : Boolean := True;
+   --  Boolean to know whether we have already displayed information about
+   --  dispatching calls.
+
+   First_Dereferencing : Boolean := True;
+   --  Boolean to know whether we have already displayed information about
+   --  indirect calls.
+
    -----------------------
    -- Local subprograms --
    -----------------------
@@ -118,9 +126,10 @@ package body Display is
    --  Print the subprogram name if the position corresponds to a node with
    --  no information about stack usage.
 
-   procedure Print_Indirect (Position : Static_Stack_Analysis.Node_Id);
-   --  Print the information about indirect (including dispatching) calls made
-   --  by this subprogram.
+   procedure Print_Unresolved_Indirect
+     (Position : Static_Stack_Analysis.Node_Id);
+   --  Print the information about unresolved indirect (including dispatching)
+   --  calls made by this subprogram.
 
    procedure Print_Node
      (Subprogram_Name         : String;
@@ -137,7 +146,10 @@ package body Display is
    --  file containing the VCG call graph being generated.
 
    procedure Print_Edge
-     (Source : String; Target : String; File : Ada.Text_IO.File_Type);
+     (Source : String;
+      Target : String;
+      Loc    : Static_Stack_Analysis.Location;
+      File   : Ada.Text_IO.File_Type);
    --  Print the information about this concrete call-to-subprogram with the
    --  format used by the compiler when generating call graph and stack usage
    --  information.
@@ -218,6 +230,11 @@ package body Display is
    --  platform-specific EOL if New_Line is True. Does nothing if
    --  Generate_XML_Output is set False.
 
+   procedure Print_Resolved_Indirect_Calls;
+   --  Display the list of indirect calls (including dispatching calls) that
+   --  have been resolved by either user-defined information or dispatching
+   --  or signature analysis.
+
    ------------------------
    -- Close_Output_Files --
    ------------------------
@@ -274,6 +291,7 @@ package body Display is
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
       use type Ada.Text_IO.File_Access;
+      use type Static_Stack_Analysis.File_Name;
 
    begin
       --  Demangled name
@@ -297,10 +315,12 @@ package body Display is
 
       --  File location
 
-      Ada.Text_IO.Put (Location.File.all & ":");
-      Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
-      Ada.Text_IO.Put (":");
-      Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+      if Location.File /= null then
+         Ada.Text_IO.Put (Location.File.all & ":");
+         Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+         Ada.Text_IO.Put (":");
+         Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+      end if;
 
       if Static_Stack_Analysis.List_Of_Locations.Has_Element
         (Static_Stack_Analysis.List_Of_Locations.Next (Position))
@@ -610,8 +630,13 @@ package body Display is
    ----------------
 
    procedure Print_Edge
-     (Source : String; Target : String; File : Ada.Text_IO.File_Type)
+     (Source : String;
+      Target : String;
+      Loc    : Static_Stack_Analysis.Location;
+      File   : Ada.Text_IO.File_Type)
    is
+      use type Static_Stack_Analysis.Location;
+
    begin
       --  Caller
 
@@ -623,9 +648,26 @@ package body Display is
       Ada.Text_IO.Put (File, """ targetname: """);
       Ada.Text_IO.Put (File, Target);
 
-      --  Type of line
+      --  Location
 
-      Ada.Text_IO.Put_Line (File, """ priority: 100 linestyle: solid }");
+      if Loc /= Static_Stack_Analysis.Null_Location then
+         Ada.Text_IO.Put (File, """ label: """);
+
+         Ada.Text_IO.Put (File, Loc.File.all);
+
+         if Loc.Line_Number > 0 then
+            Ada.Text_IO.Put (File, ":");
+            Ada.Integer_Text_IO.Put (File, Loc.Line_Number, 0);
+            if Loc.Column_Number > 0 then
+               Ada.Text_IO.Put (File, ":");
+               Ada.Integer_Text_IO.Put (File, Loc.Column_Number, 0);
+            end if;
+         end if;
+      end if;
+
+      --  End of line
+
+      Ada.Text_IO.Put_Line (File, """ }");
    end Print_Edge;
 
    -------------------------
@@ -937,6 +979,8 @@ package body Display is
       Ada.Text_IO.New_Line;
 
       Print_Longest_Paths;
+
+      Print_Resolved_Indirect_Calls;
    end Generate_Results;
 
    ---------------------------
@@ -1098,9 +1142,11 @@ package body Display is
         and then Global_Data.Indirect_Calls
       then
          Ada.Text_IO.Put_Line
-           ("List of reachable indirect (including dispatching) calls:");
+           ("List of reachable and unresolved indirect (including " &
+            "dispatching) calls:");
          Ada.Text_IO.New_Line;
-         Global_Data.List_Of_Subprograms.Iterate (Print_Indirect'Access);
+         Global_Data.List_Of_Subprograms.Iterate
+           (Print_Unresolved_Indirect'Access);
          Ada.Text_IO.New_Line;
       end if;
 
@@ -1129,12 +1175,6 @@ package body Display is
       Locations : constant Static_Stack_Analysis.List_Of_Locations.Set :=
            Static_Stack_Analysis.Get_Location_List (Node.all);
 
-      type Indirect_Call_States is (None, Unknown_Indirect_Call, User_Defined);
-      Indirect_Call_Status : Indirect_Call_States := None;
-      --  Used to distinguish whether the subprogram being analyzed contains
-      --  indirect calls, and whether the user has specified the required
-      --  manual information to determine potential targets to this call.
-
       procedure Expand_Edge (Position : Static_Stack_Analysis.Edge_Id);
       --  Generate the information about this call to subprogram
 
@@ -1155,21 +1195,32 @@ package body Display is
          --  file that will be later filled by the user.
 
          Print_Edge
-           (Source => Caller, Target => Callee, File => VCG_Descriptor);
+           (Source => Caller,
+            Target => Callee,
+            Loc => Static_Stack_Analysis.Null_Location,
+            File => VCG_Descriptor);
 
-         if Edge.Ada_File_Name = null then
-            --  The user defined manually some targets for this call so we
-            --  do not ask again.
+         --  Print missing information for indirect calls in the undefined.ciu
+         --  file but only if the node is reachable.
 
-            Indirect_Call_Status := User_Defined;
+         if Node.Is_Reachable and then
+           Target.all in Static_Stack_Analysis.Fake_Node'Class and then
+           Target.Target_Calls.Is_Empty
+         then
+            --  In the undefined.ciu file we put the information only if the
+            --  node is reachable.
 
-         elsif Indirect_Call_Status = None and then
-           Target.all in Static_Stack_Analysis.Fake_Node'Class then
-            --  Mark this as information needed. The mark can be later removed
-            --  if the user has specified manually potential targets for this
-            --  call.
+            Print_Edge
+              (Source => Caller,
+               Target => "XXX",
+               Loc    => (if Edge.Point_Of_Call.Is_Empty then
+                            Static_Stack_Analysis.Null_Location
+                          else
+                            Edge.Point_Of_Call.First_Element),
+               File   => Undefined_Descriptor);
 
-            Indirect_Call_Status := Unknown_Indirect_Call;
+            --   ??? We are only printing the first element of the set of
+            --  locations which should be enough to identify the call.
          end if;
 
       end Expand_Edge;
@@ -1209,18 +1260,6 @@ package body Display is
 
       Static_Stack_Analysis.List_Of_Edges.Iterate
         (Node.Target_Calls, Expand_Edge'Access);
-
-      --  In the undefined.ciu file we put the information only if the node
-      --  is reachable.
-
-      if Indirect_Call_Status = Unknown_Indirect_Call and then
-        Node.Is_Reachable
-      then
-         Print_Edge
-           (Source => Caller,
-            Target => "XXX",
-            File   => Undefined_Descriptor);
-      end if;
 
       Ada.Text_IO.Set_Output (Ada.Text_IO.Standard_Output);
 
@@ -1560,28 +1599,238 @@ package body Display is
       end if;
    end Print_External;
 
-   --------------------
-   -- Print_Indirect --
-   --------------------
+   -----------------------------------
+   -- Print_Resolved_Indirect_Calls --
+   -----------------------------------
 
-   procedure Print_Indirect (Position : Static_Stack_Analysis.Node_Id) is
+   procedure Print_Resolved_Indirect_Calls is
+      use Static_Stack_Analysis;
+
+      Caller : Node_Class_Access;
+
+      First_Local_Dispatching : Boolean := True;
+
+      First_Local_Dereferencing : Boolean := True;
+
+      procedure Print_Targets (Position : Static_Stack_Analysis.Edge_Id);
+      --  Print the list of targets that resolve an indirect call
+
+      procedure Print_Targets (Position : Static_Stack_Analysis.Edge_Id) is
+         Call : constant Edge := List_Of_Edges.Element (Position);
+
+         Callee_Ptr : constant Node_Class_Access :=
+           List_Of_Nodes.Element (Call.Target);
+
+      begin
+         --  Put indentation
+
+         Ada.Text_IO.Put ("    +-> ");
+
+         --  Subprogram name
+
+         Print_Name (Callee_Ptr);
+
+         Ada.Text_IO.New_Line;
+      end Print_Targets;
+
+      procedure Print_Dispatching_Callers
+        (Position : Static_Stack_Analysis.Node_Id);
+      --  Print the list of subprograms performing dispatching calls
+
+      procedure Print_Dereference_Callers
+        (Position : Static_Stack_Analysis.Node_Id);
+      --  Print the list of subprograms performing dereferences to
+      --  access-to-subprogram values.
+
+      procedure Print_Dispatching_Targets
+        (Position : Static_Stack_Analysis.Edge_Id);
+      --  Print the list of potential targets for every dispatching call
+
+      procedure Print_Dereference_Targets
+        (Position : Static_Stack_Analysis.Edge_Id);
+      --  Print the list of potential targets for every indirect call
+
+      procedure Print_Dispatching_Targets
+        (Position : Static_Stack_Analysis.Edge_Id)
+      is
+         Call   : constant Edge := List_Of_Edges.Element (Position);
+
+         Target : constant Node_Class_Access :=
+           List_Of_Nodes.Element (Call.Target);
+
+      begin
+         if Target.all in Dispatching_Node'Class
+           and then not Target.Target_Calls.Is_Empty
+         then
+            if First_Dispatching then
+               First_Dispatching := False;
+               Ada.Text_IO.Put_Line
+                 ("List of dispatching calls resolved by analysis");
+               Ada.Text_IO.New_Line;
+            end if;
+
+            if First_Local_Dispatching then
+               First_Local_Dispatching := False;
+               Ada.Text_IO.Put ("From subprogram ");
+               Print_Name (Caller);
+               Ada.Text_IO.Put_Line (":");
+               Ada.Text_IO.New_Line;
+            end if;
+
+            --  Print the location of the call
+
+            if Call.Point_Of_Call.Is_Empty then
+               Ada.Text_IO.Put ("  Indirect call");
+            else
+               --  Location list
+               Ada.Text_IO.Put ("  Call at ");
+
+               Static_Stack_Analysis.List_Of_Locations.Iterate
+                 (Call.Point_Of_Call, Expand_Location'Access);
+            end if;
+
+            Ada.Text_IO.Put (" may dispatch to:");
+            Ada.Text_IO.New_Line;
+
+            List_Of_Edges.Iterate (Target.Target_Calls, Print_Targets'Access);
+
+            Ada.Text_IO.New_Line;
+         end if;
+      end Print_Dispatching_Targets;
+
+      procedure Print_Dereference_Targets
+        (Position : Static_Stack_Analysis.Edge_Id)
+      is
+         Call   : constant Edge := List_Of_Edges.Element (Position);
+
+         Target : constant Node_Class_Access :=
+           List_Of_Nodes.Element (Call.Target);
+
+      begin
+         if Target.all in Indirect_Node'Class
+           and then not Target.Target_Calls.Is_Empty
+         then
+            if First_Dereferencing then
+               First_Dereferencing := False;
+               Ada.Text_IO.Put_Line
+                 ("List of dereference calls resolved by manual information");
+               Ada.Text_IO.New_Line;
+            end if;
+
+            if First_Local_Dereferencing then
+               First_Local_Dereferencing := False;
+               Ada.Text_IO.Put ("From subprogram ");
+               Print_Name (Caller);
+               Ada.Text_IO.Put_Line (":");
+            end if;
+
+            --  Print the location of the call
+
+            if Call.Point_Of_Call.Is_Empty then
+               Ada.Text_IO.Put ("  Indirect call");
+            else
+               --  Location list
+               Ada.Text_IO.Put ("  Call at ");
+
+               Static_Stack_Analysis.List_Of_Locations.Iterate
+                 (Call.Point_Of_Call, Expand_Location'Access);
+            end if;
+
+            Ada.Text_IO.Put (" may dereference:");
+            Ada.Text_IO.New_Line;
+
+            List_Of_Edges.Iterate (Target.Target_Calls, Print_Targets'Access);
+
+            Ada.Text_IO.New_Line;
+         end if;
+      end Print_Dereference_Targets;
+
+      procedure Print_Dispatching_Callers
+        (Position : Static_Stack_Analysis.Node_Id) is
+      begin
+         Caller := List_Of_Nodes.Element (Position);
+
+         if Caller.all in Explicit_Node'Class then
+            First_Local_Dispatching := True;
+
+            List_Of_Edges.Iterate
+              (Caller.Target_Calls, Print_Dispatching_Targets'Access);
+         end if;
+      end Print_Dispatching_Callers;
+
+      procedure Print_Dereference_Callers
+        (Position : Static_Stack_Analysis.Node_Id) is
+      begin
+         Caller := List_Of_Nodes.Element (Position);
+
+         if Caller.all in Explicit_Node'Class then
+            First_Local_Dereferencing := True;
+
+            List_Of_Edges.Iterate
+              (Caller.Target_Calls, Print_Dereference_Targets'Access);
+         end if;
+      end Print_Dereference_Callers;
+
+      use type Options.Target_Resolution_Options;
+
+   --  Start of processing for Print_Resolved_Indirect_Calls
+   begin
+      if Options.Target_Resolution = Options.Dispatching_Calls or else
+        Options.Target_Resolution = Options.Both
+      then
+         --  Iterate the list of subprograms looking for dispatching calls and
+         --  print the potential targets for each if they have been computed.
+
+         List_Of_Nodes.Iterate
+           (Global_Data.List_Of_Subprograms, Print_Dispatching_Callers'Access);
+      end if;
+
+      if Options.Target_Resolution = Options.Indirect_Calls or else
+        Options.Target_Resolution = Options.Both
+      then
+         --  Iterate the list of subprograms looking for dereferences to
+         --  access-to-subprogram values and print the potential targets for
+         --  each.
+
+         List_Of_Nodes.Iterate
+           (Global_Data.List_Of_Subprograms, Print_Dereference_Callers'Access);
+      end if;
+   end Print_Resolved_Indirect_Calls;
+
+   -------------------------------
+   -- Print_Unresolved_Indirect --
+   -------------------------------
+
+   procedure Print_Unresolved_Indirect
+     (Position : Static_Stack_Analysis.Node_Id)
+   is
       Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
-      Indirect_Calls : constant Static_Stack_Analysis.List_Of_Locations.Set :=
-        Static_Stack_Analysis.Get_Indirect_Calls (Node.all);
+      Indirect_Calls : constant Static_Stack_Analysis.List_Of_Edges.Vector :=
+        Static_Stack_Analysis.Get_Indirect_Calls
+          (Node.all,
+           Static_Stack_Analysis.Both,
+           Static_Stack_Analysis.Unresolved);
       --  Set of locations where there is an indirect call within the
       --  subprogram being analyzed.
 
       procedure Print_Location
-        (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
-      --  Print the location using the format: file:line
+        (Position : Static_Stack_Analysis.List_Of_Edges.Cursor);
+      --  Print the location of the represented calls using the format:
+      --  file:line.
 
       procedure Print_Location
-        (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+        (Position : Static_Stack_Analysis.List_Of_Edges.Cursor)
       is
+         Call : constant Static_Stack_Analysis.Edge :=
+           Static_Stack_Analysis.List_Of_Edges.Element (Position);
+
          Location : constant Static_Stack_Analysis.Location :=
-           Static_Stack_Analysis.List_Of_Locations.Element (Position);
+           (if Call.Point_Of_Call.Is_Empty then
+               Static_Stack_Analysis.Null_Location
+            else
+               Call.Point_Of_Call.First_Element);
 
          use type Static_Stack_Analysis.Location;
          use type Static_Stack_Analysis.File_Name;
@@ -1631,7 +1880,11 @@ package body Display is
 
          Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
 
-         Ada.Text_IO.Put (" indirect calls in: ");
+         if Integer (Indirect_Calls.Length) > 1 then
+            Ada.Text_IO.Put (" indirect calls in: ");
+         else
+            Ada.Text_IO.Put (" indirect call in: ");
+         end if;
 
          Open_Tag ("indirect");
 
@@ -1641,14 +1894,14 @@ package body Display is
 
          Open_Tag ("indirectcallset");
 
-         Static_Stack_Analysis.List_Of_Locations.Iterate
+         Static_Stack_Analysis.List_Of_Edges.Iterate
            (Indirect_Calls, Print_Location'Access);
 
          Close_Tag ("indirectcallset");
 
          Close_Tag ("indirect");
       end if;
-   end Print_Indirect;
+   end Print_Unresolved_Indirect;
 
    ---------------------
    -- Print_Unbounded --
@@ -1728,36 +1981,42 @@ package body Display is
       Location : constant Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
+      use type Static_Stack_Analysis.File_Name;
+
    begin
       Open_Tag ("location");
 
-      Open_Tag ("subprogramname type=""strings""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, Location.Demangled.all & "</value>");
-      Close_Tag ("subprogramname");
+      if Location.Demangled /= null then
+         Open_Tag ("subprogramname type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.Demangled.all & "</value>");
+         Close_Tag ("subprogramname");
+      end if;
 
-      Open_Tag ("file type=""strings""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, Location.File.all & "</value>");
-      Close_Tag ("file");
+      if Location.File /= null then
+         Open_Tag ("file type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.File.all & "</value>");
+         Close_Tag ("file");
 
-      Open_Tag ("line type=""integers""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Integer_Text_IO.Put
-        (XML_Descriptor, Location.Line_Number, 0);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, "</value>");
-      Close_Tag ("line");
+         Open_Tag ("line type=""integers""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Integer_Text_IO.Put
+           (XML_Descriptor, Location.Line_Number, 0);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("line");
 
-      Open_Tag ("column type=""integers""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Integer_Text_IO.Put
-        (XML_Descriptor, Location.Column_Number, 0);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, "</value>");
-      Close_Tag ("column");
+         Open_Tag ("column type=""integers""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Integer_Text_IO.Put
+           (XML_Descriptor, Location.Column_Number, 0);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("column");
+      end if;
 
       Close_Tag ("location");
    end Print_XML_Location;

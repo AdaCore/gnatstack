@@ -53,6 +53,14 @@ package Options is
    --  Active warnings (for cycles, unbounded frames, external calls, and
    --  indirect calls)
 
+   type Target_Resolution_Options is
+     (None, Indirect_Calls, Dispatching_Calls, Both);
+
+   Target_Resolution : Target_Resolution_Options := None;
+   --  Determines whether we want to display information about indirect and
+   --  dispatching calls resolved using either compiler-generated or manual
+   --  information.
+
    Display_Call_Chains : Boolean := True;
    --  Print the call chain information for the different entry points. This
    --  is the list of subprograms that make up the longest path in terms of

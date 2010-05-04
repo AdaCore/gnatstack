@@ -446,6 +446,12 @@ package Static_Stack_Analysis is
          Ada_File_Name : File_Name;
          --  Name of the Ada file where this subprogram is defined
 
+         Location_List : List_Of_Locations.Set;
+         --  List of places where the subprogram appears. This list of
+         --  locations will typically contain just one entry, and it will
+         --  contain a list of more than one location in the case of
+         --  instantiations of generic units.
+
          Target_Calls : List_Of_Edges.Vector;
          --  Target_Calls represent the set of possible nodes that can be
          --  called from this node (frame).
@@ -518,8 +524,7 @@ package Static_Stack_Analysis is
    --  This function returns the demangled name of the subprogram associated
    --  to the specified node.
 
-   function Get_Location_List
-     (Target : Node) return List_Of_Locations.Set is abstract;
+   function Get_Location_List (Target : Node) return List_Of_Locations.Set;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where the associated subprogram is defined.
 
@@ -535,10 +540,29 @@ package Static_Stack_Analysis is
    --  column) where dynamic objects are defined (if any) within the
    --  subprogram represented.
 
+   type Indirect_Calls is (Access_To_Subprogram, Dispatching, Both);
+   --  Clasification of indirect calls according to their nature into either
+   --  dereferences to access-to-subprogram, dispatching, or both.
+
+   type Indirect_Resolution is (Unresolved, Resolved, Both);
+   --  Clasification of indirect calls according to the information we have
+   --  about their potential targets.
+
    function Get_Indirect_Calls
-     (Target : Node) return List_Of_Locations.Set is abstract;
-   --  This function returns the list of locations (file, line, column) where
-   --  indirect calls are made within the subprogram represented.
+     (Target : Node;
+      Kind   : Indirect_Calls := Both;
+      Status : Indirect_Resolution := Both)
+      return List_Of_Edges.Vector;
+   --  This function returns the list of indirect calls made from any given
+   --  subprogram. We can get either dereferences to access-to-subprogram
+   --  values, or dispatching calls, or both (by default). We can get either
+   --  resolved or unresolved indirect calls (or both).
+
+   procedure Move_Indirect_Calls (Source, Target : Node_Class_Access);
+   --  Procedure to move user-defined targets for indirect calls (associated
+   --  to Source) into the node representing indirect calls. The location of
+   --  the Target node is the one that will determine the indirect calls that
+   --  need to be moved.
 
    ---------------
    -- Real_Node --
@@ -546,37 +570,23 @@ package Static_Stack_Analysis is
 
    type Real_Node is abstract new Node with
       record
-         Location_List : List_Of_Locations.Set;
-         --  List of places where the subprogram appears. This list of
-         --  locations will typically contain just one entry, and it will
-         --  contain a list of more than one location in the case of
-         --  instantiations of generic units.
-
-         Subprogram    : Name;
+         Subprogram : Name;
          --  Name of the symbol representing this subprogram
 
-         Demangled     : Name;
+         Demangled  : Name;
          --  Demangled name (Ada/C++) corresponding the symbol name
       end record;
    --  Node representing  real nodes (explicit and unresolved). We need to
    --  store the list of candidate target nodes that may correspond to this
    --  call.
 
-   overriding function Get_Subprogram_Name
-     (Target : Real_Node) return Name;
+   overriding function Get_Subprogram_Name (Target : Real_Node) return Name;
    --  This function returns the name of the subprogram associated to an
    --  real (explicit or unresolved) node.
 
-   overriding function Get_Demangled_Name
-     (Target : Real_Node) return Name;
+   overriding function Get_Demangled_Name (Target : Real_Node) return Name;
    --  This function returns the demangled name of the subprogram associated
    --  to an real (explicit or unresolved) node.
-
-   overriding function Get_Location_List
-     (Target : Real_Node) return List_Of_Locations.Set;
-   --  This function returns the list of locations (file, demangled, line,
-   --  column) where the associated subprogram is defined for a real
-   --  (explicit or unresolved) node.
 
    -------------------
    -- Explicit_Node --
@@ -606,11 +616,6 @@ package Static_Stack_Analysis is
    --  column) where dynamic objects are defined (if any) for an explicit
    --  node.
 
-   overriding function Get_Indirect_Calls
-     (Target : Explicit_Node) return List_Of_Locations.Set;
-   --  This function returns the list of locations (file, line, column) where
-   --  indirect calls are made for an explicit node.
-
    not overriding procedure Update_Stack_Usage
      (Target : in out Explicit_Node; Stack_Usage : Stack_Usage_Info);
    --  Incorporate the stack usage information for an explicit node
@@ -634,48 +639,44 @@ package Static_Stack_Analysis is
    --  column) where dynamic objects are defined (if any) for an unresolved
    --  node.
 
-   overriding function Get_Indirect_Calls
-     (Target : Unresolved_Node) return List_Of_Locations.Set;
-   --  This function returns the list of locations (file, line, column) where
-   --  indirect calls are made for an unresolved node.
-
    ---------------
    -- Fake_Node --
    ---------------
 
-   type Fake_Node is abstract new Node with null record;
+   type Fake_Node is abstract new Node with
+      record
+         Internal_Name : Name;
+         --  Artificial name which is used as equivalent to the symbol name.
+      end record;
    --  Node representing  fake nodes (dispatching and indirect). We need to
    --  store the list of candidate target nodes that may correspond to this
    --  call.
+   --  Internal name is an artificial once created concatenating a string
+   --  representing either the triple base_class:slot:static_class for
+   --  dispatching nodes or the indirect mark plus the caller plus its
+   --  location for indirect nodes. One advantage of using this representation
+   --  for dispatching nodes is that every dispatching call with the same
+   --  pattern (same base and static class and same slot) will be equivalent,
+   --  and will be represented by the same node, simplifying the analysis.
 
    overriding function Get_Stack_Usage
      (Target : Fake_Node) return Stack_Usage_Info;
    --  This function returns the stack requirements for the any fake node
 
-   overriding function Get_Subprogram_Name
-     (Target : Fake_Node) return Name;
-   --  This function returns the name of the subprogram associated to a fake
-   --  node.
+   overriding function Get_Subprogram_Name (Target : Fake_Node) return Name;
+   --  This function returns the internal name associated to a fake node.
 
-   overriding function Get_Demangled_Name
-     (Target : Fake_Node) return Name;
-   --  This function returns the demangled name of the subprogram associated
-   --  to a fake node.
-
-   overriding function Get_Location_List
-     (Target : Fake_Node) return List_Of_Locations.Set;
-   --  This function returns the list of locations (file, demangled, line,
-   --  column) where the associated subprogram is defined for a fake node.
+   overriding function Get_Demangled_Name (Target : Fake_Node) return Name;
+   --  This function returns the equivalent of a demangled name of the
+   --  subprogram associated to a fake node. This is the internal name, which
+   --  is either the triple base_class:slot:static_class for dispatching nodes
+   --  or the indirect mark plus the caller plus its location for indirect
+   --  nodes.
 
    overriding function Get_Dynamic_Objects
      (Target : Fake_Node) return List_Of_Locations.Set;
    --  This function returns the list of locations (file, demangled, line,
    --  column) where dynamic objects are defined (if any) for a fake node.
-
-   overriding function Get_Indirect_Calls
-     (Target : Fake_Node) return List_Of_Locations.Set;
-   --  This function returns the list of locations (file, line, column) where
-   --  indirect calls are made for a fake node.
 
    ----------------------
    -- Dispatching_Node --
@@ -683,12 +684,6 @@ package Static_Stack_Analysis is
 
    type Dispatching_Node is new Fake_Node with
       record
-         Location_List : List_Of_Locations.Set;
-         --  List of places where the subprogram appears. This list of
-         --  locations will typically contain just one entry, and it will
-         --  contain a list of more than one location in the case of
-         --  instantiations of generic units.
-
          Slot          : Slot_Number;
          --  Slot used for dispatching
 
@@ -697,11 +692,6 @@ package Static_Stack_Analysis is
 
          Static_Class  : Class_Access;
          --  Static view of the object
-
-         Internal_Name : Name;
-         --  Artificial name which is used as equivalent to the symbol name.
-         --  It is built concatenating the names of the base and static
-         --  classes and the slot number.
       end record;
    --  Dispatching calls are those which cannot be uniquely determined at
    --  compile-time because it uses the dynamic dispatching capability
@@ -709,26 +699,11 @@ package Static_Stack_Analysis is
    --  slot number in the vtable that is used for dispatching, the base
    --  class for the dispatching call, and the static view of the object
    --  used for dispatching.
-   --  Internal name is an artificial once created concatenating a string
-   --  representing the triple base_class:slot:static_class.
 
    overriding function Get_Stack_Usage
      (Target : Dispatching_Node) return Stack_Usage_Info;
    --  This function returns the stack requirements for the any dispatching
    --  node.
-
-   overriding function Get_Subprogram_Name
-     (Target : Dispatching_Node) return Name;
-   --  This function returns the name of the subprogram associated to a
-   --  dispatching node. We represent them by a string representing the
-   --  triple base_class:slot:static_class. One advantage of using this
-   --  representation is that every dispatching call with the same pattern
-   --  will be represented by the same node, simplifying the analysis.
-
-   overriding function Get_Demangled_Name
-     (Target : Dispatching_Node) return Name;
-   --  This function returns the demangled name of the subprogram associated
-   --  to a dispatching node.
 
    -------------------
    -- Indirect_Node --

@@ -194,23 +194,32 @@ package body Static_Stack_Analysis is
       --  Compare first the file name, then the subprogram name, and finally
       --  the line number.
 
-      if Left.File = null then
-         return Right.File /= null;
+      if Left.File = null and then Right.File /= null then
+         return True;
 
-      elsif Right.File = null then
+      elsif Left.File /= null and then Right.File = null then
          return False;
 
-      elsif Left.File.all /= Right.File.all then
+      elsif Left.File /= null and then
+        Right.File /= null and then
+        Left.File.all /= Right.File.all
+      then
          return Left.File.all < Right.File.all;
 
       elsif Left.Demangled = null and then Right.Demangled /= null then
          return True;
 
-      elsif Right.Demangled = null then
+      elsif Left.Demangled /= null and then Right.Demangled = null then
          return False;
 
-      elsif Left.Demangled.all /= Right.Demangled.all then
-         return Left.Demangled.all < Right.Demangled.all;
+      elsif Left.Demangled /= null and then
+        Right.Demangled /= null and then
+        Left.Demangled.all /= Right.Demangled.all
+      then
+            return Left.Demangled.all < Right.Demangled.all;
+
+      elsif Left.Line_Number = Right.Line_Number then
+         return Left.Column_Number < Right.Column_Number;
 
       else
          return Left.Line_Number < Right.Line_Number;
@@ -382,21 +391,43 @@ package body Static_Stack_Analysis is
    ------------------------
 
    function Get_Indirect_Calls
-     (Target : Explicit_Node) return List_Of_Locations.Set
+     (Target : Node;
+      Kind   : Indirect_Calls := Both;
+      Status : Indirect_Resolution := Both)
+      return List_Of_Edges.Vector
    is
-      List_Of_Indirect_Calls : List_Of_Locations.Set :=
-        List_Of_Locations.Empty_Set;
+      List_Of_Indirect_Calls : List_Of_Edges.Vector :=
+        List_Of_Edges.Empty_Vector;
 
       procedure Extract_Indirect_Calls (Position : Edge_Id);
-      --  If the referenced call is an indirect call then insert its location
-      --  within the set to be returned.
+      --  If the referenced call is an indirect call with the expected
+      --  attributes then insert the call within the set to be returned.
 
       procedure Extract_Indirect_Calls (Position : Edge_Id) is
          Call : constant Edge := List_Of_Edges.Element (Position);
 
+         Callee_Ptr : constant Node_Class_Access :=
+           List_Of_Nodes.Element (Call.Target);
+
       begin
-         if List_Of_Nodes.Element (Call.Target).all in Fake_Node'Class then
-            List_Of_Indirect_Calls.Union (Call.Point_Of_Call);
+         if (Kind = Access_To_Subprogram and then
+               Callee_Ptr.all in Indirect_Node'Class)
+           or else
+            (Kind = Dispatching and then
+               Callee_Ptr.all in Dispatching_Node'Class)
+           or else
+            (Kind = Both and then
+               Callee_Ptr.all in Fake_Node'Class)
+         then
+            if
+              (Status = Unresolved and then Callee_Ptr.Target_Calls.Is_Empty)
+                 or else
+              (Status = Resolved and then not Callee_Ptr.Target_Calls.Is_Empty)
+                 or else
+              Status = Both
+            then
+               List_Of_Edges.Append (List_Of_Indirect_Calls, Call);
+            end if;
          end if;
       end Extract_Indirect_Calls;
 
@@ -405,35 +436,13 @@ package body Static_Stack_Analysis is
       return List_Of_Indirect_Calls;
    end Get_Indirect_Calls;
 
-   function Get_Indirect_Calls
-     (Target : Unresolved_Node) return List_Of_Locations.Set is
-      pragma Unreferenced (Target);
-   begin
-      return List_Of_Locations.Empty_Set;
-   end Get_Indirect_Calls;
-
-   function Get_Indirect_Calls
-     (Target : Fake_Node) return List_Of_Locations.Set is
-      pragma Unreferenced (Target);
-   begin
-      return List_Of_Locations.Empty_Set;
-   end Get_Indirect_Calls;
-
    -----------------------
    -- Get_Location_List --
    -----------------------
 
-   function Get_Location_List
-     (Target : Real_Node) return List_Of_Locations.Set is
+   function Get_Location_List (Target : Node) return List_Of_Locations.Set is
    begin
       return Target.Location_List;
-   end Get_Location_List;
-
-   function Get_Location_List
-     (Target : Fake_Node) return List_Of_Locations.Set is
-      pragma Unreferenced (Target);
-   begin
-      return List_Of_Locations.Empty_Set;
    end Get_Location_List;
 
    --------------
@@ -523,13 +532,6 @@ package body Static_Stack_Analysis is
 
    function Get_Subprogram_Name
      (Target : Fake_Node) return Name is
-      pragma Unreferenced (Target);
-   begin
-      return Indirect_Call;
-   end Get_Subprogram_Name;
-
-   function Get_Subprogram_Name
-     (Target : Dispatching_Node) return Name is
    begin
       return Target.Internal_Name;
    end Get_Subprogram_Name;
@@ -538,23 +540,13 @@ package body Static_Stack_Analysis is
    -- Get_Demangled_Name --
    ------------------------
 
-   function Get_Demangled_Name
-     (Target : Real_Node) return Name is
+   function Get_Demangled_Name (Target : Real_Node) return Name is
    begin
       return Target.Demangled;
    end Get_Demangled_Name;
 
-   function Get_Demangled_Name
-     (Target : Fake_Node) return Name is
-      pragma Unreferenced (Target);
+   function Get_Demangled_Name (Target : Fake_Node) return Name is
    begin
-      return Indirect_Call;
-   end Get_Demangled_Name;
-
-   function Get_Demangled_Name
-     (Target : Dispatching_Node) return Name is
-   begin
-      --  ??? We should return the demangled name of the classes.
       return Target.Internal_Name;
    end Get_Demangled_Name;
 
@@ -690,6 +682,64 @@ package body Static_Stack_Analysis is
       return Element.Vtable_Entry;
    end Vtable_Key;
 
+   -------------------------
+   -- Move_Indirect_Calls --
+   -------------------------
+
+   procedure Move_Indirect_Calls (Source, Target : Node_Class_Access) is
+      Target_Location : constant Location :=
+        (if Target.Location_List.Is_Empty then
+           Null_Location
+         else
+           Target.Location_List.First_Element);
+      --  ??? We are just taking the first location. Do we need to take more?
+
+      Calls : List_Of_Edges.Vector renames Source.Target_Calls;
+
+      procedure Replace_Indirect_Calls (Position : Natural);
+      --  If the referenced call
+
+      procedure Replace_Indirect_Calls (Position : Natural) is
+         Call : constant Edge := Source.Target_Calls.Element (Position);
+
+      begin
+         if Call.Ada_File_Name = null then
+            --  This call has been defined by the user, so it may be a
+            --  candidate to fulfill the indirect call we are analyzing.
+
+            if Call.Point_Of_Call.Is_Empty or else
+              Target_Location = Null_Location
+            then
+               --  The user defined manually a target for any indirect call
+               --  (no explicit location) originating from Source. Therefore
+               --  we copy this target, but we do not delete it because it can
+               --  be used for other indirect calls with the same origin.
+
+               Target.Target_Calls.Append (Call);
+
+            elsif
+              List_Of_Nodes.Element (Call.Target).all in Real_Node'Class
+                 and then
+              List_Of_Locations.Contains (Call.Point_Of_Call, Target_Location)
+            then
+               --  The user defined manually some targets for this call so we
+               --  move it to the appropriate place.
+
+               Source.Target_Calls.Delete (Position);
+               Target.Target_Calls.Append (Call);
+            end if;
+         end if;
+      end Replace_Indirect_Calls;
+
+   begin
+      pragma Assert (Source.all in Real_Node'Class);
+      pragma Assert (Target.all in Indirect_Node'Class);
+
+      for Index in reverse Calls.First_Index .. Calls.Last_Index loop
+         Replace_Indirect_Calls (Index);
+      end loop;
+   end Move_Indirect_Calls;
+
    ---------------
    -- Normalize --
    ---------------
@@ -748,21 +798,30 @@ package body Static_Stack_Analysis is
    -----------------------
 
    function Stack_Usage_Order
-     (Left, Right : Node_Class_Access) return Boolean is
+     (Left, Right : Node_Class_Access) return Boolean
+   is
    begin
+      pragma Assert (Left /= null and then Right /= null);
+
       return Get_Accumulated_Stack_Usage (Right.all) <
              Get_Accumulated_Stack_Usage (Left.all);
    end Stack_Usage_Order;
 
    function Stack_Usage_Order (Left, Right : Node_Id) return Boolean is
    begin
+      pragma Assert
+        (Left /= List_Of_Nodes.No_Element and then
+         Right /= List_Of_Nodes.No_Element);
+
       return Stack_Usage_Order
         (List_Of_Nodes.Element (Left), List_Of_Nodes.Element (Right));
    end Stack_Usage_Order;
 
    function Stack_Usage_Order (Left, Right : Edge) return Boolean is
    begin
-      --  Compare the weigth of the subprograms to wich we are pointing to
+      pragma Assert (Left /= null and then Right /= null);
+
+      --  Compare the weight of the subprograms to wich we are pointing to
 
       return Stack_Usage_Order (Left.Target, Right.Target);
    end Stack_Usage_Order;

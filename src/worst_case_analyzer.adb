@@ -20,7 +20,6 @@
 ------------------------------------------------------------------------------
 
 with Global_Data;
-with Dispatching_Calls;
 
 package body Worst_Case_Analyzer is
 
@@ -90,18 +89,6 @@ package body Worst_Case_Analyzer is
             --  For a given node we need to explore all the possible target
             --  calls (getting their accumulated stack usage) and then order
             --  these calls according to to the previously computed value.
-
-            --  If the node is an artificial dispatching node, we need to
-            --  verify whether we have all the potential targets. If the
-            --  information is not there yet we compute and store it.
-
-            if Explored_Node.all in Dispatching_Node'Class and then
-              List_Of_Edges.Is_Empty (Explored_Node.Target_Calls)
-            then
-               Explored_Node.Target_Calls :=
-                 Dispatching_Calls.Get_Overriding_Methods
-                   (Dispatching_Node (Explored_Node.all));
-            end if;
 
             --  Iterate over every call from this node
 

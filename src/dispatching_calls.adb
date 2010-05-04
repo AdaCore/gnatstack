@@ -21,12 +21,20 @@
 
 with Global_Data;
 with Demangle;
+with Static_Stack_Analysis; use Static_Stack_Analysis;
 
 package body Dispatching_Calls is
 
    -----------------------
    -- Local Subprograms --
    -----------------------
+
+   function Get_Overriding_Methods
+     (Node : Dispatching_Node) return List_Of_Edges.Vector;
+   --  This function returns the list of potential targets for a dispatching
+   --  call. The dispatching call is specified using the index in a vtable
+   --  used for dispatch, the type whose vtable is used, and the static type
+   --  of the expression.
 
    procedure Propagate_Derived_Classes
      (Position : Static_Stack_Analysis.List_Of_Classes.Cursor);
@@ -148,6 +156,10 @@ package body Dispatching_Calls is
 
             pragma Assert (List_Of_Nodes.Has_Element (Method_Subprogram));
 
+            --  Mark the potential target of the dispatching call as reachable
+
+            List_Of_Nodes.Element (Method_Subprogram).Is_Called := True;
+
             Static_Stack_Analysis.List_Of_Edges.Append
               (Result,
                new Static_Stack_Analysis.Edge_Element'(
@@ -214,6 +226,10 @@ package body Dispatching_Calls is
       end if;
 
       pragma Assert (List_Of_Nodes.Has_Element (Method_Subprogram));
+
+      --  Mark the potential target of the dispatching call as reachable
+
+      List_Of_Nodes.Element (Method_Subprogram).Is_Called := True;
 
       Static_Stack_Analysis.List_Of_Edges.Append
         (Result,
@@ -387,5 +403,38 @@ package body Dispatching_Calls is
       Propagate_To_Base
         (Static_Stack_Analysis.Get_Method (Overloaded.Redefines_Multiple));
    end Propagate_Overloaded_Methods;
+
+   -------------------------------
+   -- Resolve_Dispatching_Calls --
+   -------------------------------
+
+   procedure Resolve_Dispatching_Calls is
+      Index : List_Of_Nodes.Cursor :=
+        Global_Data.List_Of_Subprograms.First;
+
+      Node : Static_Stack_Analysis.Node_Class_Access;
+
+   begin
+      --  Loop for every instance of dispatching call
+
+      while Static_Stack_Analysis.List_Of_Nodes.Has_Element (Index) loop
+
+         Node := Static_Stack_Analysis.List_Of_Nodes.Element (Index);
+
+         if Node.all in Dispatching_Node'Class then
+            --  If the node is an artificial dispatching node, we need to
+            --  verify whether we have all the potential targets. If the
+            --  information is not there yet we compute and store it.
+
+            List_Of_Edges.Append
+              (Node.Target_Calls,
+               Dispatching_Calls.Get_Overriding_Methods
+                 (Dispatching_Node (Node.all)));
+
+         end if;
+
+         Index := Static_Stack_Analysis.List_Of_Nodes.Next (Index);
+      end loop;
+   end Resolve_Dispatching_Calls;
 
 end Dispatching_Calls;

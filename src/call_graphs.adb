@@ -208,9 +208,10 @@ package body Call_Graphs is
             then
                Global_Data.External_Calls := True;
 
-            --  Indirect call
+            --  Indirect and dispatching call
             elsif not Global_Data.Indirect_Calls
               and then Node.all in Fake_Node'Class
+              and then Node.Target_Calls.Is_Empty
             then
                Global_Data.Indirect_Calls := True;
             end if;

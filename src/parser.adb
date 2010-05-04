@@ -524,7 +524,7 @@ package body Parser is
             case
               GNAT.Command_Line.Getopt
                 ("a aO: ca c: d: e: f: files= g h k l: np o= oc= p q r: s= " &
-                 "u: v W! x -help -version")
+                 "t! u: v W! x -help -version")
             is
             when ASCII.NUL =>
                exit;
@@ -775,6 +775,54 @@ package body Parser is
 
                Options.Section_Name :=
                  new String'(GNAT.Command_Line.Parameter);
+
+            --  Resolution of indirect and dispatching calls
+            when 't' =>
+               declare
+                  Parameter : constant String := GNAT.Command_Line.Parameter;
+
+                  use type Options.Target_Resolution_Options;
+
+               begin
+                  for Index in Parameter'Range loop
+                     case Parameter (Index) is
+                        --  -ta
+                        when 'a' =>
+                           Options.Target_Resolution := Options.Both;
+
+                        --  -ti
+                        when 'i' =>
+                           --  Add the indirect calls
+
+                           if Options.Target_Resolution = Options.None or else
+                             Options.Target_Resolution = Options.Indirect_Calls
+                           then
+                              Options.Target_Resolution :=
+                                Options.Indirect_Calls;
+                           else
+                              Options.Target_Resolution := Options.Both;
+                           end if;
+
+                        --  -td
+                        when 'd' =>
+                           --  Add the dispatching calls
+
+                           if Options.Target_Resolution = Options.None or else
+                             Options.Target_Resolution =
+                               Options.Dispatching_Calls
+                           then
+                              Options.Target_Resolution :=
+                                Options.Dispatching_Calls;
+                           else
+                              Options.Target_Resolution := Options.Both;
+                           end if;
+
+                        --  Wrong resolution option
+                        when others =>
+                           raise GNAT.Command_Line.Invalid_Parameter;
+                     end case;
+                  end loop;
+               end;
 
             when others =>
                raise GNAT.Command_Line.Invalid_Switch;
@@ -1769,7 +1817,8 @@ package body Parser is
 
       New_Node         : Boolean := False;
 
-      Symbol_Name      : Name;
+      Source_Name      : Name;
+      Target_Name      : Name;
 
       procedure Mark_As_Called
         (Target : Static_Stack_Analysis.Node_Class_Access);
@@ -1782,6 +1831,8 @@ package body Parser is
       end Mark_As_Called;
 
       use type Ada.Text_IO.Positive_Count;
+
+   --  Start of processing for Parse_Edge
    begin
       --  The pattern of the input line is:
       --  edge: { sourcename: "([^"]*)" targetname: "([^"]*)"
@@ -1813,6 +1864,9 @@ package body Parser is
                Tmp_Location := Static_Stack_Analysis.Null_Location;
 
             else
+               pragma Assert (Loc_Matches (3) /= GNAT.Regpat.No_Match);
+               --  The location has been found
+
                --  This dynamically created object is later destroyed if it is
                --  not used (not inserted in the list).
 
@@ -1863,11 +1917,11 @@ package body Parser is
          --  Look for the source node in the list, or create the node if it
          --  does not exist yet.
 
-         Symbol_Name := new String'
+         Source_Name := new String'
            (Get_Unique_Symbol_Name
               (Input (Matches (1).First .. Matches (1).Last)));
 
-         Source_Id := Get_Node (Symbol_Name.all);
+         Source_Id := Get_Node (Source_Name.all);
 
          if not List_Of_Nodes.Has_Element (Source_Id) then
 
@@ -1876,9 +1930,9 @@ package body Parser is
                Target_Calls            => List_Of_Edges.Empty_Vector,
                Accumulated_Stack_Usage => Unknown_Stack_Usage,
                Location_List           => List_Of_Locations.Empty_Set,
-               Subprogram              => Symbol_Name,
+               Subprogram              => Source_Name,
                Demangled               =>
-                  new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                  new String'(Demangle.Decode (Source_Name, Ada_File_Name)),
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => False,
@@ -1896,7 +1950,7 @@ package body Parser is
 
             --  The previously allocated name is not needed in this case
 
-            Free (Symbol_Name);
+            Free (Source_Name);
          end if;
 
          --  Look for the target node in the list, or create the node if it
@@ -1947,7 +2001,9 @@ package body Parser is
                   begin
                      --  Add this location
 
-                     Node.Location_List.Include (Tmp_Location);
+                     if Tmp_Location /= Null_Location then
+                        Node.Location_List.Include (Tmp_Location);
+                     end if;
 
                      --  Verify that the information that we have corresponds
                      --  to the information that is stored.
@@ -1972,7 +2028,10 @@ package body Parser is
                   Target_Ptr := new Dispatching_Node'
                     (Ada_File_Name           => Ada_File_Name,
                      Location_List           =>
-                       List_Of_Locations.To_Set (Tmp_Location),
+                       (if Tmp_Location = Null_Location then
+                         List_Of_Locations.Empty_Set
+                       else
+                         List_Of_Locations.To_Set (Tmp_Location)),
                      Target_Calls            => List_Of_Edges.Empty_Vector,
                      Accumulated_Stack_Usage => Unknown_Stack_Usage,
                      Slot                    => Slot,
@@ -2000,37 +2059,78 @@ package body Parser is
                end if;
             end;
 
-         --  Create an indirect node for an indirect call
+         --  Handle indirect calls
          elsif
            Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
          then
-            Target_Ptr := new Indirect_Node'
-              (Ada_File_Name           => Ada_File_Name,
-               Target_Calls            => List_Of_Edges.Empty_Vector,
-               Accumulated_Stack_Usage => Unknown_Stack_Usage,
-               Under_Analysis          => False,
-               Analysis_Finished       => False,
-               Is_Called               => True,
-               Is_Reachable            => False,
-               Cycles                  => List_Of_Cycles.Empty_Set);
+            Target_Name :=
+              new String'
+                (if Loc_Matches (3) /= GNAT.Regpat.No_Match then
+                   Indirect_Call.all &
+                   Real_Node (Source_Ptr.all).Subprogram.all &
+                   Input (Loc_Matches (3).First .. Loc_Matches (3).Last)
+                 else
+                   Indirect_Call.all &
+                   Real_Node (Source_Ptr.all).Subprogram.all);
 
-            Global_Data.List_Of_Subprograms.Insert
-              (Target_Ptr, Target_Id, New_Node);
+            --  Try to see whether the indirect node exists
 
-            --  ??? For the moment we create the same indirect node for all
-            --  indirect calls. We should create different ones, but there
-            --  is no means yet to distinguish them. It will be possible when
-            --  we add the location to the calls.
+            if Target_Name = null then
+               Target_Id := Static_Stack_Analysis.List_Of_Nodes.No_Element;
+            else
+               Target_Id := Get_Node (Target_Name.all);
+            end if;
 
-            --  pragma Assert (New_Node);
+            --  Create the node for the indirect call if it does not exist
 
+            if List_Of_Nodes.Has_Element (Target_Id) then
+               --  If the node is already in the list then there is nothing
+               --  else to do.
+
+               return;
+
+            else
+               Target_Ptr := new Indirect_Node'
+                 (Ada_File_Name           => Ada_File_Name,
+                  Location_List           =>
+                    (if Tmp_Location = Null_Location then
+                         List_Of_Locations.Empty_Set
+                       else
+                         List_Of_Locations.To_Set (Tmp_Location)),
+                  Internal_Name           => Target_Name,
+                  Target_Calls            => List_Of_Edges.Empty_Vector,
+                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                  Under_Analysis          => False,
+                  Analysis_Finished       => False,
+                  Is_Called               => True,
+                  Is_Reachable            => False,
+                  Cycles                  => List_Of_Cycles.Empty_Set);
+
+               Global_Data.List_Of_Subprograms.Insert
+                 (Target_Ptr, Target_Id, New_Node);
+
+               pragma Assert (New_Node);
+               --  We have previously verified that the node is not in the list
+
+               --  Now we have created a new node to describe an indirect
+               --  We may have already overridden this indirect call with the
+               --  required information to find the list of actual targets. In
+               --  that case, the caller will already have an edge with the
+               --  same location as the one we are trying to insert. What we
+               --  need to do now is to put user provided information under
+               --  the new node.
+
+               Move_Indirect_Calls (Source_Ptr, Target_Ptr);
+            end if;
+
+         --  Regular call (call to neither dispatching nor indirect nodes)
          else
-            Symbol_Name :=
+            Target_Name :=
               new String'
                 (Get_Unique_Symbol_Name
                      (Input (Matches (2).First .. Matches (2).Last)));
 
-            Target_Id := Get_Node (Symbol_Name.all);
+            Target_Id := Get_Node (Target_Name.all);
 
             if List_Of_Nodes.Has_Element (Target_Id) then
                --  Mark the subprogram as called by another
@@ -2040,7 +2140,7 @@ package body Parser is
 
                --  The previously allocated name is not needed in this case
 
-               Free (Symbol_Name);
+               Free (Target_Name);
 
             --  This node is considered unresolved for the moment. It can be
             --  later modified if we find more information.
@@ -2050,9 +2150,9 @@ package body Parser is
                   Target_Calls            => List_Of_Edges.Empty_Vector,
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => List_Of_Locations.Empty_Set,
-                  Subprogram              => Symbol_Name,
+                  Subprogram              => Target_Name,
                   Demangled               =>
-                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                     new String'(Demangle.Decode (Target_Name, Ada_File_Name)),
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => True,
@@ -2101,6 +2201,7 @@ package body Parser is
 
                   if Tmp_Location /= Static_Stack_Analysis.Null_Location then
                      --  Do not destroy the contents of Tmp_Location
+
                      Call.Point_Of_Call.Include (Tmp_Location);
                   end if;
 
@@ -2108,6 +2209,35 @@ package body Parser is
 
                   exit;
 
+               --  The edge that we are inserting may need to be located at two
+               --  different places. It will usually be added as an edge for
+               --  the Source node but, in the case of edges added manually by
+               --  the user to resolve indirect calls, it will need to be
+               --  placed in the node representing the indirect call.
+               elsif
+                 Ada_File_Name = null
+                   and then
+                 Target_Ptr.all in Real_Node'Class
+                   and then
+                 List_Of_Nodes.Element (Call.Target).all in Indirect_Node'Class
+                   and then
+                 (Tmp_Location = Null_Location or else
+                  Call.Point_Of_Call.Is_Empty or else
+                  Call.Point_Of_Call.Contains (Tmp_Location))
+               then
+                  --  ??? Do I need to use Fake_Node'Class?
+
+                  --  Force the creation of the edge
+
+                  Index := Static_Stack_Analysis.List_Of_Edges.No_Element;
+
+                  --  Modify the source to be located at the indirect node
+
+                  Source_Ptr := List_Of_Nodes.Element (Call.Target);
+
+                  --  Exit since we have found the location we were looking for
+
+                  exit;
                else
                   Static_Stack_Analysis.List_Of_Edges.Next (Index);
                end if;
@@ -2124,12 +2254,56 @@ package body Parser is
                   new Static_Stack_Analysis.Edge_Element'(
                     Ada_File_Name  => Ada_File_Name,
                     Target         => Target_Id,
-                    Point_Of_Call  => List_Of_Locations.To_Set (Tmp_Location),
+                    Point_Of_Call  =>
+                      (if Tmp_Location = Null_Location then
+                         List_Of_Locations.Empty_Set
+                       else
+                         List_Of_Locations.To_Set (Tmp_Location)),
                     Feasible_Call  => True,
                     Under_Analysis => False));
 
                Display.Increase_Count (Global_Data.Call_To_Subprogram);
             end if;
+
+            --  The only possible missing step is the propagation of the edge
+            --  to all dispatching calls when we add manually an edge without
+            --  an specific location. In this case, the manual edge applies to
+            --  all indirect calls originating from Source.
+
+            if Ada_File_Name = null and then Tmp_Location = Null_Location then
+               Index := Source_Ptr.Target_Calls.First;
+
+               while List_Of_Edges.Has_Element (Index) loop
+                  Call := Static_Stack_Analysis.List_Of_Edges.Element (Index);
+
+                  if List_Of_Nodes.Element (Call.Target).all in
+                     Indirect_Node'Class
+                     --  ??? Do I need to use Fake_Node'Class?
+                  then
+                     --  Create new edge with the information that we have
+                     --  about the source and the target.
+
+                     pragma Assert (List_Of_Nodes.Has_Element (Target_Id));
+
+                     Static_Stack_Analysis.List_Of_Edges.Append
+                       (List_Of_Nodes.Element (Call.Target).Target_Calls,
+                        new Static_Stack_Analysis.Edge_Element'(
+                          Ada_File_Name  => Ada_File_Name,
+                          Target         => Target_Id,
+                          Point_Of_Call  =>
+                            (if Tmp_Location = Null_Location then
+                               List_Of_Locations.Empty_Set
+                             else
+                               List_Of_Locations.To_Set (Tmp_Location)),
+                          Feasible_Call  => True,
+                          Under_Analysis => False));
+
+                  end if;
+
+                  Static_Stack_Analysis.List_Of_Edges.Next (Index);
+               end loop;
+            end if;
+
          end;
       else
          raise Parser_Error;
@@ -2635,6 +2809,11 @@ package body Parser is
                                "entry points");
       Put_Line ("  -s=section   name of the section where the .ci is " &
                                "in the object");
+      Put_Line ("  -txx         print targets for indirect and dispatching " &
+                               "calls");
+      Put_Line ("    i          only for indirect calls");
+      Put_Line ("    d          only for dispatching calls");
+      Put_Line ("    a          for both indirect and dispatching calls");
       Put_Line ("  -u size      default for unknown (external) calls");
       Put_Line ("  -v           verbose");
       Put_Line ("  --version    version information");

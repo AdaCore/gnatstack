@@ -47,6 +47,10 @@ begin
 
    Dispatching_Calls.Create_Method_Hierarchies;
 
+   --  Resolve dispatching calls
+
+   Dispatching_Calls.Resolve_Dispatching_Calls;
+
    --  Do accuracy analysis of the graph and extract entry points
 
    Global_Data.Phase := Global_Data.Call_Graph_Analysis;
@@ -56,15 +60,15 @@ begin
 
    Display.Open_Output_Files;
 
-   --  Display incomplete information (if warnings are activated)
-
-   Global_Data.Phase := Global_Data.Print_Warnings;
-   Display.Generate_Warnings;
-
    --  Analyze stack usage
 
    Global_Data.Phase := Global_Data.Worst_Case_Analysis;
    Worst_Case_Analyzer.Worst_Case_Analysis;
+
+   --  Display incomplete information (if warnings are activated)
+
+   Global_Data.Phase := Global_Data.Print_Warnings;
+   Display.Generate_Warnings;
 
    --  Display results
 

@@ -73,6 +73,7 @@ package Global_Data is
    List_Of_Methods : Static_Stack_Analysis.List_Of_Virtual_Methods.Set :=
      Static_Stack_Analysis.List_Of_Virtual_Methods.Empty_Set;
    --  List of all virtual methods under analysis
+
    -------------
    -- Tasking --
    -------------
