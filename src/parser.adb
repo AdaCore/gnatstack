@@ -1820,16 +1820,6 @@ package body Parser is
       Source_Name      : Name;
       Target_Name      : Name;
 
-      procedure Mark_As_Called
-        (Target : Static_Stack_Analysis.Node_Class_Access);
-      --  Mark the subprogram as being called by someone else
-
-      procedure Mark_As_Called
-        (Target : Static_Stack_Analysis.Node_Class_Access) is
-      begin
-         Target.Is_Called := True;
-      end Mark_As_Called;
-
       use type Ada.Text_IO.Positive_Count;
 
    --  Start of processing for Parse_Edge
@@ -2135,8 +2125,9 @@ package body Parser is
             if List_Of_Nodes.Has_Element (Target_Id) then
                --  Mark the subprogram as called by another
 
-               Static_Stack_Analysis.List_Of_Nodes.Query_Element
-                 (Target_Id, Mark_As_Called'Access);
+               Target_Ptr := List_Of_Nodes.Element (Target_Id);
+
+               Target_Ptr.Is_Called := True;
 
                --  The previously allocated name is not needed in this case
 
