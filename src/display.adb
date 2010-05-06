@@ -759,7 +759,9 @@ package body Display is
       Print_Source_Name (Node);
 
       --  Print symbol name in debug mode
-      if Options.Debug then
+      if Options.Debug and then
+        Node.all in Static_Stack_Analysis.Real_Node'Class
+      then
          Ada.Text_IO.Put
            (" (" &
             Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all &
@@ -857,6 +859,10 @@ package body Display is
    --  Mark used to determine whether a call is the result of a dispatching
    --  call.
 
+   Indirect_Call_Mark : Boolean := False;
+   --  Mark used to determine whether a call is the result of a dereference
+   --  to a access-to-subprogram.
+
    procedure Print_Node (Node : Static_Stack_Analysis.Node_Class_Access) is
       Stack_Info : constant Static_Stack_Analysis.Stack_Usage_Info :=
         Static_Stack_Analysis.Get_Stack_Usage (Node.all);
@@ -868,8 +874,15 @@ package body Display is
       --  do not print it, but we mark that the following call is the result
       --  of a dispatching call.
 
-      if Node.all in Static_Stack_Analysis.Dispatching_Node'Class then
+      if Node.all in Static_Stack_Analysis.Dispatching_Node'Class and then
+        not Node.Target_Calls.Is_Empty
+      then
          Dispatching_Call_Mark := True;
+
+      elsif Node.all in Static_Stack_Analysis.Indirect_Node'Class and then
+        not Node.Target_Calls.Is_Empty
+      then
+         Indirect_Call_Mark := True;
 
       --  This represents the result of aliasing analysis, so we skip the
       --  representation of this node.
@@ -894,6 +907,11 @@ package body Display is
          if Dispatching_Call_Mark then
             Ada.Text_IO.Put ("dispatching to ");
             Dispatching_Call_Mark := False;
+
+         elsif Indirect_Call_Mark then
+            Ada.Text_IO.Put ("dereferencing to ");
+            Indirect_Call_Mark := False;
+
          end if;
 
          --  Subprogram name
@@ -950,8 +968,16 @@ package body Display is
       --  Print the symbol name (demangled), removing file information. If it
       --  is an Ada/C++ subprogram we demangle the subprogram name.
 
-      Ada.Text_IO.Put
-        (File, Static_Stack_Analysis.Get_Demangled_Name (Node.all).all);
+      if Node.all in Static_Stack_Analysis.Indirect_Node'Class then
+         Ada.Text_IO.Put (File, "indirect call");
+
+      elsif Node.all in Static_Stack_Analysis.Dispatching_Node'Class then
+         Ada.Text_IO.Put (File, "dispatching call");
+
+      else
+         Ada.Text_IO.Put
+           (File, Static_Stack_Analysis.Get_Demangled_Name (Node.all).all);
+      end if;
    end Print_Source_Name;
 
    ----------------------
