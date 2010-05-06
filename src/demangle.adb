@@ -258,16 +258,25 @@ package body Demangle is
       --  Index to point to the beginning of the subprogram name (removing the
       --  file information).
 
-      Matches : GNAT.Regpat.Match_Array (0 .. 1);
+      File_Regexp : constant String :=
+        "(([\w/ \.~\-\+]+)|" &  -- Unix-style
+        "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
+        "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
+        ":" &  -- separator between file name and symbol name
+        "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]+)$";  --  symbol name
+
+      Matches : GNAT.Regpat.Match_Array (0 .. 5);
 
    begin
       --  Remove file information (look for the ":" separator between file
       --  name and subprogram name).
 
-      GNAT.Regpat.Match ("(:)", Symbol_Name.all, Matches);
+      GNAT.Regpat.Match (File_Regexp, Symbol_Name.all, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         Name_First := Matches (1).Last + 1;
+         pragma Assert (Matches (5) /= GNAT.Regpat.No_Match);
+
+         Name_First := Matches (5).First;
       else
          Name_First := Symbol_Name'First;
       end if;
