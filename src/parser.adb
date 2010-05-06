@@ -171,6 +171,7 @@ package body Parser is
      "^node: {" &
      " title: ""([^""]+)""" &
      "( label: ""[^""]*"")?" &
+     "( alias: ""([^""]*)"")?" &
      "( shape : \w*)?" &
      "\s*}";
    --  The information that is mandatory for a node is the title which
@@ -1244,12 +1245,14 @@ package body Parser is
 
       Symbol_Name     : Name := null;
       Demangled_Name  : Name := null;
+      Alias           : Name := null;
+
       Stack_Info      : Stack_Usage_Info := Unknown_Stack_Usage;
       Locally_Defined : Boolean := False;
 
       Node_Ptr        : Node_Class_Access := null;
 
-      Matches         : GNAT.Regpat.Match_Array (0 .. 3);
+      Matches         : GNAT.Regpat.Match_Array (0 .. 5);
 
       Locations_Set   : List_Of_Locations.Set := List_Of_Locations.Empty_Set;
 
@@ -1257,7 +1260,8 @@ package body Parser is
 
    begin
       --  The pattern of the input line is:
-      --  node: { title: "symbol_name" label: "LABEL"[ shape : ellipse] }
+      --  node: { title: "symbol_name" label: "LABEL"
+      --          [ alias: "alias"][ shape : ellipse] }
       --
       --  The symbol_name is the one that is used for distinguising among the
       --  different nodes. It may include the file name to be able to
@@ -1273,6 +1277,9 @@ package body Parser is
       --      the subprogram
       --  DLOC = object file:line
       --
+      --  The alias information indicates the actual symbol name when the
+      --  current node is an alias for another symbol.
+      --
       --  The shape : ellipse indicates that the node is used but not defined,
       --  which means that it is an unresolved call.
       --
@@ -1287,7 +1294,6 @@ package body Parser is
          raise Parser_Error;
 
       else
-
          --  Get the unique symbol name corresponding to the subprogram
 
          Symbol_Name := new String'
@@ -1317,14 +1323,28 @@ package body Parser is
                Dynamic_Objects := List_Of_Locations.Empty_Set;
             end if;
 
-            --  Get information from the shape
+            --  Get alias information
 
             if Matches (3) /= GNAT.Regpat.No_Match then
+               pragma Assert (Matches (4) /= GNAT.Regpat.No_Match);
+
+               Alias :=
+                 new String'(Input (Matches (4).First .. Matches (4).Last));
+            end if;
+
+            --  Get information from the shape
+
+            if Matches (5) /= GNAT.Regpat.No_Match then
                Parse_Shape
-                 (Input (Matches (3).First .. Matches (3).Last),
+                 (Input (Matches (5).First .. Matches (5).Last),
                   Locally_Defined);
+
             else
-               Locally_Defined := True;
+               --  Nodes are also locally defined if they define their stack
+               --  usage.
+
+               Locally_Defined :=
+                 Stack_Info.Frame_Type /= Static_Stack_Analysis.Unknown;
             end if;
          end if;
       end if;
@@ -1379,6 +1399,7 @@ package body Parser is
                   Subprogram              => Symbol_Name,
                   Demangled               =>
                      new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                  Alias                   => Alias,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
@@ -1923,6 +1944,7 @@ package body Parser is
                Subprogram              => Source_Name,
                Demangled               =>
                   new String'(Demangle.Decode (Source_Name, Ada_File_Name)),
+               Alias                   => null,
                Under_Analysis          => False,
                Analysis_Finished       => False,
                Is_Called               => False,
@@ -2144,6 +2166,7 @@ package body Parser is
                   Subprogram              => Target_Name,
                   Demangled               =>
                      new String'(Demangle.Decode (Target_Name, Ada_File_Name)),
+                  Alias                   => null,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => True,

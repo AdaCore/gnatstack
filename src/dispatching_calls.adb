@@ -137,6 +137,7 @@ package body Dispatching_Calls is
                   new String'
                     (Demangle.Decode
                        (Explored_Method_Name, Node.Ada_File_Name)),
+                  Alias                   => null,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
                   Is_Called               => False,
@@ -208,6 +209,7 @@ package body Dispatching_Calls is
             Demangled               =>
             new String'
               (Demangle.Decode (Base_Method_Name, Node.Ada_File_Name)),
+            Alias                   => null,
             Under_Analysis          => False,
             Analysis_Finished       => False,
             Is_Called               => False,

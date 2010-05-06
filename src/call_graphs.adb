@@ -205,6 +205,7 @@ package body Call_Graphs is
             --  External call
             elsif not Global_Data.External_Calls
               and then Node.all in Unresolved_Node'Class
+              and then Node.Target_Calls.Is_Empty
             then
                Global_Data.External_Calls := True;
 
@@ -627,5 +628,61 @@ package body Call_Graphs is
          Mark_Path_End_Of_Analysis (Next_Node, To);
       end if;
    end Mark_Path_End_Of_Analysis;
+
+   ---------------------
+   -- Resolve_Aliases --
+   ---------------------
+
+   procedure Resolve_Aliases is
+      procedure Resolve_Alias (Position : Static_Stack_Analysis.Node_Id);
+      --  If the node needs to be resolved using the alias information we do
+      --  it here.
+
+      procedure Resolve_Alias (Position : Static_Stack_Analysis.Node_Id) is
+         Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=
+           Static_Stack_Analysis.List_Of_Nodes.Element (Position);
+
+         Alias_Id : Static_Stack_Analysis.Node_Id;
+
+         use Static_Stack_Analysis;
+
+      begin
+         --  If a node with an alias attribute has not been resolved yet it
+         --  means that we need to rely on the alias information to know the
+         --  actual subprogram that will be called.
+
+         if Explored_Node.all in Unresolved_Node'Class and then
+           Unresolved_Node (Explored_Node.all).Alias /= null
+         then
+            --  Look for the alias target
+
+            Alias_Id :=
+              Get_Node (Unresolved_Node (Explored_Node.all).Alias.all);
+
+            if List_Of_Nodes.Has_Element (Alias_Id) then
+               pragma Assert (Explored_Node.Target_Calls.Is_Empty);
+
+               --  Mark the callee as called by another one
+
+               List_Of_Nodes.Element (Alias_Id).Is_Called := True;
+
+               --  Create new edge to represent the alias information.
+
+               Static_Stack_Analysis.List_Of_Edges.Append
+                 (Explored_Node.Target_Calls,
+                  new Static_Stack_Analysis.Edge_Element'(
+                    Ada_File_Name  => Explored_Node.Ada_File_Name,
+                    Target         => Alias_Id,
+                    Point_Of_Call  => Explored_Node.Location_List,
+                    Feasible_Call  => True,
+                    Under_Analysis => False));
+            end if;
+         end if;
+      end Resolve_Alias;
+
+   begin
+      Static_Stack_Analysis.List_Of_Nodes.Iterate
+        (Global_Data.List_Of_Subprograms, Resolve_Alias'Access);
+   end Resolve_Aliases;
 
 end Call_Graphs;

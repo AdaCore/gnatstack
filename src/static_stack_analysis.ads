@@ -624,10 +624,15 @@ package Static_Stack_Analysis is
    -- Unresolved_Node --
    ---------------------
 
-   type Unresolved_Node is new Real_Node with null record;
+   type Unresolved_Node is new Real_Node with
+      record
+         Alias      : Name;
+         --  Points to the actual implementation of this node;
+      end record;
    --  Unresolved calls are those for which there is no information about its
    --  stack usage nor about subprograms that are called from this node. We
    --  know the name of the symbol and the place where the subprogram appears.
+   --  It may include aliasing information.
 
    overriding function Get_Stack_Usage
      (Target : Unresolved_Node) return Stack_Usage_Info;

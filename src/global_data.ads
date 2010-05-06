@@ -104,8 +104,9 @@ package Global_Data is
    -- Phases of analysis --
    ------------------------
 
-   type Phase_Type is (Parse, Dispatching_Calls, Call_Graph_Analysis,
-                       Print_Warnings, Worst_Case_Analysis, Print_Results);
+   type Phase_Type is
+     (Parse, Dispatching_Calls, Call_Graph_Analysis, Alias_Analysis,
+      Print_Warnings, Worst_Case_Analysis, Print_Results);
    --  Type for Phase variable
 
    Phase : Phase_Type;

@@ -510,14 +510,29 @@ package body Static_Stack_Analysis is
 
    function Get_Stack_Usage
      (Target : Unresolved_Node) return Stack_Usage_Info is
-      pragma Unreferenced (Target);
    begin
-      return Stack_Usage_Info'
-        (Frame_Type    => Unknown,
-         Static_Usage  => Empty_Value,
-         Dynamic_Usage => Empty_Value,
-         Unknown_Usage => Frame_Size (Options.Default_Unknown),
-         Cycle_Usage   => Empty_Value);
+      if Target.Target_Calls.Is_Empty then
+         return Stack_Usage_Info'
+           (Frame_Type    => Unknown,
+            Static_Usage  => Empty_Value,
+            Dynamic_Usage => Empty_Value,
+            Unknown_Usage => Frame_Size (Options.Default_Unknown),
+            Cycle_Usage   => Empty_Value);
+
+      else
+         --  When the node is resolved by aliasing then return a local stack
+         --  usage of 0. The actual stack consumption comes from the alias
+         --  target.
+
+         pragma Assert (Target.Alias /= null);
+
+         return Stack_Usage_Info'
+           (Frame_Type    => Static,
+            Static_Usage  => 0,
+            Dynamic_Usage => Empty_Value,
+            Unknown_Usage => Empty_Value,
+            Cycle_Usage   => Empty_Value);
+      end if;
    end Get_Stack_Usage;
 
    -------------------------

@@ -871,6 +871,16 @@ package body Display is
       if Node.all in Static_Stack_Analysis.Dispatching_Node'Class then
          Dispatching_Call_Mark := True;
 
+      --  This represents the result of aliasing analysis, so we skip the
+      --  representation of this node.
+      elsif Node.all in Static_Stack_Analysis.Unresolved_Node'Class and then
+        not Node.Target_Calls.Is_Empty
+      then
+         pragma Assert
+           (Static_Stack_Analysis.Unresolved_Node (Node.all).Alias /= null);
+
+         null;
+
       --  Normal node
       else
          Open_Tag ("subprogram");
@@ -1164,7 +1174,9 @@ package body Display is
         Static_Stack_Analysis.List_Of_Nodes.Element (Position);
 
       Unresolved : constant Boolean :=
-        Node.all in Static_Stack_Analysis.Unresolved_Node'Class;
+        Node.all in Static_Stack_Analysis.Unresolved_Node'Class
+           and then
+        Static_Stack_Analysis.Unresolved_Node (Node.all).Target_Calls.Is_Empty;
 
       Stack : constant Static_Stack_Analysis.Stack_Usage_Info :=
         Static_Stack_Analysis.Get_Stack_Usage (Node.all);
@@ -1585,8 +1597,10 @@ package body Display is
       --  entry points we do not display this node (although the subprogram may
       --  be reachable via indirect calls).
 
-      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class
-        and then Node.Is_Reachable then
+      if Node.all in Static_Stack_Analysis.Unresolved_Node'Class and then
+        Node.Is_Reachable and then
+        Static_Stack_Analysis.Unresolved_Node (Node.all).Target_Calls.Is_Empty
+      then
          Ada.Text_IO.Put ("  ");
 
          Open_Tag ("external");

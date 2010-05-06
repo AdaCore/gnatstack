@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2007, AdaCore                     --
+--                     Copyright (C) 2005-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -27,5 +27,9 @@ package Call_Graphs is
    --  references, indirect calls and unbounded frames. It will also get the
    --  entry points for the application (depending on the options defined by
    --  the user).
+
+   procedure Resolve_Aliases;
+   --  Look for unresolved subprograms which need to be resolved using the
+   --  aliasing information.
 
 end Call_Graphs;

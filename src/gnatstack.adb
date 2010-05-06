@@ -51,6 +51,11 @@ begin
 
    Dispatching_Calls.Resolve_Dispatching_Calls;
 
+   --  Resolve aliases
+
+   Global_Data.Phase := Global_Data.Alias_Analysis;
+   Call_Graphs.Resolve_Aliases;
+
    --  Do accuracy analysis of the graph and extract entry points
 
    Global_Data.Phase := Global_Data.Call_Graph_Analysis;
