@@ -1,5 +1,7 @@
 with System.Machine_Code; use System.Machine_Code;
 
+with Memory;
+
 procedure Last_Chance_Handler (Msg : System.Address; Line : Integer) is
    pragma Unreferenced (Msg, Line);
 begin
