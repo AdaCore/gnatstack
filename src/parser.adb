@@ -207,16 +207,16 @@ package body Parser is
    --  Ada comments and blank lines are allowed
 
    Location_Regexp : constant String :=
-     "(<no location>)|" &
+     "(<no location>)|" &  -- Encoding for no location
      "(<built-in>.*)|" &  -- Location for built-in functions
-     "((([\w/ \.~\-\+]+)|" &  -- Unix-style
-     "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
-     "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
+     "(((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  -- Normal locations
      ":(\d+)(:\d+)?)";  -- line and possibly column number
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
-   --  cygwin-style (drive_letter:/path). There is also .extension for the
-   --  file, and file location (:line[:column]).
+   --  cygwin-style (drive_letter:/path or /path). There is also .extension
+   --  for the file, and file location (:line[:column]). Note that sometimes,
+   --  on cygwin, locations have a pattern with mixed / and \, such as
+   --  /path\file.ext.
 
    Stack_Regexp : constant String :=
      "(\d+) bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))?";
@@ -1134,7 +1134,7 @@ package body Parser is
      (Input           : String;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 12);
+      Matches : GNAT.Regpat.Match_Array (0 .. 10);
 
       Tmp_Location : Static_Stack_Analysis.Location;
 
@@ -1151,24 +1151,32 @@ package body Parser is
          Tmp_Location.Demangled :=
            new String'(Input (Matches (1).First .. Matches (1).Last));
 
-         if Matches (3) /= GNAT.Regpat.No_Match then
-            --  Matches <no location>
+         if Matches (3) /= GNAT.Regpat.No_Match or else
+           Matches (4) /= GNAT.Regpat.No_Match
+         then
+            --  Matches <no location> or <built-in>
 
             Tmp_Location := Static_Stack_Analysis.Null_Location;
 
          else
+            pragma Assert
+              (Matches (5) /= GNAT.Regpat.No_Match and then
+               Matches (6) /= GNAT.Regpat.No_Match);
+
             Tmp_Location.File :=
               new String'(Input (Matches (6).First .. Matches (6).Last));
 
-            Tmp_Location.Line_Number :=
-              Integer'Value (Input (Matches (10).First .. Matches (10).Last));
+            pragma Assert (Matches (8) /= GNAT.Regpat.No_Match);
 
-            if Matches (11) /= GNAT.Regpat.No_Match then
+            Tmp_Location.Line_Number :=
+              Integer'Value (Input (Matches (8).First .. Matches (8).Last));
+
+            if Matches (9) /= GNAT.Regpat.No_Match then
                --  'First + 1 to skip the ":"
 
                Tmp_Location.Column_Number :=
                  Integer'Value
-                   (Input (Matches (11).First + 1 .. Matches (11).Last));
+                   (Input (Matches (9).First + 1 .. Matches (9).Last));
             else
                Tmp_Location.Column_Number := 0;
             end if;
@@ -1176,9 +1184,9 @@ package body Parser is
 
          --  Parse additional locations, if any
 
-         if Matches (12) /= GNAT.Regpat.No_Match then
+         if Matches (10) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (12).First .. Matches (12).Last),
+              (Input (Matches (10).First .. Matches (10).Last),
                Dynamic_Objects);
          end if;
 
@@ -1582,7 +1590,7 @@ package body Parser is
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 19);
+      Matches : GNAT.Regpat.Match_Array (0 .. 17);
 
    begin
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
@@ -1638,9 +1646,9 @@ package body Parser is
 
          --  Stack usage
 
-         if Matches (15) /= GNAT.Regpat.No_Match then
+         if Matches (13) /= GNAT.Regpat.No_Match then
             Parse_Stack_Usage
-              (Input (Matches (15).First .. Matches (15).Last), Stack);
+              (Input (Matches (13).First .. Matches (13).Last), Stack);
          else
             Stack := Static_Stack_Analysis.Unknown_Stack_Usage;
             Stack.Unknown_Usage :=
@@ -1649,9 +1657,9 @@ package body Parser is
 
          --  Dynamic objects
 
-         if Matches (19) /= GNAT.Regpat.No_Match then
+         if Matches (17) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (19).First .. Matches (19).Last),
+              (Input (Matches (17).First .. Matches (17).Last),
                Dynamic_Objects);
          else
             Dynamic_Objects :=
@@ -1669,7 +1677,7 @@ package body Parser is
       Demangled : Static_Stack_Analysis.Name;
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches      : GNAT.Regpat.Match_Array (0 .. 11);
+      Matches      : GNAT.Regpat.Match_Array (0 .. 9);
 
       Tmp_Location : Static_Stack_Analysis.Location;
 
@@ -1690,32 +1698,38 @@ package body Parser is
             --  This dynamically created object will be later destroyed if it
             --  is not used (inserted in the list).
 
+            pragma Assert
+              (Matches (4) /= GNAT.Regpat.No_Match and then
+               Matches (5) /= GNAT.Regpat.No_Match);
+
             Tmp_Location.File :=
               new String'
                 (Input (Matches (5).First .. Matches (5).Last));
 
             Tmp_Location.Demangled := Demangled;
 
+            pragma Assert (Matches (7) /= GNAT.Regpat.No_Match);
+
             Tmp_Location.Line_Number :=
-              Integer'Value (Input (Matches (9).First .. Matches (9).Last));
+              Integer'Value (Input (Matches (7).First .. Matches (7).Last));
 
             --  The column number is not always present
 
-            if Matches (10) /= GNAT.Regpat.No_Match then
+            if Matches (8) /= GNAT.Regpat.No_Match then
                --  'First + 1 to skip the ":"
 
                Tmp_Location.Column_Number :=
                  Integer'Value
-                   (Input (Matches (10).First + 1 .. Matches (10).Last));
+                   (Input (Matches (8).First + 1 .. Matches (8).Last));
             else
                Tmp_Location.Column_Number := 0;
             end if;
 
             --  Parse additional locations, if any
 
-            if Matches (11) /= GNAT.Regpat.No_Match then
+            if Matches (9) /= GNAT.Regpat.No_Match then
                Parse_Node_Locations
-                 (Input (Matches (11).First .. Matches (11).Last),
+                 (Input (Matches (9).First .. Matches (9).Last),
                   Demangled,
                   Locations);
             end if;
@@ -1824,7 +1838,7 @@ package body Parser is
       use Static_Stack_Analysis;
 
       Matches          : GNAT.Regpat.Match_Array (0 .. 3);
-      Loc_Matches      : GNAT.Regpat.Match_Array (0 .. 9);
+      Loc_Matches      : GNAT.Regpat.Match_Array (0 .. 7);
       Dispatch_Matches : GNAT.Regpat.Match_Array (0 .. 3);
 
       Source_Id        : Static_Stack_Analysis.Node_Id;
@@ -1875,8 +1889,11 @@ package body Parser is
                Tmp_Location := Static_Stack_Analysis.Null_Location;
 
             else
-               pragma Assert (Loc_Matches (3) /= GNAT.Regpat.No_Match);
                --  The location has been found
+
+               pragma Assert
+                 (Loc_Matches (3) /= GNAT.Regpat.No_Match and then
+                  Loc_Matches (4) /= GNAT.Regpat.No_Match);
 
                --  This dynamically created object is later destroyed if it is
                --  not used (not inserted in the list).
@@ -1885,17 +1902,19 @@ package body Parser is
                  new String'
                    (Input (Loc_Matches (4).First .. Loc_Matches (4).Last));
 
+               pragma Assert (Loc_Matches (6) /= GNAT.Regpat.No_Match);
+
                Tmp_Location.Line_Number :=
                  Integer'Value
-                   (Input (Loc_Matches (8).First .. Loc_Matches (8).Last));
+                   (Input (Loc_Matches (6).First .. Loc_Matches (6).Last));
 
-               if Loc_Matches (9) /= GNAT.Regpat.No_Match then
+               if Loc_Matches (7) /= GNAT.Regpat.No_Match then
                   --  'First + 1 to skip the ":"
 
                   Tmp_Location.Column_Number :=
                     Integer'Value
                       (Input
-                        (Loc_Matches (9).First + 1 .. Loc_Matches (9).Last));
+                        (Loc_Matches (7).First + 1 .. Loc_Matches (7).Last));
                else
                   Tmp_Location.Column_Number := 0;
                end if;
@@ -2333,7 +2352,7 @@ package body Parser is
 
       Match_Class_Info : GNAT.Regpat.Match_Array (0 .. 5);
 
-      Match_Label      : GNAT.Regpat.Match_Array (0 .. 11);
+      Match_Label      : GNAT.Regpat.Match_Array (0 .. 9);
 
       This_Class       : Class_Access;
 
@@ -2591,21 +2610,21 @@ package body Parser is
               new String'
                 (Input (Match_Label (6).First .. Match_Label (6).Last));
 
-            pragma Assert (Match_Label (10) /= GNAT.Regpat.No_Match);
+            pragma Assert (Match_Label (8) /= GNAT.Regpat.No_Match);
 
             CLocation.Line_Number :=
               Integer'Value
-                (Input (Match_Label (10).First .. Match_Label (10).Last));
+                (Input (Match_Label (8).First .. Match_Label (8).Last));
 
             --  The column number is not always there
 
-            if Match_Label (11) /= GNAT.Regpat.No_Match then
+            if Match_Label (9) /= GNAT.Regpat.No_Match then
                --  'First + 1 to skip the ":"
 
                CLocation.Column_Number :=
                  Integer'Value
                    (Input
-                        (Match_Label (11).First + 1 .. Match_Label (11).Last));
+                        (Match_Label (9).First + 1 .. Match_Label (9).Last));
             else
                CLocation.Column_Number := 0;
             end if;

@@ -259,13 +259,17 @@ package body Demangle is
       --  file information).
 
       File_Regexp : constant String :=
-        "(([\w/ \.~\-\+]+)|" &  -- Unix-style
-        "([a-zA-Z]:[\\/][\w\\/ \.~\-\+]+)|" &  -- UNC-style
-        "(\\\\[\w\\ \.~\-\+]+))" &  -- cygwin-style
+        "((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &
         ":" &  -- separator between file name and symbol name
         "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]+)$";  --  symbol name
+      --  Accepted locations are Unix-style (directories separated by slashes),
+      --  Windows UNC-style (drive_letter:\path or \\server\path), and
+      --  cygwin-style (drive_letter:/path or /path). There is also .extension
+      --  for the file, and file location (:line[:column]). Note that
+      --  sometimes, on cygwin, locations have a pattern with mixed / and \,
+      --  such as /path\file.ext.
 
-      Matches : GNAT.Regpat.Match_Array (0 .. 5);
+      Matches : GNAT.Regpat.Match_Array (0 .. 3);
 
    begin
       --  Remove file information (look for the ":" separator between file
@@ -274,9 +278,9 @@ package body Demangle is
       GNAT.Regpat.Match (File_Regexp, Symbol_Name.all, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
-         pragma Assert (Matches (5) /= GNAT.Regpat.No_Match);
+         pragma Assert (Matches (3) /= GNAT.Regpat.No_Match);
 
-         Name_First := Matches (5).First;
+         Name_First := Matches (3).First;
       else
          Name_First := Symbol_Name'First;
       end if;
