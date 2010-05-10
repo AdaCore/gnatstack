@@ -261,6 +261,19 @@ package body Dispatching_Calls is
          --  "1:grandchild__foo,1:child__foo"
          --  while the C++ compiler generates the following:
          --  "1:grandchild__foo,1:parent__foo"
+         --
+         --  Note that there is another issue to consider for Ada. If we have
+         --  again the hierarchy Parent->Child->Grandchild, and Parent and
+         --  Grandchild (but no Child) define a method called Foo, the Ada
+         --  compiler generates the following for Grandchild::Foo:
+         --  "1:grandchild__foo,1:child__foo"
+         --  even when the method Child::Foo does not actually exist. The C++
+         --  compiler consistently generates the following:
+         --  "1:grandchild__foo,1:parent__foo"
+         --  This issue is handled at the moment of propagating the different
+         --  methods upstream (in Propagate_Overloaded_Methods), when we add
+         --  to every method the list of methods are overloading it, putting
+         --  the information in the Redefined_By field.
 
          declare
             Overriding_List : List_Of_Virtual_Methods.Set :=
@@ -364,30 +377,78 @@ package body Dispatching_Calls is
       Overloaded : constant Virtual_Class_Access :=
         List_Of_Virtual_Methods.Element (Position);
 
-      procedure Propagate_To_Base (Base : Virtual_Class_Access);
+      procedure Propagate_To_Base (Base : Vtable_Loc);
 
-      procedure Propagate_To_Base (Base : Virtual_Class_Access) is
+      procedure Propagate_To_Base (Base : Vtable_Loc) is
+         Overloaded_Method : Virtual_Class_Access;
+         Primary_Parent    : Class_Access;
+
       begin
-         if Base /= null then
-            --  Include the list of overloaded methods to the base
+         if Base = Null_Vtable_Loc then
+            --  Stop propagating because this is not overriding any other
+            --  method.
 
-            Base.Redefined_By.Union (Accumulated_Overloaded);
+            null;
 
-            --  Add this method to the list and continue going upstream
-            --  through both the primary and secondary vtables that may be
-            --  overridden.
+         else
+            Overloaded_Method := Static_Stack_Analysis.Get_Method (Base);
 
-            Accumulated_Overloaded.Insert (Base);
+            if Overloaded_Method = null then
+               --  It means that this method is overriding another one, but the
+               --  one to which it is pointing is not a real one and we need to
+               --  look for the real on going upstream in the class hierarchy.
+               --
+               --  This happens with the Ada compiler when we have  hierarchy
+               --  like Parent->Child->Grandchild, and Parent and Grandchild
+               --  (but no Child) define a method called Foo. The Ada compiler
+               --  generates the following for Grandchild::Foo:
+               --  "1:grandchild__foo,1:child__foo"
+               --  even when the method Child::Foo does not actually exist. The
+               --  C++ compiler consistently generates the following:
+               --  "1:grandchild__foo,1:parent__foo"
 
-            Propagate_To_Base
-              (Static_Stack_Analysis.Get_Method (Base.Redefines));
+               --  ??? Go up through the primary parents hierarchy. Note that
+               --  we may need to go up through the secondary parents also.
+               --  This should be fixed in the compiler.
 
-            Propagate_To_Base
-              (Static_Stack_Analysis.Get_Method (Base.Redefines_Multiple));
+               Primary_Parent := Base.Class.Primary_Parent;
 
-            --  Remove me from the list
+               while Primary_Parent /= null loop
+                  Overloaded_Method := Static_Stack_Analysis.Get_Method
+                    (Vtable_Loc'(Primary_Parent, Base.Slot));
 
-            Accumulated_Overloaded.Delete (Base);
+                  if Overloaded_Method = null then
+                     Primary_Parent := Primary_Parent.Primary_Parent;
+                  else
+                     --  Found
+
+                     exit;
+                  end if;
+               end loop;
+
+            end if;
+
+            if Overloaded_Method /= null then
+               --  Include the list of overloaded methods to the base
+
+               Overloaded_Method.Redefined_By.Union (Accumulated_Overloaded);
+
+               --  Add this method to the list and continue going upstream
+               --  through both the primary and secondary vtables that may be
+               --  overridden.
+
+               Accumulated_Overloaded.Insert (Overloaded_Method);
+
+               --  Go up the bases' links (primary and secondary)
+
+               Propagate_To_Base (Overloaded_Method.Redefines);
+
+               Propagate_To_Base (Overloaded_Method.Redefines_Multiple);
+
+               --  Remove me from the list
+
+               Accumulated_Overloaded.Delete (Overloaded_Method);
+            end if;
          end if;
       end Propagate_To_Base;
 
@@ -399,11 +460,9 @@ package body Dispatching_Calls is
 
       --  Go up the bases' links (primary and secondary)
 
-      Propagate_To_Base
-        (Static_Stack_Analysis.Get_Method (Overloaded.Redefines));
+      Propagate_To_Base (Overloaded.Redefines);
 
-      Propagate_To_Base
-        (Static_Stack_Analysis.Get_Method (Overloaded.Redefines_Multiple));
+      Propagate_To_Base (Overloaded.Redefines_Multiple);
    end Propagate_Overloaded_Methods;
 
    -------------------------------

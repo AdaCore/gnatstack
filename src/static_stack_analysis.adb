@@ -580,11 +580,12 @@ package body Static_Stack_Analysis is
          --  Create the object to store the class information
 
          This_Class := new Class'
-           (Class_Name => new String'(Symbol),
-            Class_Loc  => Loc,
-            Parents    => List_Of_Classes.Empty_Set,
-            Derived    => List_Of_Classes.Empty_Set,
-            Virtual    => List_Of_Virtual_Methods.Empty_Set);
+           (Class_Name     => new String'(Symbol),
+            Class_Loc      => Loc,
+            Parents        => List_Of_Classes.Empty_Set,
+            Primary_Parent => null,
+            Derived        => List_Of_Classes.Empty_Set,
+            Virtual        => List_Of_Virtual_Methods.Empty_Set);
 
          --  Insert in the list
 

@@ -2350,15 +2350,17 @@ package body Parser is
    procedure Parse_Class (Input : String) is
       use Static_Stack_Analysis;
 
-      Match_Class_Info : GNAT.Regpat.Match_Array (0 .. 5);
+      Match_Class_Info  : GNAT.Regpat.Match_Array (0 .. 5);
 
-      Match_Label      : GNAT.Regpat.Match_Array (0 .. 9);
+      Match_Label       : GNAT.Regpat.Match_Array (0 .. 9);
 
-      This_Class       : Class_Access;
+      This_Class        : Class_Access;
 
-      CName            : Name;
+      CName             : Name;
 
-      CLocation        : Location;
+      CLocation         : Location;
+
+      Is_Primary_Parent : Boolean := True;
 
       procedure Get_Parents (Input : String);
       --  Get the list of parents class stored in the comma-separated list
@@ -2394,6 +2396,19 @@ package body Parser is
             --  may be in the set already.
 
             This_Class.Parents.Include (Parent);
+
+            --  The first parent is the primary parent
+
+            if Is_Primary_Parent then
+               pragma Assert (This_Class.Primary_Parent = null);
+
+               This_Class.Primary_Parent := Parent;
+
+               --  We already have the primary parent
+
+               Is_Primary_Parent := False;
+
+            end if;
 
          else
             raise Parser_Error with

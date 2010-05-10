@@ -424,6 +424,11 @@ package Static_Stack_Analysis is
          Class_Loc  : Location;
          --  Demangled name and file location for the class
 
+         Primary_Parent : Class_Access;
+         --  Identifier for the primary parent of the class. ??? This field can
+         --  be probably removed when the compiler generates the information
+         --  about the actual method overloaded.
+
          Parents    : List_Of_Classes.Set;
          --  List of direct parents.
 

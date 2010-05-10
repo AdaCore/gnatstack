@@ -13,10 +13,10 @@ begin
    Dispatching.Foo (Obj.all);
    --  Obj belongs to the classwide type rooted at Base, so
    --  this call can dispatch to any instance of Foo.
-   --  GNATstack should take Base::Foo as the biggest stack
+   --  GNATstack should take Subsubderived::Foo as the biggest stack
    --  consumer. If we want the actual execution of the program to
    --  actually traverse the worst-case path we need an object of
-   --  type either Base or Intermediate.
+   --  type Subsubderived.
 
    Print_Stack_Usage;
 end Test;
