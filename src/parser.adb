@@ -1238,6 +1238,10 @@ package body Parser is
       elsif GNAT.Regpat.Match (Allowed_Lines_Regexp, Input) then
          null;
 
+      --  Skip file termination lines that may appear on Windows
+      elsif Input'Length = 1 and then Input (Input'First) = ASCII.SUB then
+         null;
+
       --  Error otherwise
       else
          raise Parser_Error;
@@ -2400,10 +2404,22 @@ package body Parser is
             --  The first parent is the primary parent
 
             if Is_Primary_Parent then
-               pragma Assert (This_Class.Primary_Parent = null);
 
-               This_Class.Primary_Parent := Parent;
+               if This_Class.Primary_Parent = null then
+                  --  Insert the pointer to the first parent if the information
+                  --  is not there yet.
 
+                  This_Class.Primary_Parent := Parent;
+
+               elsif
+                 This_Class.Primary_Parent.Class_Name.all /=
+                   Input (Match_Parents (1).First .. Match_Parents (1).Last)
+               then
+                  --  The information about the primary parent may be already
+                  --  there but we make sure it is consistent.
+
+                  raise Parser_Error with "Conflicting primary parent";
+               end if;
                --  We already have the primary parent
 
                Is_Primary_Parent := False;
