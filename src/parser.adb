@@ -224,9 +224,9 @@ package body Parser is
 
    Node_Label_Regexp : constant String :=
      "^ label: " &
-     """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=)?" &  -- Unary operators
-     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*)?(\\n)?" &  -- Demangled name
-     "(" & Location_Regexp & ",?)*" & "(\\n)?" &
+     """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=|" &  -- Unary operators
+     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*)\\n)?" &  -- Demangled name
+     "((" & Location_Regexp & ",?)*(\\n)?)?" &
      "(" & Stack_Regexp & ")?" &
      "(\\n\d+ dynamic objects(\\n .*)?)?""$";
    --  Extra information about a node
@@ -1613,7 +1613,7 @@ package body Parser is
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 17);
+      Matches : GNAT.Regpat.Match_Array (0 .. 16);
 
    begin
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
@@ -1645,19 +1645,23 @@ package body Parser is
 
          --  Demangled name
 
-         if Matches (1) /= GNAT.Regpat.No_Match then
+         if Matches (1) /= GNAT.Regpat.No_Match and then
+           Matches (2) /= GNAT.Regpat.No_Match
+         then
             --  This dynamically allocated String is later destroyed if it is
             --  not used (inserted in the list).
 
             Demangled :=
-              new String'(Input (Matches (1).First .. Matches (1).Last));
+              new String'(Input (Matches (2).First .. Matches (2).Last));
          else
             Demangled := null;
          end if;
 
          --  Subprogram location
 
-         if Matches (4) /= GNAT.Regpat.No_Match then
+         if Matches (3) /= GNAT.Regpat.No_Match and then
+           Matches (4) /= GNAT.Regpat.No_Match
+         then
             Parse_Node_Locations
               (Input (Matches (4).First .. Matches (4).Last),
                Demangled,
@@ -1680,9 +1684,9 @@ package body Parser is
 
          --  Dynamic objects
 
-         if Matches (17) /= GNAT.Regpat.No_Match then
+         if Matches (16) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (17).First .. Matches (17).Last),
+              (Input (Matches (16).First .. Matches (16).Last),
                Dynamic_Objects);
          else
             Dynamic_Objects :=
