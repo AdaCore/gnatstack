@@ -1393,8 +1393,8 @@ package body Parser is
          --  Unresolved
          elsif not Locally_Defined then
             --  If the subprogram is not yet in the list then we insert it.
-            --  Otherwise, we do nothing because there is no information to
-            --  add.
+            --  Otherwise, we simply add the information that may be missing,
+            --  which is the alias information.
 
             if not List_Of_Nodes.Has_Element (Found_Id) then
                --  Insert new unresolved node.
@@ -1424,6 +1424,25 @@ package body Parser is
 
                List_Of_Nodes.Insert
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
+
+            --  The only additional information may be the alias, which can
+            --  only happen for unresolved nodes.
+            elsif Alias /= null then
+               --  Get the node that we previously found
+
+               Node_Ptr := List_Of_Nodes.Element (Found_Id);
+
+               --  The alias information must either be missing or equal to
+               --  the one we are inserting.
+
+               pragma Assert
+                 (Node_Ptr.all in Unresolved_Node'Class and then
+                    (Unresolved_Node (Node_Ptr.all).Alias = null or else
+                     Unresolved_Node (Node_Ptr.all).Alias.all = Alias.all));
+
+               --  Add the missing alias information
+
+               Unresolved_Node (Node_Ptr.all).Alias := Alias;
             end if;
 
          --  Explicit node
