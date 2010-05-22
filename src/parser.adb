@@ -1613,7 +1613,7 @@ package body Parser is
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 16);
+      Matches : GNAT.Regpat.Match_Array (0 .. 17);
 
    begin
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
@@ -1684,9 +1684,9 @@ package body Parser is
 
          --  Dynamic objects
 
-         if Matches (16) /= GNAT.Regpat.No_Match then
+         if Matches (17) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (16).First .. Matches (16).Last),
+              (Input (Matches (17).First .. Matches (17).Last),
                Dynamic_Objects);
          else
             Dynamic_Objects :=
