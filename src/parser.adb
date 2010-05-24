@@ -2409,46 +2409,54 @@ package body Parser is
          if Match_Parents (0) /= GNAT.Regpat.No_Match and then
            Match_Parents (1) /= GNAT.Regpat.No_Match
          then
-            --  Look for the class in the list or insert it if not there yet
+            --  Sometimes (for private tagged types) the compiler indicates
+            --  that a class is its own parent also. We skip this case.
 
-            Parent :=
-              Insert_Class
-                (Symbol  =>
+            if CName.all /=
+              Input (Match_Parents (1).First .. Match_Parents (1).Last)
+            then
+               --  Look for the class in the list or insert it if not there yet
+
+               Parent :=
+                 Insert_Class
+                   (Symbol  =>
                      Input (Match_Parents (1).First .. Match_Parents (1).Last),
-                 Defined => False,
-                 Loc     => Null_Location);
+                    Defined => False,
+                    Loc     => Null_Location);
 
-            --  Insert the parent in the list of parents for the class being
-            --  processed. Use Include instead of Insert because the class
-            --  may be in the set already.
+               --  Insert the parent in the list of parents for the class being
+               --  processed. Use Include instead of Insert because the class
+               --  may be in the set already.
 
-            This_Class.Parents.Include (Parent);
+               This_Class.Parents.Include (Parent);
 
-            --  The first parent is the primary parent
+               --  The first parent is the primary parent
 
-            if Is_Primary_Parent then
+               if Is_Primary_Parent then
 
-               if This_Class.Primary_Parent = null then
-                  --  Insert the pointer to the first parent if the information
-                  --  is not there yet.
+                  if This_Class.Primary_Parent = null then
+                     --  Insert the pointer to the first parent if the
+                     --  information is not there yet.
 
-                  This_Class.Primary_Parent := Parent;
+                     This_Class.Primary_Parent := Parent;
 
-               elsif
-                 This_Class.Primary_Parent.Class_Name.all /=
-                   Input (Match_Parents (1).First .. Match_Parents (1).Last)
-               then
-                  --  The information about the primary parent may be already
-                  --  there but we make sure it is consistent.
+                  elsif
+                    This_Class.Primary_Parent.Class_Name.all /=
+                      Input (Match_Parents (1).First .. Match_Parents (1).Last)
+                  then
+                     --  The information about the primary parent may be
+                     --  already there but we make sure it is consistent.
 
-                  raise Parser_Error with "Conflicting primary parent";
+                     raise Parser_Error with "Conflicting primary parent";
+                  end if;
+
+                  --  We already have the primary parent
+
+                  Is_Primary_Parent := False;
+
                end if;
-               --  We already have the primary parent
-
-               Is_Primary_Parent := False;
 
             end if;
-
          else
             raise Parser_Error with
               "Cannot find class in parent list" & Input;
