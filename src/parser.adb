@@ -232,11 +232,11 @@ package body Parser is
    --  Extra information about a node
 
    Edge_Label_Regexp : constant String :=
-     "^\s*label: """ & Location_Regexp & """$";
+     "^\s*label: ""(" & Location_Regexp & "( \[.+\])?)" & """$";
    --  Extra information about an edge
 
    Class_Label_Regexp : constant String :=
-     "([^\\]+)\\n(" & Location_Regexp & ")$";
+     "(([^\\]+)\\n)?(" & Location_Regexp & "( \[.+\])?)$";
    --  Demangled name and location information in classes
 
    Subprogram_Location_Regexp : constant String :=
@@ -246,6 +246,10 @@ package body Parser is
    Data_Location_Regexp : constant String :=
      "^\\n ([\w \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
    --  Location of an unbounded object
+
+   Front_End_Location_Regexp : constant String :=
+     "^(" & Location_Regexp & ")( \[.+\])?$";
+   --  List of locations using [] for nesting
 
    Create_Task : constant String := "system__tasking__stages__create_task";
    Create_Ravenscar_Task : constant String :=
@@ -302,6 +306,16 @@ package body Parser is
       Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
    --  Extract the list of locations in source files.
    --  Format: [filename:line[:column][,filename:line[:column]]
+
+   procedure Parse_Front_End_Locations
+     (Input     : String;
+      Demangled : Static_Stack_Analysis.Name;
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set);
+   --  Get the list of locations encoded in the string. It handles the list
+   --  of locations encoded by the front end (file.ext:NN:CC). If the location
+   --  is within an instantiation, then the instance location is appended,
+   --  enclosed in square brackets (which can nest if necessary).
+   --  Format: "f1.adb:10:10 [f2.ads:5:4 [f3.ads:43:10]]"
 
    procedure Parse_Stack_Usage
      (Input : String; Stack : out Static_Stack_Analysis.Stack_Usage_Info);
@@ -1410,7 +1424,8 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Demangled               =>
-                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                    new String'
+                      (Demangle.Decode (Symbol_Name.all, Ada_File_Name)),
                   Alias                   => Alias,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
@@ -1465,7 +1480,8 @@ package body Parser is
                   Location_List           => Locations_Set,
                   Subprogram              => Symbol_Name,
                   Demangled               =>
-                     new String'(Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                    new String'
+                      (Demangle.Decode (Symbol_Name.all, Ada_File_Name)),
                   Dynamic_Objects         => Dynamic_Objects,
                   Stack_Info              => Stack_Info,
                   Under_Analysis          => False,
@@ -1522,7 +1538,7 @@ package body Parser is
                      Subprogram              => Symbol_Name,
                      Demangled               =>
                         new String'
-                          (Demangle.Decode (Symbol_Name, Ada_File_Name)),
+                          (Demangle.Decode (Symbol_Name.all, Ada_File_Name)),
                      Dynamic_Objects         => Dynamic_Objects,
                      Stack_Info              => Stack_Info,
                      Under_Analysis          => False,
@@ -1794,6 +1810,109 @@ package body Parser is
       end if;
    end Parse_Node_Locations;
 
+   -------------------------------
+   -- Parse_Front_End_Locations --
+   -------------------------------
+
+   procedure Parse_Front_End_Locations
+     (Input     : String;
+      Demangled : Static_Stack_Analysis.Name;
+      Locations : out Static_Stack_Analysis.List_Of_Locations.Set)
+   is
+      Matches      : GNAT.Regpat.Match_Array (0 .. 9);
+
+      Tmp_Location : Static_Stack_Analysis.Location;
+
+      Ignore       : Static_Stack_Analysis.List_Of_Locations.Cursor;
+      New_Location : Boolean := False;
+
+      use type Ada.Text_IO.Positive_Count;
+
+   begin
+      GNAT.Regpat.Match (Front_End_Location_Regexp, Input, Matches);
+
+      if Matches (0) /= GNAT.Regpat.No_Match then
+
+         if Matches (2) = GNAT.Regpat.No_Match and then
+           Matches (3) = GNAT.Regpat.No_Match
+         then
+            --  It matches neither <no location> nor <built-in>
+
+            --  This dynamically created object will be later destroyed if it
+            --  is not used (inserted in the list).
+
+            pragma Assert
+              (Matches (4) /= GNAT.Regpat.No_Match and then
+               Matches (5) /= GNAT.Regpat.No_Match);
+
+            Tmp_Location.File :=
+              new String'
+                (Input (Matches (5).First .. Matches (5).Last));
+
+            Tmp_Location.Demangled := Demangled;
+
+            pragma Assert (Matches (7) /= GNAT.Regpat.No_Match);
+
+            Tmp_Location.Line_Number :=
+              Integer'Value (Input (Matches (7).First .. Matches (7).Last));
+
+                        --  The column number is not always present
+
+            if Matches (8) /= GNAT.Regpat.No_Match then
+               --  'First + 1 to skip the ":"
+
+               Tmp_Location.Column_Number :=
+                 Integer'Value
+                   (Input (Matches (8).First + 1 .. Matches (8).Last));
+            else
+               Tmp_Location.Column_Number := 0;
+            end if;
+
+            --  Parse additional locations, if any
+
+            if Matches (9) /= GNAT.Regpat.No_Match then
+               --  The match is for " [XXX]", so we use 'First + 2 to skip the
+               --  " [" and 'Last - 1 to skip the "]".
+
+               Parse_Front_End_Locations
+                 (Input (Matches (9).First + 2 .. Matches (9).Last - 1),
+                  Demangled,
+                  Locations);
+            end if;
+
+            --  Include the parsed location if it is not already in the list
+
+            Locations.Insert (Tmp_Location, Ignore, New_Location);
+
+            --  Destroy the String that was previously allocated if it is no
+            --  longer needed.
+
+            if not New_Location then
+               GNAT.Strings.Free
+                 (GNAT.Strings.String_Access (Tmp_Location.File));
+            end if;
+         end if;
+
+      else
+         --  The file location is malformed. This information is not
+         --  required for computing stack usage (it is only helpful to
+         --  present the results).
+
+         Locations := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+
+         if Options.Debug then
+            Ada.Text_IO.Put_Line
+              (Ada.Directories.Simple_Name
+                 (Ada.Text_IO.Name (Descriptor)) & ":" &
+               Ada.Strings.Fixed.Trim
+                 (Ada.Text_IO.Positive_Count'Image
+                    (Ada.Text_IO.Line (Descriptor) - 1),
+                  Ada.Strings.Both) &
+               ": Could not parse the label");
+         end if;
+      end if;
+   end Parse_Front_End_Locations;
+
    -----------------------
    -- Parse_Stack_Usage --
    -----------------------
@@ -1865,7 +1984,7 @@ package body Parser is
       use Static_Stack_Analysis;
 
       Matches          : GNAT.Regpat.Match_Array (0 .. 3);
-      Loc_Matches      : GNAT.Regpat.Match_Array (0 .. 7);
+      Loc_Matches      : GNAT.Regpat.Match_Array (0 .. 9);
       Dispatch_Matches : GNAT.Regpat.Match_Array (0 .. 3);
 
       Source_Id        : Static_Stack_Analysis.Node_Id;
@@ -1874,8 +1993,8 @@ package body Parser is
       Source_Ptr       : Static_Stack_Analysis.Node_Class_Access;
       Target_Ptr       : Static_Stack_Analysis.Node_Class_Access;
 
-      Tmp_Location     : Static_Stack_Analysis.Location :=
-        Static_Stack_Analysis.Null_Location;
+      Locations_Set    : Static_Stack_Analysis.List_Of_Locations.Set :=
+        Static_Stack_Analysis.List_Of_Locations.Empty_Set;
 
       New_Node         : Boolean := False;
 
@@ -1908,44 +2027,14 @@ package body Parser is
                Input (Matches (3).First .. Matches (3).Last),
                Loc_Matches);
 
-            if Loc_Matches (1) /= GNAT.Regpat.No_Match or else
-              Loc_Matches (2) /= GNAT.Regpat.No_Match
-            then
-               --  Matches either <no location> or <built-in>
+            pragma Assert
+              (Loc_Matches (0) /= GNAT.Regpat.No_Match and then
+               Loc_Matches (1) /= GNAT.Regpat.No_Match);
 
-               Tmp_Location := Static_Stack_Analysis.Null_Location;
-
-            else
-               --  The location has been found
-
-               pragma Assert
-                 (Loc_Matches (3) /= GNAT.Regpat.No_Match and then
-                  Loc_Matches (4) /= GNAT.Regpat.No_Match);
-
-               --  This dynamically created object is later destroyed if it is
-               --  not used (not inserted in the list).
-
-               Tmp_Location.File :=
-                 new String'
-                   (Input (Loc_Matches (4).First .. Loc_Matches (4).Last));
-
-               pragma Assert (Loc_Matches (6) /= GNAT.Regpat.No_Match);
-
-               Tmp_Location.Line_Number :=
-                 Integer'Value
-                   (Input (Loc_Matches (6).First .. Loc_Matches (6).Last));
-
-               if Loc_Matches (7) /= GNAT.Regpat.No_Match then
-                  --  'First + 1 to skip the ":"
-
-                  Tmp_Location.Column_Number :=
-                    Integer'Value
-                      (Input
-                        (Loc_Matches (7).First + 1 .. Loc_Matches (7).Last));
-               else
-                  Tmp_Location.Column_Number := 0;
-               end if;
-            end if;
+            Parse_Front_End_Locations
+              (Input (Loc_Matches (1).First .. Loc_Matches (1).Last),
+               null,
+               Locations_Set);
 
          --  Emit warning when the label cannot be processed. Ignore lines
          --  with " priority: .*" or with nothing.
@@ -1989,7 +2078,8 @@ package body Parser is
                Location_List           => List_Of_Locations.Empty_Set,
                Subprogram              => Source_Name,
                Demangled               =>
-                  new String'(Demangle.Decode (Source_Name, Ada_File_Name)),
+                 new String'
+                   (Demangle.Decode (Source_Name.all, Ada_File_Name)),
                Alias                   => null,
                Under_Analysis          => False,
                Analysis_Finished       => False,
@@ -2059,9 +2149,7 @@ package body Parser is
                   begin
                      --  Add this location
 
-                     if Tmp_Location /= Null_Location then
-                        Node.Location_List.Include (Tmp_Location);
-                     end if;
+                     Node.Location_List.Union (Locations_Set);
 
                      --  Verify that the information that we have corresponds
                      --  to the information that is stored.
@@ -2085,22 +2173,18 @@ package body Parser is
 
                   Target_Ptr := new Dispatching_Node'
                     (Ada_File_Name           => Ada_File_Name,
-                     Location_List           =>
-                       (if Tmp_Location = Null_Location then
-                         List_Of_Locations.Empty_Set
-                       else
-                         List_Of_Locations.To_Set (Tmp_Location)),
+                     Location_List           => Locations_Set,
                      Target_Calls            => List_Of_Edges.Empty_Vector,
                      Accumulated_Stack_Usage => Unknown_Stack_Usage,
                      Slot                    => Slot,
                      Base_Class              =>
                        Insert_Class (Symbol  => Base_Class_Name,
                                      Defined => False,
-                                     Loc     => Null_Location),
+                                     Loc     => List_Of_Locations.Empty_Set),
                      Static_Class            =>
                        Insert_Class (Symbol  => Static_Class_Name,
                                      Defined => False,
-                                     Loc     => Null_Location),
+                                     Loc     => List_Of_Locations.Empty_Set),
                      Internal_Name           =>
                      new String'
                        (Base_Class_Name & Slot_String & Static_Class_Name),
@@ -2115,70 +2199,102 @@ package body Parser is
 
                   pragma Assert (New_Node);
                end if;
+
+               --  Add the location of this dispatching call to the global list
+               --  so it is much faster to find it to check for duplicated
+               --  indirect calls (generated by the back end when compiling
+               --  Ada code).
+
+               Global_Data.Location_All_Dispatching_Calls.Union
+                 (Locations_Set);
             end;
 
          --  Handle indirect calls
          elsif
            Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
          then
-            Target_Name :=
-              new String'
-                (if Loc_Matches (3) /= GNAT.Regpat.No_Match then
-                   Indirect_Call.all &
-                   Real_Node (Source_Ptr.all).Subprogram.all &
-                   Input (Loc_Matches (3).First .. Loc_Matches (3).Last)
-                 else
-                   Indirect_Call.all &
-                   Real_Node (Source_Ptr.all).Subprogram.all);
+            --  The compiler may generate for a single dispatching call two
+            --  edges:
+            --    * One generated by the front end with the dispatching
+            --      information:
+            --         edge: { sourcename: "caller"
+            --                 targetname: "1:tagged_type,tagged_type"
+            --                 label: "file.adb:9:7"
+            --               }
+            --
+            --    * One generated by the back end indicating that this is an
+            --      indirect call:
+            --         edge: { sourcename: "caller"
+            --                 targetname: "__indirect_call"
+            --                 label: "file.adb:9:7"
+            --               }
+            --
+            --  If this is the case, we ignore the one generated by the back
+            --  end because the information is in the edge generated by the
+            --  front end, and keeping the one from the back end leads to
+            --  GNATstack to think there are two different calls.
 
-            --  Try to see whether the indirect node exists
+            if Locations_Set.Is_Empty or else
+              not Demangle.Is_Ada (Ada_File_Name) or else
+              not Location_Is_Dispatching (Locations_Set.First_Element)
+            then
+               Target_Name :=
+                 new String'
+                   (if not Locations_Set.Is_Empty then
+                      Indirect_Call.all &
+                      Real_Node (Source_Ptr.all).Subprogram.all &
+                      Input (Loc_Matches (1).First .. Loc_Matches (1).Last)
+                    else
+                      Indirect_Call.all &
+                      Real_Node (Source_Ptr.all).Subprogram.all);
 
-            if Target_Name = null then
-               Target_Id := Static_Stack_Analysis.List_Of_Nodes.No_Element;
-            else
-               Target_Id := Get_Node (Target_Name.all);
-            end if;
+               --  Try to see whether the indirect node exists
 
-            --  Create the node for the indirect call if it does not exist
+               if Target_Name = null then
+                  Target_Id := Static_Stack_Analysis.List_Of_Nodes.No_Element;
+               else
+                  Target_Id := Get_Node (Target_Name.all);
+               end if;
 
-            if List_Of_Nodes.Has_Element (Target_Id) then
-               --  If the node is already in the list then there is nothing
-               --  else to do.
+               --  Create the node for the indirect call if it does not exist
 
-               return;
+               if List_Of_Nodes.Has_Element (Target_Id) then
+                  --  If the node is already in the list then there is nothing
+                  --  else to do.
 
-            else
-               Target_Ptr := new Indirect_Node'
-                 (Ada_File_Name           => Ada_File_Name,
-                  Location_List           =>
-                    (if Tmp_Location = Null_Location then
-                         List_Of_Locations.Empty_Set
-                       else
-                         List_Of_Locations.To_Set (Tmp_Location)),
-                  Internal_Name           => Target_Name,
-                  Target_Calls            => List_Of_Edges.Empty_Vector,
-                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                  Under_Analysis          => False,
-                  Analysis_Finished       => False,
-                  Is_Called               => True,
-                  Is_Reachable            => False,
-                  Cycles                  => List_Of_Cycles.Empty_Set);
+                  return;
 
-               Global_Data.List_Of_Subprograms.Insert
-                 (Target_Ptr, Target_Id, New_Node);
+               else
+                  Target_Ptr := new Indirect_Node'
+                    (Ada_File_Name           => Ada_File_Name,
+                     Location_List           => Locations_Set,
+                     Internal_Name           => Target_Name,
+                     Target_Calls            => List_Of_Edges.Empty_Vector,
+                     Accumulated_Stack_Usage => Unknown_Stack_Usage,
+                     Under_Analysis          => False,
+                     Analysis_Finished       => False,
+                     Is_Called               => True,
+                     Is_Reachable            => False,
+                     Cycles                  => List_Of_Cycles.Empty_Set);
 
-               pragma Assert (New_Node);
-               --  We have previously verified that the node is not in the list
+                  Global_Data.List_Of_Subprograms.Insert
+                    (Target_Ptr, Target_Id, New_Node);
 
-               --  Now we have created a new node to describe an indirect
-               --  We may have already overridden this indirect call with the
-               --  required information to find the list of actual targets. In
-               --  that case, the caller will already have an edge with the
-               --  same location as the one we are trying to insert. What we
-               --  need to do now is to put user provided information under
-               --  the new node.
+                  pragma Assert (New_Node);
+                  --  We have previously verified that the node is not in the
+                  --  list.
 
-               Move_Indirect_Calls (Source_Ptr, Target_Ptr);
+                  --  Now we have created a new node to describe an indirect
+                  --  We may have already overridden this indirect call with
+                  --  the required information to find the list of actual
+                  --  targets. In that case, the caller will already have an
+                  --  edge with the same location as the one we are trying to
+                  --  insert. What we need to do now is to put user provided
+                  --  information under the new node.
+
+                  Move_Indirect_Calls (Source_Ptr, Target_Ptr);
+               end if;
+
             end if;
 
          --  Regular call (call to neither dispatching nor indirect nodes)
@@ -2211,7 +2327,8 @@ package body Parser is
                   Location_List           => List_Of_Locations.Empty_Set,
                   Subprogram              => Target_Name,
                   Demangled               =>
-                     new String'(Demangle.Decode (Target_Name, Ada_File_Name)),
+                    new String'
+                      (Demangle.Decode (Target_Name.all, Ada_File_Name)),
                   Alias                   => null,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
@@ -2259,11 +2376,7 @@ package body Parser is
                if Static_Stack_Analysis."=" (Call.Target, Target_Id) then
                   --  Add new location.
 
-                  if Tmp_Location /= Static_Stack_Analysis.Null_Location then
-                     --  Do not destroy the contents of Tmp_Location
-
-                     Call.Point_Of_Call.Include (Tmp_Location);
-                  end if;
+                  Call.Point_Of_Call.Union (Locations_Set);
 
                   --  We found the edge so that we leave
 
@@ -2281,9 +2394,9 @@ package body Parser is
                    and then
                  List_Of_Nodes.Element (Call.Target).all in Indirect_Node'Class
                    and then
-                 (Tmp_Location = Null_Location or else
+                 (Locations_Set.Is_Empty or else
                   Call.Point_Of_Call.Is_Empty or else
-                  Call.Point_Of_Call.Contains (Tmp_Location))
+                  Call.Point_Of_Call.Contains (Locations_Set.First_Element))
                then
                   --  ??? Do I need to use Fake_Node'Class?
 
@@ -2314,11 +2427,7 @@ package body Parser is
                   new Static_Stack_Analysis.Edge_Element'(
                     Ada_File_Name  => Ada_File_Name,
                     Target         => Target_Id,
-                    Point_Of_Call  =>
-                      (if Tmp_Location = Null_Location then
-                         List_Of_Locations.Empty_Set
-                       else
-                         List_Of_Locations.To_Set (Tmp_Location)),
+                    Point_Of_Call  => Locations_Set,
                     Feasible_Call  => True,
                     Under_Analysis => False));
 
@@ -2330,7 +2439,7 @@ package body Parser is
             --  an specific location. In this case, the manual edge applies to
             --  all indirect calls originating from Source.
 
-            if Ada_File_Name = null and then Tmp_Location = Null_Location then
+            if Ada_File_Name = null and then Locations_Set.Is_Empty then
                Index := Source_Ptr.Target_Calls.First;
 
                while List_Of_Edges.Has_Element (Index) loop
@@ -2350,11 +2459,7 @@ package body Parser is
                         new Static_Stack_Analysis.Edge_Element'(
                           Ada_File_Name  => Ada_File_Name,
                           Target         => Target_Id,
-                          Point_Of_Call  =>
-                            (if Tmp_Location = Null_Location then
-                               List_Of_Locations.Empty_Set
-                             else
-                               List_Of_Locations.To_Set (Tmp_Location)),
+                          Point_Of_Call  => Locations_Set,
                           Feasible_Call  => True,
                           Under_Analysis => False));
 
@@ -2379,13 +2484,14 @@ package body Parser is
 
       Match_Class_Info  : GNAT.Regpat.Match_Array (0 .. 5);
 
-      Match_Label       : GNAT.Regpat.Match_Array (0 .. 9);
+      Match_Label       : GNAT.Regpat.Match_Array (0 .. 11);
 
       This_Class        : Class_Access;
 
       CName             : Name;
+      Demangled         : Name;
 
-      CLocation         : Location;
+      Locations_Set     : List_Of_Locations.Set := List_Of_Locations.Empty_Set;
 
       Is_Primary_Parent : Boolean := True;
 
@@ -2422,7 +2528,7 @@ package body Parser is
                    (Symbol  =>
                      Input (Match_Parents (1).First .. Match_Parents (1).Last),
                     Defined => False,
-                    Loc     => Null_Location);
+                    Loc     => List_Of_Locations.Empty_Set);
 
                --  Insert the parent in the list of parents for the class being
                --  processed. Use Include instead of Insert because the class
@@ -2546,7 +2652,7 @@ package body Parser is
                             Input (Match_Info (5).First ..
                                    Match_Info (5).Last),
                           Defined => False,
-                          Loc => Null_Location),
+                          Loc => List_Of_Locations.Empty_Set),
                        Slot_Number'Value
                          (Input (Match_Info (4).First ..
                                  Match_Info (4).Last)));
@@ -2577,7 +2683,7 @@ package body Parser is
                             Input (Match_Info (8).First ..
                                    Match_Info (8).Last),
                           Defined => False,
-                          Loc => Null_Location),
+                          Loc => List_Of_Locations.Empty_Set),
                        Slot_Number'Value
                          (Input (Match_Info (7).First ..
                                  Match_Info (7).Last)));
@@ -2657,46 +2763,41 @@ package body Parser is
             Match_Label);
 
          if Match_Label (0) /= GNAT.Regpat.No_Match then
-            pragma Assert (Match_Label (1) /= GNAT.Regpat.No_Match);
+            pragma Assert (Match_Label (3) /= GNAT.Regpat.No_Match);
 
-            CLocation.Demangled :=
-              new String'
-                (Input (Match_Label (1).First .. Match_Label (1).Last));
+            if Match_Label (1) /= GNAT.Regpat.No_Match and then
+              Match_Label (2) /= GNAT.Regpat.No_Match
+            then
+               --  We have the demangled information
 
-            pragma Assert
-              (Match_Label (2) /= GNAT.Regpat.No_Match and then
-               Match_Label (5) /= GNAT.Regpat.No_Match and then
-               Match_Label (6) /= GNAT.Regpat.No_Match);
+               Demangled :=
+                 new String'
+                   (Input (Match_Label (2).First .. Match_Label (2).Last));
 
-            CLocation.File :=
-              new String'
-                (Input (Match_Label (6).First .. Match_Label (6).Last));
-
-            pragma Assert (Match_Label (8) /= GNAT.Regpat.No_Match);
-
-            CLocation.Line_Number :=
-              Integer'Value
-                (Input (Match_Label (8).First .. Match_Label (8).Last));
-
-            --  The column number is not always there
-
-            if Match_Label (9) /= GNAT.Regpat.No_Match then
-               --  'First + 1 to skip the ":"
-
-               CLocation.Column_Number :=
-                 Integer'Value
-                   (Input
-                        (Match_Label (9).First + 1 .. Match_Label (9).Last));
             else
-               CLocation.Column_Number := 0;
+               --  We need to generate the demangled name
+
+               Demangled :=
+                 new String'
+                   (Demangle.Decode (CName.all, Ada_File_Name));
             end if;
+
+            pragma Assert (Match_Label (3) /= GNAT.Regpat.No_Match and then
+               Match_Label (6) /= GNAT.Regpat.No_Match and then
+               Match_Label (7) /= GNAT.Regpat.No_Match and then
+               Match_Label (9) /= GNAT.Regpat.No_Match);
+
+            Parse_Front_End_Locations
+              (Input (Match_Label (3).First .. Match_Label (3).Last),
+               Demangled,
+               Locations_Set);
 
          else
             --  The label is malformed. This information is not required for
             --  computing stack usage (it is only helpful to present the
             --  results).
 
-            CLocation := Null_Location;
+            Locations_Set := Static_Stack_Analysis.List_Of_Locations.Empty_Set;
 
             if Options.Debug then
                Ada.Text_IO.Put_Line
@@ -2710,7 +2811,7 @@ package body Parser is
 
          This_Class :=
            Insert_Class
-             (Symbol => CName.all, Defined => True, Loc => CLocation);
+             (Symbol => CName.all, Defined => True, Loc => Locations_Set);
 
          --  Populate the list of parents, if any
 

@@ -74,6 +74,15 @@ package Global_Data is
      Static_Stack_Analysis.List_Of_Virtual_Methods.Empty_Set;
    --  List of all virtual methods under analysis
 
+   -----------------------
+   -- Dispatching calls --
+   -----------------------
+
+   Location_All_Dispatching_Calls :
+   Static_Stack_Analysis.List_Of_Locations.Set :=
+     Static_Stack_Analysis.List_Of_Locations.Empty_Set;
+   --  List of all file locations where there is a dispatching call
+
    -------------
    -- Tasking --
    -------------

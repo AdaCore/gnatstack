@@ -19,6 +19,9 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
+with Ada.Strings.Fixed;
+with GNAT.Regpat;
+
 with Global_Data;
 with Demangle;
 with Static_Stack_Analysis; use Static_Stack_Analysis;
@@ -80,7 +83,12 @@ package body Dispatching_Calls is
       Base_Method : constant Virtual_Class_Access :=
         Get_Method (Vtable_Loc'(Node.Base_Class, Node.Slot));
 
-      Base_Method_Name : Name;
+      Base_Method_Name      : Name;
+      Base_Method_Demangled : Name;
+
+      Matches : GNAT.Regpat.Match_Array (0 .. 2);
+
+      use type GNAT.Regpat.Match_Location;
 
       Method_Subprogram : Node_Id;
       Target_Ptr        : Node_Class_Access;
@@ -98,7 +106,8 @@ package body Dispatching_Calls is
          Explored_Method : constant Virtual_Class_Access :=
            List_Of_Virtual_Methods.Element (Position);
 
-         Explored_Method_Name : Name;
+         Explored_Method_Name      : Name;
+         Explored_Method_Demangled : Name;
 
       begin
          if
@@ -112,14 +121,49 @@ package body Dispatching_Calls is
               Explored_Method.Symbol_Name /= null
             then
                Explored_Method_Name := Explored_Method.Symbol_Name;
+
+               --  Get the demangled name from the symbol name. Take into
+               --  account that the symbol name may have a :NN suffix
+               --  indicating the slot.
+
+               GNAT.Regpat.Match
+                 ("^(.+):([\-]?\d+)$", Explored_Method_Name.all, Matches);
+
+               Explored_Method_Demangled :=
+                 (if Matches (0) /= GNAT.Regpat.No_Match then
+                   new String'
+                     (Demangle.Decode
+                        (Explored_Method_Name
+                           (Matches (1).First .. Matches (1).Last),
+                         Node.Ada_File_Name) &
+                      ':' &
+                      Explored_Method_Name
+                        (Matches (2).First .. Matches (2).Last))
+                  else
+                   new String'
+                     (Demangle.Decode
+                        (Explored_Method_Name.all, Node.Ada_File_Name)));
+
             else
                --  We do not have information about the subprogram associated
                --  to the method. We give it a name line class:slot.
 
                Explored_Method_Name :=
                  new String'
-                   (Explored_Method.Vtable_Entry.Class.Class_Name.all & ':' &
-                    Slot_Number'Image (Explored_Method.Vtable_Entry.Slot));
+                   (Explored_Method.Vtable_Entry.Class.Class_Name.all &
+                    ':' &
+                    Ada.Strings.Fixed.Trim
+                      (Slot_Number'Image (Explored_Method.Vtable_Entry.Slot),
+                       Ada.Strings.Both));
+
+               Explored_Method_Demangled := new String'
+                 (Demangle.Decode
+                    (Explored_Method.Vtable_Entry.Class.Class_Name.all,
+                     Node.Ada_File_Name) &
+                  ':' &
+                  Ada.Strings.Fixed.Trim
+                    (Slot_Number'Image (Explored_Method.Vtable_Entry.Slot),
+                     Ada.Strings.Both));
             end if;
 
             Method_Subprogram := Get_Node (Explored_Method_Name.all);
@@ -133,10 +177,7 @@ package body Dispatching_Calls is
                   Accumulated_Stack_Usage => Unknown_Stack_Usage,
                   Location_List           => List_Of_Locations.Empty_Set,
                   Subprogram              => Explored_Method_Name,
-                  Demangled               =>
-                  new String'
-                    (Demangle.Decode
-                       (Explored_Method_Name, Node.Ada_File_Name)),
+                  Demangled               => Explored_Method_Demangled,
                   Alias                   => null,
                   Under_Analysis          => False,
                   Analysis_Finished       => False,
@@ -186,13 +227,42 @@ package body Dispatching_Calls is
       if Base_Method /= null and then Base_Method.Symbol_Name /= null then
          Base_Method_Name := Base_Method.Symbol_Name;
 
+         --  Get the demangled name from the symbol name. Take into account
+         --  that the symbol name may have a :NN suffix indicating the slot.
+
+         GNAT.Regpat.Match
+           ("^(.+):([\-]?\d+)$", Base_Method_Name.all, Matches);
+
+         Base_Method_Demangled :=
+           (if Matches (0) /= GNAT.Regpat.No_Match then
+             new String'
+               (Demangle.Decode
+                  (Base_Method_Name (Matches (1).First .. Matches (1).Last),
+                   Node.Ada_File_Name) &
+                ':' &
+                Base_Method_Name (Matches (2).First .. Matches (2).Last))
+            else
+             new String'
+               (Demangle.Decode
+                  (Base_Method_Name.all, Node.Ada_File_Name)));
+
       else
          --  We do not have information about the subprogram associated to
          --  the method. We give it a name line class:slot.
 
          Base_Method_Name :=
-           new String'(Node.Base_Class.Class_Name.all & ':' &
-                       Slot_Number'Image (Node.Slot));
+           new String'(Node.Base_Class.Class_Name.all &
+                       ':' &
+                       Ada.Strings.Fixed.Trim
+                         (Slot_Number'Image (Node.Slot), Ada.Strings.Both));
+
+         Base_Method_Demangled := new String'
+                 (Demangle.Decode
+                    (Node.Base_Class.Class_Name.all, Node.Ada_File_Name) &
+                  ':' &
+                  Ada.Strings.Fixed.Trim
+                    (Slot_Number'Image (Node.Slot), Ada.Strings.Both));
+
       end if;
 
       Method_Subprogram := Get_Node (Base_Method_Name.all);
@@ -206,9 +276,7 @@ package body Dispatching_Calls is
             Accumulated_Stack_Usage => Unknown_Stack_Usage,
             Location_List           => List_Of_Locations.Empty_Set,
             Subprogram              => Base_Method_Name,
-            Demangled               =>
-            new String'
-              (Demangle.Decode (Base_Method_Name, Node.Ada_File_Name)),
+            Demangled               => Base_Method_Demangled,
             Alias                   => null,
             Under_Analysis          => False,
             Analysis_Finished       => False,

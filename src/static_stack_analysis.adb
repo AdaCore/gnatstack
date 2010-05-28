@@ -570,7 +570,9 @@ package body Static_Stack_Analysis is
    ------------------
 
    function Insert_Class
-     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
+     (Symbol : String;
+      Defined : Boolean;
+      Loc : List_Of_Locations.Set := List_Of_Locations.Empty_Set)
       return Class_Access
    is
       This_Class : Class_Access := Get_Class (Symbol);
@@ -603,9 +605,7 @@ package body Static_Stack_Analysis is
 
          --  Update the location if needed
 
-         if This_Class.Class_Loc = Null_Location then
-            This_Class.Class_Loc := Loc;
-         end if;
+         This_Class.Class_Loc.Union (Loc);
 
          --  We may be viewing here the same class with different information.
          --  It is not necesarily an error. For example, we may have a view of
@@ -670,6 +670,18 @@ package body Static_Stack_Analysis is
 
       return Method;
    end Insert_Method;
+
+   -----------------------------
+   -- Location_Is_Dispatching --
+   -----------------------------
+
+   function Location_Is_Dispatching (Loc : Location) return Boolean is
+   begin
+      --  Look at the location of every dispatching call
+
+      return List_Of_Locations.Contains
+        (Global_Data.Location_All_Dispatching_Calls, Loc);
+   end Location_Is_Dispatching;
 
    --------------
    -- Node_Key --

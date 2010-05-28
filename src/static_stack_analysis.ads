@@ -303,7 +303,9 @@ package Static_Stack_Analysis is
    --  class is not yet in the list.
 
    function Insert_Class
-     (Symbol : String; Defined : Boolean; Loc : Location := Null_Location)
+     (Symbol : String;
+      Defined : Boolean;
+      Loc : List_Of_Locations.Set := List_Of_Locations.Empty_Set)
       return Class_Access;
    --  Insert the class. It creates the descriptor for the class if it has
    --  not yet been registered, or return the existing one. Defined is True
@@ -421,7 +423,7 @@ package Static_Stack_Analysis is
          Class_Name : Name;
          --  Name of the class (tagged type)
 
-         Class_Loc  : Location;
+         Class_Loc  : List_Of_Locations.Set;
          --  Demangled name and file location for the class
 
          Primary_Parent : Class_Access;
@@ -568,6 +570,10 @@ package Static_Stack_Analysis is
    --  to Source) into the node representing indirect calls. The location of
    --  the Target node is the one that will determine the indirect calls that
    --  need to be moved.
+
+   function Location_Is_Dispatching (Loc : Location) return Boolean;
+   --  Function which says whether a location corresponds to a dispatching
+   --  call.
 
    ---------------
    -- Real_Node --

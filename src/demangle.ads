@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2006-2009, AdaCore                     --
+--                     Copyright (C) 2006-2010, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -37,7 +37,8 @@ package Demangle is
    --  This function returns True if the node represents an Ada subprogram
 
    function Decode
-     (Symbol_Name : Static_Stack_Analysis.Name;
-      File : Static_Stack_Analysis.File_Name) return String;
+     (Symbol_Name : String;
+      File : Static_Stack_Analysis.File_Name)
+      return String;
    --  Return the Ada/C++ name from the encoded form
 end Demangle;

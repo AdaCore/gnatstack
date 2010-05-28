@@ -251,8 +251,9 @@ package body Demangle is
    ------------
 
    function Decode
-     (Symbol_Name : Static_Stack_Analysis.Name;
-      File : Static_Stack_Analysis.File_Name) return String
+     (Symbol_Name : String;
+      File : Static_Stack_Analysis.File_Name)
+      return String
    is
       Name_First : Integer;
       --  Index to point to the beginning of the subprogram name (removing the
@@ -275,7 +276,7 @@ package body Demangle is
       --  Remove file information (look for the ":" separator between file
       --  name and subprogram name).
 
-      GNAT.Regpat.Match (File_Regexp, Symbol_Name.all, Matches);
+      GNAT.Regpat.Match (File_Regexp, Symbol_Name, Matches);
 
       if Matches (0) /= GNAT.Regpat.No_Match then
          pragma Assert (Matches (3) /= GNAT.Regpat.No_Match);
@@ -287,12 +288,12 @@ package body Demangle is
 
       if Is_Ada (File) then
          return Demangle.Ada_Decode
-           (Symbol_Name (Name_First .. Symbol_Name.all'Last));
+           (Symbol_Name (Name_First .. Symbol_Name'Last));
       else
          --  If not Ada code, try to decode it assuming it is C++
 
          return Demangle.Cplus_Decode
-           (Symbol_Name (Name_First .. Symbol_Name.all'Last));
+           (Symbol_Name (Name_First .. Symbol_Name'Last));
       end if;
    end Decode;
 
