@@ -208,7 +208,7 @@ package body Parser is
 
    Location_Regexp : constant String :=
      "(<no location>)|" &  -- Encoding for no location
-     "(<built-in>.*)|" &  -- Location for built-in functions
+     "(<built-in>.*|<internal>.*)|" &  -- Location for built-in functions
      "(((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  -- Normal locations
      ":(\d+)(:\d+)?)";  -- line and possibly column number
    --  Accepted locations are Unix-style (directories separated by slashes),
@@ -1168,7 +1168,7 @@ package body Parser is
          if Matches (3) /= GNAT.Regpat.No_Match or else
            Matches (4) /= GNAT.Regpat.No_Match
          then
-            --  Matches <no location> or <built-in>
+            --  Matches <no location>, <built-in> or <internal>
 
             Tmp_Location := Static_Stack_Analysis.Null_Location;
 
@@ -1736,7 +1736,7 @@ package body Parser is
          if Matches (2) = GNAT.Regpat.No_Match and then
            Matches (3) = GNAT.Regpat.No_Match
          then
-            --  It matches neither <no location> nor <built-in>
+            --  It matches neither <no location> nor <built-in> nor <internal>
 
             --  This dynamically created object will be later destroyed if it
             --  is not used (inserted in the list).
