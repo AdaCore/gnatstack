@@ -19,11 +19,7 @@
 -- Floor, Boston, MA 02110-1301, USA.                                       --
 ------------------------------------------------------------------------------
 
-with Ada.Strings.Fixed;
-with GNAT.Regpat;
-
 with Global_Data;
-with Demangle;
 with Static_Stack_Analysis; use Static_Stack_Analysis;
 
 package body Dispatching_Calls is
@@ -83,19 +79,9 @@ package body Dispatching_Calls is
       Base_Method : constant Virtual_Class_Access :=
         Get_Method (Vtable_Loc'(Node.Base_Class, Node.Slot));
 
-      Base_Method_Name      : Name;
-      Base_Method_Demangled : Name;
-
-      Matches : GNAT.Regpat.Match_Array (0 .. 2);
-
-      use type GNAT.Regpat.Match_Location;
-
       Method_Subprogram : Node_Id;
-      Target_Ptr        : Node_Class_Access;
 
       Static_Class : Class_Access renames Node.Static_Class;
-
-      Inserted : Boolean;
 
       procedure Add_To_Potential_Targets
         (Position : Static_Stack_Analysis.List_Of_Virtual_Methods.Cursor);
@@ -106,98 +92,62 @@ package body Dispatching_Calls is
          Explored_Method : constant Virtual_Class_Access :=
            List_Of_Virtual_Methods.Element (Position);
 
-         Explored_Method_Name      : Name;
-         Explored_Method_Demangled : Name;
-
       begin
          if
            Static_Class.Derived.Contains (Explored_Method.Vtable_Entry.Class)
+              and then
+           Explored_Method /= null
+              and then
+           Explored_Method.Symbol_Name /= null
          then
             --  The method is overloaded in a class which is a descencent
             --  of the static class used for dispatching, so it is a potential
             --  canditate for dispatching and we add it to the list.
+            --
+            --  If we do not have information about the subprogram associated
+            --  to the method, it means that the method is abstract, so it
+            --  does not count for dispatching.
 
-            if Explored_Method /= null and then
-              Explored_Method.Symbol_Name /= null
-            then
-               Explored_Method_Name := Explored_Method.Symbol_Name;
+            Method_Subprogram := Get_Node (Explored_Method.Symbol_Name.all);
 
-               --  Get the demangled name from the symbol name. Take into
-               --  account that the symbol name may have a :NN suffix
-               --  indicating the slot.
+            if List_Of_Nodes.Has_Element (Method_Subprogram) then
 
-               GNAT.Regpat.Match
-                 ("^(.+):([\-]?\d+)$", Explored_Method_Name.all, Matches);
+               --  Mark the potential target of the dispatching call as
+               --  reachable.
 
-               Explored_Method_Demangled :=
-                 (if Matches (0) /= GNAT.Regpat.No_Match then
-                   new String'
-                     (Demangle.Decode
-                        (Explored_Method_Name
-                           (Matches (1).First .. Matches (1).Last),
-                         Node.Ada_File_Name) &
-                      ':' &
-                      Explored_Method_Name
-                        (Matches (2).First .. Matches (2).Last))
-                  else
-                   new String'
-                     (Demangle.Decode
-                        (Explored_Method_Name.all, Node.Ada_File_Name)));
+               List_Of_Nodes.Element (Method_Subprogram).Is_Called := True;
 
-            else
-               --  We do not have information about the subprogram associated
-               --  to the method. We give it a name line class:slot.
-
-               Explored_Method_Name :=
-                 new String'
-                   (Explored_Method.Vtable_Entry.Class.Class_Name.all &
-                    ':' &
-                    Ada.Strings.Fixed.Trim
-                      (Slot_Number'Image (Explored_Method.Vtable_Entry.Slot),
-                       Ada.Strings.Both));
-
-               Explored_Method_Demangled := new String'
-                 (Demangle.Decode
-                    (Explored_Method.Vtable_Entry.Class.Class_Name.all,
-                     Node.Ada_File_Name) &
-                  ':' &
-                  Ada.Strings.Fixed.Trim
-                    (Slot_Number'Image (Explored_Method.Vtable_Entry.Slot),
-                     Ada.Strings.Both));
+               Static_Stack_Analysis.List_Of_Edges.Append
+                 (Result,
+                  new Static_Stack_Analysis.Edge_Element'(
+                    Ada_File_Name  => Node.Ada_File_Name,
+                    Target         => Method_Subprogram,
+                    Point_Of_Call  => Node.Location_List,
+                    Feasible_Call  => True,
+                    Under_Analysis => False));
             end if;
+         end if;
+      end Add_To_Potential_Targets;
 
-            Method_Subprogram := Get_Node (Explored_Method_Name.all);
+   --  Start of processing for Get_Overriding_Methods
+   begin
+      --  We need to get the list of methods which override the one defined
+      --  in the base class, and from this set we take only those which are
+      --  defined by classes derived from the static class.
 
-            if not List_Of_Nodes.Has_Element (Method_Subprogram) then
-               --  We need to create an artificial unresolved node
+      --  At least there is the base method
 
-               Target_Ptr := new Unresolved_Node'
-                 (Ada_File_Name           => Node.Ada_File_Name,
-                  Target_Calls            => List_Of_Edges.Empty_Vector,
-                  Accumulated_Stack_Usage => Unknown_Stack_Usage,
-                  Location_List           => List_Of_Locations.Empty_Set,
-                  Subprogram              => Explored_Method_Name,
-                  Demangled               => Explored_Method_Demangled,
-                  Alias                   => null,
-                  Under_Analysis          => False,
-                  Analysis_Finished       => False,
-                  Is_Called               => False,
-                  Is_Reachable            => False,
-                  Cycles                  => List_Of_Cycles.Empty_Set);
+      --  Get the subprogram associated to the base method. If it is not in
+      --  the list, it means that the method is abstract, so it does not count
+      --  for dispatching.
 
-               --  Insert new subprogram descriptor
+      if Base_Method /= null and then Base_Method.Symbol_Name /= null then
 
-               List_Of_Nodes.Insert
-                 (Global_Data.List_Of_Subprograms,
-                  Target_Ptr,
-                  Method_Subprogram,
-                  Inserted);
+         --  Get the demangled name from the symbol name
 
-               pragma Assert (Inserted);
-            end if;
+         Method_Subprogram := Get_Node (Base_Method.Symbol_Name.all);
 
-            pragma Assert (List_Of_Nodes.Has_Element (Method_Subprogram));
-
+         if List_Of_Nodes.Has_Element (Method_Subprogram) then
             --  Mark the potential target of the dispatching call as reachable
 
             List_Of_Nodes.Element (Method_Subprogram).Is_Called := True;
@@ -211,110 +161,13 @@ package body Dispatching_Calls is
                  Feasible_Call  => True,
                  Under_Analysis => False));
          end if;
-      end Add_To_Potential_Targets;
-
-   --  Start of processing for Get_Overriding_Methods
-   begin
-      --  We need to get the list of methods which override the one defined
-      --  in the base class, and from this set we take only those which are
-      --  defined by classes derived from the static class.
-
-      --  At least there is the base method
-
-      --  Get the subprogram associated to the base method. If it is not in
-      --  the list we need to create an undefined one.
-
-      if Base_Method /= null and then Base_Method.Symbol_Name /= null then
-         Base_Method_Name := Base_Method.Symbol_Name;
-
-         --  Get the demangled name from the symbol name. Take into account
-         --  that the symbol name may have a :NN suffix indicating the slot.
-
-         GNAT.Regpat.Match
-           ("^(.+):([\-]?\d+)$", Base_Method_Name.all, Matches);
-
-         Base_Method_Demangled :=
-           (if Matches (0) /= GNAT.Regpat.No_Match then
-             new String'
-               (Demangle.Decode
-                  (Base_Method_Name (Matches (1).First .. Matches (1).Last),
-                   Node.Ada_File_Name) &
-                ':' &
-                Base_Method_Name (Matches (2).First .. Matches (2).Last))
-            else
-             new String'
-               (Demangle.Decode
-                  (Base_Method_Name.all, Node.Ada_File_Name)));
-
-      else
-         --  We do not have information about the subprogram associated to
-         --  the method. We give it a name line class:slot.
-
-         Base_Method_Name :=
-           new String'(Node.Base_Class.Class_Name.all &
-                       ':' &
-                       Ada.Strings.Fixed.Trim
-                         (Slot_Number'Image (Node.Slot), Ada.Strings.Both));
-
-         Base_Method_Demangled := new String'
-                 (Demangle.Decode
-                    (Node.Base_Class.Class_Name.all, Node.Ada_File_Name) &
-                  ':' &
-                  Ada.Strings.Fixed.Trim
-                    (Slot_Number'Image (Node.Slot), Ada.Strings.Both));
-
       end if;
-
-      Method_Subprogram := Get_Node (Base_Method_Name.all);
-
-      if not List_Of_Nodes.Has_Element (Method_Subprogram) then
-         --  We need to create an artificial unresolved node
-
-         Target_Ptr := new Unresolved_Node'
-           (Ada_File_Name           => Node.Ada_File_Name,
-            Target_Calls            => List_Of_Edges.Empty_Vector,
-            Accumulated_Stack_Usage => Unknown_Stack_Usage,
-            Location_List           => List_Of_Locations.Empty_Set,
-            Subprogram              => Base_Method_Name,
-            Demangled               => Base_Method_Demangled,
-            Alias                   => null,
-            Under_Analysis          => False,
-            Analysis_Finished       => False,
-            Is_Called               => False,
-            Is_Reachable            => False,
-            Cycles                  => List_Of_Cycles.Empty_Set);
-
-         --  Insert new subprogram descriptor
-
-         List_Of_Nodes.Insert
-           (Global_Data.List_Of_Subprograms,
-            Target_Ptr,
-            Method_Subprogram,
-            Inserted);
-
-         pragma Assert (Inserted);
-      end if;
-
-      pragma Assert (List_Of_Nodes.Has_Element (Method_Subprogram));
-
-      --  Mark the potential target of the dispatching call as reachable
-
-      List_Of_Nodes.Element (Method_Subprogram).Is_Called := True;
-
-      Static_Stack_Analysis.List_Of_Edges.Append
-        (Result,
-         new Static_Stack_Analysis.Edge_Element'(
-           Ada_File_Name  => Node.Ada_File_Name,
-           Target         => Method_Subprogram,
-           Point_Of_Call  => Node.Location_List,
-           Feasible_Call  => True,
-           Under_Analysis => False));
 
       --  Now we need to iterate over the list of overriding methods.
       --
-      --  When Base_Method is null it means that GNATstack does not have
-      --  any information about this method, so the only thing that we can
-      --  say is that it is an unresolved call.
+      --  When Base_Method is null it means that GNATstack does not have any
+      --  information about this method, so the only thing that we can say is
+      --  that it is an unresolved call.
 
       if Base_Method /= null then
          --  We need to use the Redefined_By list that comes from either
