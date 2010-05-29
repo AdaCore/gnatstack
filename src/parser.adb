@@ -2234,10 +2234,14 @@ package body Parser is
             --  front end, and keeping the one from the back end leads to
             --  GNATstack to think there are two different calls.
 
-            if Locations_Set.Is_Empty or else
-              not Demangle.Is_Ada (Ada_File_Name) or else
-              not Location_Is_Dispatching (Locations_Set.First_Element)
+            if not Locations_Set.Is_Empty and then
+              Demangle.Is_Ada (Ada_File_Name) and then
+              Location_Is_Dispatching (Locations_Set.First_Element)
             then
+               --  Nothing else to do
+               return;
+
+            else
                Target_Name :=
                  new String'
                    (if not Locations_Set.Is_Empty then
