@@ -511,15 +511,8 @@ package body Static_Stack_Analysis is
    function Get_Stack_Usage
      (Target : Unresolved_Node) return Stack_Usage_Info is
    begin
-      if Target.Target_Calls.Is_Empty then
-         return Stack_Usage_Info'
-           (Frame_Type    => Unknown,
-            Static_Usage  => Empty_Value,
-            Dynamic_Usage => Empty_Value,
-            Unknown_Usage => Frame_Size (Options.Default_Unknown),
-            Cycle_Usage   => Empty_Value);
+      if Target.Alias /= null and then not Target.Target_Calls.Is_Empty then
 
-      else
          --  When the node is resolved by aliasing then return a local stack
          --  usage of 0. The actual stack consumption comes from the alias
          --  target.
@@ -531,6 +524,20 @@ package body Static_Stack_Analysis is
             Static_Usage  => 0,
             Dynamic_Usage => Empty_Value,
             Unknown_Usage => Empty_Value,
+            Cycle_Usage   => Empty_Value);
+
+      else
+
+         --  In the normal case of not aliasing, we cannot say anything
+         --  else about the local stack consumption of the subprogram
+         --  (although we may have information about subprograms called from
+         --  it).
+
+         return Stack_Usage_Info'
+           (Frame_Type    => Unknown,
+            Static_Usage  => Empty_Value,
+            Dynamic_Usage => Empty_Value,
+            Unknown_Usage => Frame_Size (Options.Default_Unknown),
             Cycle_Usage   => Empty_Value);
       end if;
    end Get_Stack_Usage;
