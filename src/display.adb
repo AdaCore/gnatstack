@@ -593,6 +593,10 @@ package body Display is
 
       Ada.Text_IO.Put (Location.File.all & ":");
       Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+      if Location.Column_Number > 0 then
+         Ada.Text_IO.Put (":");
+         Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+      end if;
 
       Ada.Text_IO.New_Line;
 
@@ -620,6 +624,16 @@ package body Display is
          Ada.Text_IO.Put_Line
            (XML_Descriptor, "</value>");
          Close_Tag ("line");
+
+         if Location.Column_Number > 0 then
+            Open_Tag ("column type=""integers""");
+            Report_XML (Message => "<value>", New_Line => False);
+            Ada.Integer_Text_IO.Put
+              (XML_Descriptor, Location.Column_Number, 0);
+            Ada.Text_IO.Put_Line
+              (XML_Descriptor, "</value>");
+            Close_Tag ("column");
+         end if;
 
          Close_Tag ("unboundedobject");
       end if;
