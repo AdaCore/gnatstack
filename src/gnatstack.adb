@@ -84,6 +84,7 @@ begin
 
    Display.Close_Output_Files;
 
+   Ada.Text_IO.Put_Line ("GNATstack: analysis successfully finished");
 exception
    when others =>
       Ada.Text_IO.New_Line;
