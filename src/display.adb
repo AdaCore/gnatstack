@@ -220,6 +220,24 @@ package body Display is
    --     <value>STATIC</value>
    --   </qualifier>
 
+   procedure Print_XML_Dynamic_Objects
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
+   --  Print the location of dynamic objects using the format:
+   --   <unboundedobject>
+   --     <object type="strings">
+   --       <value>A.B</value>
+   --     </object>
+   --     <file type="strings">
+   --       <value>a.adb</value>
+   --     </file>
+   --     <line type="integers">
+   --       <value>1</value>
+   --     </line>
+   --     <column type="integers">
+   --       <value>1</value>
+   --     </column>
+   --   </unboundedobject>
+
    procedure Open_Tag (Tag_Name : String);
    procedure Close_Tag (Tag_Name : String);
    --  Puts into XML file string <Tag_Name> or </Tag_Name>. The indentation is
@@ -603,39 +621,7 @@ package body Display is
       --  Print information about unbounded frames in the XML file
 
       if Options.Generate_XML_Output then
-         Open_Tag ("unboundedobject");
-
-         Open_Tag ("object type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.Demangled.all & "</value>");
-         Close_Tag ("object");
-
-         Open_Tag ("file type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.File.all & "</value>");
-         Close_Tag ("file");
-
-         Open_Tag ("line type=""integers""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put
-           (XML_Descriptor, Location.Line_Number, 0);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
-         Close_Tag ("line");
-
-         if Location.Column_Number > 0 then
-            Open_Tag ("column type=""integers""");
-            Report_XML (Message => "<value>", New_Line => False);
-            Ada.Integer_Text_IO.Put
-              (XML_Descriptor, Location.Column_Number, 0);
-            Ada.Text_IO.Put_Line
-              (XML_Descriptor, "</value>");
-            Close_Tag ("column");
-         end if;
-
-         Close_Tag ("unboundedobject");
+         Print_XML_Dynamic_Objects (Position);
       end if;
    end Print_Dynamic_Objects;
 
@@ -1340,6 +1326,12 @@ package body Display is
          Print_XML_Stack_Usage (Stack);
          Close_Tag ("localstackusage");
 
+         Open_Tag ("unboundedobjectset");
+         Static_Stack_Analysis.List_Of_Locations.Iterate
+           (Static_Stack_Analysis.Get_Dynamic_Objects (Node.all),
+            Print_XML_Dynamic_Objects'Access);
+         Close_Tag ("unboundedobjectset");
+
          Open_Tag ("subprogramcalledset");
          Static_Stack_Analysis.List_Of_Edges.Iterate
            (Node.Target_Calls, Print_XML_Edge'Access);
@@ -1994,6 +1986,52 @@ package body Display is
          Close_Tag ("unbounded");
       end if;
    end Print_Unbounded;
+
+   -------------------------------
+   -- Print_XML_Dynamic_Objects --
+   -------------------------------
+
+   procedure Print_XML_Dynamic_Objects
+     (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
+   is
+      Location : constant Static_Stack_Analysis.Location :=
+        Static_Stack_Analysis.List_Of_Locations.Element (Position);
+
+   begin
+         Open_Tag ("unboundedobject");
+
+         Open_Tag ("object type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.Demangled.all & "</value>");
+         Close_Tag ("object");
+
+         Open_Tag ("file type=""strings""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, Location.File.all & "</value>");
+         Close_Tag ("file");
+
+         Open_Tag ("line type=""integers""");
+         Report_XML (Message => "<value>", New_Line => False);
+         Ada.Integer_Text_IO.Put
+           (XML_Descriptor, Location.Line_Number, 0);
+         Ada.Text_IO.Put_Line
+           (XML_Descriptor, "</value>");
+         Close_Tag ("line");
+
+         if Location.Column_Number > 0 then
+            Open_Tag ("column type=""integers""");
+            Report_XML (Message => "<value>", New_Line => False);
+            Ada.Integer_Text_IO.Put
+              (XML_Descriptor, Location.Column_Number, 0);
+            Ada.Text_IO.Put_Line
+              (XML_Descriptor, "</value>");
+            Close_Tag ("column");
+         end if;
+
+         Close_Tag ("unboundedobject");
+   end Print_XML_Dynamic_Objects;
 
    --------------------
    -- Print_XML_Edge --
