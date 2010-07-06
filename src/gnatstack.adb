@@ -25,6 +25,7 @@ with Display;
 with Call_Graphs;
 with Global_Data;
 with Dispatching_Calls;
+with Options;
 
 with Ada.Text_IO;
 
@@ -84,7 +85,9 @@ begin
 
    Display.Close_Output_Files;
 
-   Ada.Text_IO.Put_Line ("GNATstack: analysis successfully finished");
+   if not Options.Very_Quiet then
+      Ada.Text_IO.Put_Line ("GNATstack: analysis successfully finished");
+   end if;
 exception
    when others =>
       Ada.Text_IO.New_Line;

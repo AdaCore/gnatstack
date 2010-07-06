@@ -332,7 +332,9 @@ package body Call_Graphs is
 
          Global_Data.Cycles.Iterate (Tag_Cycle'Access);
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
    end Analyze_Call_Graph;
 

@@ -33,6 +33,9 @@ package Options is
    Quiet : Boolean := False;
    --  No interractive output
 
+   Very_Quiet : Boolean := False;
+   --  No console output at all
+
    Generate_XML_Output : Boolean := False;
    --  XML output
 

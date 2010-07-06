@@ -544,18 +544,22 @@ package body Display is
 
          Print_Name (Node);
 
-         Ada.Text_IO.Put (": ");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put (": ");
 
-         --  Local stack usage
+            --  Local stack usage
 
-         Expand_Stack_Usage (Stack_Info);
+            Expand_Stack_Usage (Stack_Info);
 
-         --  If the code is not directly reachable from any of the specified
-         --  entry points we mark the subprogram as such. The subprogram may
-         --  be reachable via indirect calls
+            --  If the code is not directly reachable from any of the specified
+            --  entry points we mark the subprogram as such. The subprogram may
+            --  be reachable via indirect calls
 
-         if not Node.Is_Reachable then
-            Ada.Text_IO.Put (" (not directly reachable)");
+            if not Node.Is_Reachable then
+               Ada.Text_IO.Put (" (not directly reachable)");
+            end if;
+
+            Ada.Text_IO.New_Line;
          end if;
 
          --  Send stack information to the XML file if needed
@@ -567,8 +571,6 @@ package body Display is
          end if;
 
          Close_Tag ("frame");
-
-         Ada.Text_IO.New_Line;
       end Print_Node;
 
    begin
@@ -597,26 +599,28 @@ package body Display is
       use type Ada.Text_IO.File_Access;
 
    begin
-      --  Tabulation
+      if not Options.Very_Quiet then
+         --  Tabulation
 
-      Ada.Text_IO.Put ("    ");
+         Ada.Text_IO.Put ("    ");
 
-      --  Object name
+         --  Object name
 
-      Ada.Text_IO.Put (Location.Demangled.all);
+         Ada.Text_IO.Put (Location.Demangled.all);
 
-      --  File location
+         --  File location
 
-      Ada.Text_IO.Put (" at ");
+         Ada.Text_IO.Put (" at ");
 
-      Ada.Text_IO.Put (Location.File.all & ":");
-      Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
-      if Location.Column_Number > 0 then
-         Ada.Text_IO.Put (":");
-         Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+         Ada.Text_IO.Put (Location.File.all & ":");
+         Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+         if Location.Column_Number > 0 then
+            Ada.Text_IO.Put (":");
+            Ada.Integer_Text_IO.Put (Location.Column_Number, 0);
+         end if;
+
+         Ada.Text_IO.New_Line;
       end if;
-
-      Ada.Text_IO.New_Line;
 
       --  Print information about unbounded frames in the XML file
 
@@ -714,7 +718,9 @@ package body Display is
 
          Close_Tag ("entry");
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end Print_Longest_Path;
 
       procedure Print_Longest_Path
@@ -754,26 +760,28 @@ package body Display is
         Static_Stack_Analysis.Get_Location_List (Node.all);
 
    begin
-      --  Print subprogram name
+      if not Options.Very_Quiet then
+         --  Print subprogram name
 
-      Print_Source_Name (Node);
+         Print_Source_Name (Node);
 
-      --  Print symbol name in debug mode
-      if Options.Debug and then
-        Node.all in Static_Stack_Analysis.Real_Node'Class
-      then
-         Ada.Text_IO.Put
-           (" (" &
-            Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all &
-            ")");
-      end if;
+         --  Print symbol name in debug mode
+         if Options.Debug and then
+           Node.all in Static_Stack_Analysis.Real_Node'Class
+         then
+            Ada.Text_IO.Put
+              (" (" &
+               Static_Stack_Analysis.Get_Subprogram_Name (Node.all).all &
+               ")");
+         end if;
 
-      if Options.Verbose and then not Locations.Is_Empty then
-         --  Location list
-         Ada.Text_IO.Put (" at ");
+         if Options.Verbose and then not Locations.Is_Empty then
+            --  Location list
+            Ada.Text_IO.Put (" at ");
 
-         Static_Stack_Analysis.List_Of_Locations.Iterate
-           (Locations, Expand_Location'Access);
+            Static_Stack_Analysis.List_Of_Locations.Iterate
+              (Locations, Expand_Location'Access);
+         end if;
       end if;
 
       --  Send subprogram name and locations to the XML file
@@ -900,16 +908,22 @@ package body Display is
 
          --  Indentation
 
-         Ada.Text_IO.Put (" +-> ");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put (" +-> ");
+         end if;
 
          --  Dispatching indication if needed
 
          if Dispatching_Call_Mark then
-            Ada.Text_IO.Put ("dispatching to ");
+            if not Options.Very_Quiet then
+               Ada.Text_IO.Put ("dispatching to ");
+            end if;
             Dispatching_Call_Mark := False;
 
          elsif Indirect_Call_Mark then
-            Ada.Text_IO.Put ("dereferencing to ");
+            if not Options.Very_Quiet then
+               Ada.Text_IO.Put ("dereferencing to ");
+            end if;
             Indirect_Call_Mark := False;
 
          end if;
@@ -918,41 +932,44 @@ package body Display is
 
          Print_Name (Node);
 
-         --  Print local stack usage
+         if not Options.Very_Quiet then
+            --  Print local stack usage
 
-         if Options.Verbose then
-            Ada.Text_IO.Put (" : ");
+            if Options.Verbose then
+               Ada.Text_IO.Put (" : ");
 
-            Expand_Stack_Usage (Stack_Info);
+               Expand_Stack_Usage (Stack_Info);
 
-            --  Information about cycles
+               --  Information about cycles
 
-            if
-            not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles)
+               if
+               not Static_Stack_Analysis.List_Of_Cycles.Is_Empty (Node.Cycles)
+               then
+                  Ada.Text_IO.Put (" (");
+
+                  Node.Cycles.Iterate (Print_Cycle_Id'Access);
+
+                  Ada.Text_IO.Put (")");
+               end if;
+
+            elsif Global_Data.Phase = Global_Data.Print_Results and then
+                (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.Empty_Value
+                    or else
+                 Stack_Info.Unknown_Usage /= Static_Stack_Analysis.Empty_Value
+                    or else
+                 Stack_Info.Cycle_Usage /= Static_Stack_Analysis.Empty_Value)
             then
-               Ada.Text_IO.Put (" (");
+               --  In non-verbose mode we just put a mark indicating that the
+               --  resulting value is not accurate when we are printing the
+               --  paths.
 
-               Node.Cycles.Iterate (Print_Cycle_Id'Access);
-
-               Ada.Text_IO.Put (")");
+               Ada.Text_IO.Put (" *");
             end if;
 
-         elsif Global_Data.Phase = Global_Data.Print_Results and then
-             (Stack_Info.Dynamic_Usage /= Static_Stack_Analysis.Empty_Value
-                 or else
-              Stack_Info.Unknown_Usage /= Static_Stack_Analysis.Empty_Value
-                 or else
-              Stack_Info.Cycle_Usage /= Static_Stack_Analysis.Empty_Value)
-         then
-            --  In non-verbose mode we just put a mark indicating that the
-            --  resulting value is not accurate when we are printing the paths.
-
-            Ada.Text_IO.Put (" *");
+            Ada.Text_IO.New_Line;
          end if;
 
          Close_Tag ("subprogram");
-
-         Ada.Text_IO.New_Line;
       end if;
    end Print_Node;
 
@@ -989,9 +1006,11 @@ package body Display is
       --  Print subprograms ordered by local stack usage (if requested)
 
       if Options.Number_Of_Biggest_Frames > 0 then
-         Ada.Text_IO.Put_Line ("Local stack usage information");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put_Line ("Local stack usage information");
 
-         Ada.Text_IO.New_Line;
+            Ada.Text_IO.New_Line;
+         end if;
 
          Open_Tag ("bigframeset");
 
@@ -999,7 +1018,9 @@ package body Display is
 
          Close_Tag ("bigframeset");
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
 
       --  Generate the files containing the whole call graph and the undefined
@@ -1009,10 +1030,12 @@ package body Display is
 
       --  Print the stack usage information
 
-      Ada.Text_IO.Put_Line
-        ("Accumulated stack usage information for entry points");
+      if not Options.Very_Quiet then
+         Ada.Text_IO.Put_Line
+           ("Accumulated stack usage information for entry points");
 
-      Ada.Text_IO.New_Line;
+         Ada.Text_IO.New_Line;
+      end if;
 
       Print_Longest_Paths;
 
@@ -1052,12 +1075,14 @@ package body Display is
 
       procedure Clarify (Msg : String) is
       begin
-         if Has_Clarify then
-            Ada.Text_IO.Put (", ");
-         else
-            Has_Clarify := True;
+         if not Options.Very_Quiet then
+            if Has_Clarify then
+               Ada.Text_IO.Put (", ");
+            else
+               Has_Clarify := True;
+            end if;
+            Ada.Text_IO.Put (Msg);
          end if;
-         Ada.Text_IO.Put (Msg);
       end Clarify;
 
    begin
@@ -1074,11 +1099,14 @@ package body Display is
         or else Global_Data.External_Calls
         or else Global_Data.Indirect_Calls
       then
-         --  Screen output
+         if not Options.Very_Quiet then
+            --  Screen output
 
-         Ada.Text_IO.New_Line;
+            Ada.Text_IO.New_Line;
 
-         Ada.Text_IO.Put ("Worst case analysis is *not* accurate because of ");
+            Ada.Text_IO.Put
+              ("Worst case analysis is *not* accurate because of ");
+         end if;
 
          if not Global_Data.Cycles.Is_Empty then
             Clarify ("cycles");
@@ -1102,12 +1130,15 @@ package body Display is
             Has_Warning := Has_Warning and Options.Warnings (Options.Indirect);
          end if;
 
-         Ada.Text_IO.Put (".");
-         if not Has_Warning then
-            Ada.Text_IO.Put (" Use -Wa for details.");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put (".");
+
+            if not Has_Warning then
+               Ada.Text_IO.Put (" Use -Wa for details.");
+            end if;
+
+            Ada.Text_IO.New_Line (2);
          end if;
-         Ada.Text_IO.New_Line;
-         Ada.Text_IO.New_Line;
 
          --  XML output
 
@@ -1127,9 +1158,12 @@ package body Display is
       if Options.Warnings (Options.Cycle)
         and then not Global_Data.Cycles.Is_Empty
       then
-         Ada.Text_IO.Put_Line
-           ("List of reachable cycles:");
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put_Line
+              ("List of reachable cycles:");
+            Ada.Text_IO.New_Line;
+         end if;
+
          Global_Data.Cycles.Iterate (Print_Cycle'Access);
       end if;
 
@@ -1143,12 +1177,18 @@ package body Display is
       if Options.Warnings (Options.Unbounded)
         and then Global_Data.Unbounded_Frames
       then
-         Ada.Text_IO.Put_Line
-           ("List of reachable subprograms with dynamic unbounded frames:");
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put_Line
+              ("List of reachable subprograms with dynamic unbounded frames:");
+            Ada.Text_IO.New_Line;
+         end if;
+
          Global_Data.List_Of_Subprograms.Iterate
            (Print_Unbounded'Access);
-         Ada.Text_IO.New_Line;
+
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
 
       Close_Tag ("unboundedset");
@@ -1161,11 +1201,17 @@ package body Display is
       if Options.Warnings (Options.External)
         and then Global_Data.External_Calls
       then
-         Ada.Text_IO.Put_Line
-           ("List of reachable external subprograms:");
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put_Line
+              ("List of reachable external subprograms:");
+            Ada.Text_IO.New_Line;
+         end if;
+
          Global_Data.List_Of_Subprograms.Iterate (Print_External'Access);
-         Ada.Text_IO.New_Line;
+
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
 
       Close_Tag ("externalset");
@@ -1177,13 +1223,19 @@ package body Display is
       if Options.Warnings (Options.Indirect)
         and then Global_Data.Indirect_Calls
       then
-         Ada.Text_IO.Put_Line
-           ("List of reachable and unresolved indirect (including " &
-            "dispatching) calls:");
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put_Line
+              ("List of reachable and unresolved indirect (including " &
+               "dispatching) calls:");
+            Ada.Text_IO.New_Line;
+         end if;
+
          Global_Data.List_Of_Subprograms.Iterate
            (Print_Unresolved_Indirect'Access);
-         Ada.Text_IO.New_Line;
+
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
 
       Close_Tag ("indirectset");
@@ -1475,9 +1527,9 @@ package body Display is
       end if;
    end Print_Node_In_Path;
 
-   ----------------
-   -- Print_Path --
-   ----------------
+   -----------------
+   -- Print_Entry --
+   -----------------
 
    procedure Print_Entry (Root : Static_Stack_Analysis.Node_Class_Access) is
       Task_Wrapper : Static_Stack_Analysis.Node_Class_Access := null;
@@ -1496,15 +1548,17 @@ package body Display is
         Global_Data.Is_Task_Entry
           (Static_Stack_Analysis.Get_Subprogram_Name (Root.all));
 
-      if Is_Task then
-         --  This is an Ada task
+      if not Options.Very_Quiet then
+         if Is_Task then
+            --  This is an Ada task
 
-         Ada.Text_IO.Put ("Task ");
+            Ada.Text_IO.Put ("Task ");
+         end if;
+
+         Print_Source_Name (Root);
+
+         Ada.Text_IO.Put (" : total ");
       end if;
-
-      Print_Source_Name (Root);
-
-      Ada.Text_IO.Put (" : total ");
 
       --  For tasks we need to add the task wrapper
 
@@ -1525,9 +1579,11 @@ package body Display is
            Static_Stack_Analysis.Get_Accumulated_Stack_Usage (Root.all);
       end if;
 
-      Expand_Stack_Usage (Accumulated_Stack);
+      if not Options.Very_Quiet then
+         Expand_Stack_Usage (Accumulated_Stack);
 
-      Ada.Text_IO.New_Line;
+         Ada.Text_IO.New_Line;
+      end if;
 
       --  Print entry point information to the XML file
 
@@ -1578,25 +1634,29 @@ package body Display is
    begin
       Open_Tag ("cycle");
 
-      Print_Cycle_Id (Cycle);
+      if not Options.Very_Quiet then
+         Print_Cycle_Id (Cycle);
 
-      Ada.Text_IO.Put (" ");
+         Ada.Text_IO.Put (" ");
 
-      Print_Source_Name
-        (Static_Stack_Analysis.List_Of_Nodes.Element
-           (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
+         Print_Source_Name
+           (Static_Stack_Analysis.List_Of_Nodes.Element
+              (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
 
-      Ada.Text_IO.New_Line;
+         Ada.Text_IO.New_Line;
+      end if;
 
       --  Print the call chain
 
       Static_Stack_Analysis.Paths.Iterate (Path, Print_Node_In_Path'Access);
 
-      --  We repeat the first node just for clarity
+      if not Options.Very_Quiet then
+         --  We repeat the first node just for clarity
 
-      Print_Node_In_Path (Root);
+         Print_Node_In_Path (Root);
 
-      Ada.Text_IO.New_Line;
+         Ada.Text_IO.New_Line;
+      end if;
 
       Close_Tag ("cycle");
    end Print_Cycle;
@@ -1633,7 +1693,9 @@ package body Display is
         Node.Is_Reachable and then
         Static_Stack_Analysis.Unresolved_Node (Node.all).Target_Calls.Is_Empty
       then
-         Ada.Text_IO.Put ("  ");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put ("  ");
+         end if;
 
          Open_Tag ("external");
 
@@ -1641,7 +1703,9 @@ package body Display is
 
          Close_Tag ("external");
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
       end if;
    end Print_External;
 
@@ -1705,8 +1769,9 @@ package body Display is
            List_Of_Nodes.Element (Call.Target);
 
       begin
-         if Target.all in Dispatching_Node'Class
-           and then not Target.Target_Calls.Is_Empty
+         if not Options.Very_Quiet and then
+           Target.all in Dispatching_Node'Class and then
+           not Target.Target_Calls.Is_Empty
          then
             if First_Dispatching then
                First_Dispatching := False;
@@ -1821,25 +1886,30 @@ package body Display is
 
    --  Start of processing for Print_Resolved_Indirect_Calls
    begin
-      if Options.Target_Resolution = Options.Dispatching_Calls or else
-        Options.Target_Resolution = Options.Both
-      then
-         --  Iterate the list of subprograms looking for dispatching calls and
-         --  print the potential targets for each if they have been computed.
+      if not Options.Very_Quiet then
+         if Options.Target_Resolution = Options.Dispatching_Calls or else
+           Options.Target_Resolution = Options.Both
+         then
+            --  Iterate the list of subprograms looking for dispatching calls
+            --  and print the potential targets for each if they have been
+            --  computed.
 
-         List_Of_Nodes.Iterate
-           (Global_Data.List_Of_Subprograms, Print_Dispatching_Callers'Access);
-      end if;
+            List_Of_Nodes.Iterate
+              (Global_Data.List_Of_Subprograms,
+               Print_Dispatching_Callers'Access);
+         end if;
 
-      if Options.Target_Resolution = Options.Indirect_Calls or else
-        Options.Target_Resolution = Options.Both
-      then
-         --  Iterate the list of subprograms looking for dereferences to
-         --  access-to-subprogram values and print the potential targets for
-         --  each.
+         if Options.Target_Resolution = Options.Indirect_Calls or else
+           Options.Target_Resolution = Options.Both
+         then
+            --  Iterate the list of subprograms looking for dereferences to
+            --  access-to-subprogram values and print the potential targets for
+            --  each.
 
-         List_Of_Nodes.Iterate
-           (Global_Data.List_Of_Subprograms, Print_Dereference_Callers'Access);
+            List_Of_Nodes.Iterate
+              (Global_Data.List_Of_Subprograms,
+               Print_Dereference_Callers'Access);
+         end if;
       end if;
    end Print_Resolved_Indirect_Calls;
 
@@ -1886,11 +1956,13 @@ package body Display is
          if Location /= Static_Stack_Analysis.Null_Location
            and then Location.File /= null
          then
-            --  File location
+            if not Options.Very_Quiet then
+               --  File location
 
-            Ada.Text_IO.Put ("    at " & Location.File.all & ":");
-            Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
-            Ada.Text_IO.New_Line;
+               Ada.Text_IO.Put ("    at " & Location.File.all & ":");
+               Ada.Integer_Text_IO.Put (Location.Line_Number, 0);
+               Ada.Text_IO.New_Line;
+            end if;
 
             --  Print location to the XML file
 
@@ -1922,21 +1994,25 @@ package body Display is
       --  be reachable via indirect calls).
 
       if not Indirect_Calls.Is_Empty and then Node.Is_Reachable then
-         Ada.Text_IO.Put ("  ");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put ("  ");
 
-         Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
+            Ada.Integer_Text_IO.Put (Integer (Indirect_Calls.Length), 0);
 
-         if Integer (Indirect_Calls.Length) > 1 then
-            Ada.Text_IO.Put (" indirect calls in: ");
-         else
-            Ada.Text_IO.Put (" indirect call in: ");
+            if Integer (Indirect_Calls.Length) > 1 then
+               Ada.Text_IO.Put (" indirect calls in: ");
+            else
+               Ada.Text_IO.Put (" indirect call in: ");
+            end if;
          end if;
 
          Open_Tag ("indirect");
 
          Print_Name (Node);
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
 
          Open_Tag ("indirectcallset");
 
@@ -1967,13 +2043,17 @@ package body Display is
       if Get_Stack_Usage (Node.all).Frame_Type = Unbounded
         and then Node.Is_Reachable
       then
-         Ada.Text_IO.Put ("  In ");
+         if not Options.Very_Quiet then
+            Ada.Text_IO.Put ("  In ");
+         end if;
 
          Open_Tag ("unbounded");
 
          Print_Name (Node);
 
-         Ada.Text_IO.New_Line;
+         if not Options.Very_Quiet then
+            Ada.Text_IO.New_Line;
+         end if;
 
          Open_Tag ("unboundedobjectset");
 

@@ -539,7 +539,7 @@ package body Parser is
             case
               GNAT.Command_Line.Getopt
                 ("a aO: ca c: d: e: f: files= g h k l: np o= oc= p q r: s= " &
-                 "t! u: v W! x -help -version")
+                 "t! u: v W! x -help -version Q")
             is
             when ASCII.NUL =>
                exit;
@@ -567,11 +567,7 @@ package body Parser is
 
             --  Verbose
             when 'v' =>
-               if not Options.Verbose then
-                  Options.Verbose := True;
-
-                  Print_Version;
-               end if;
+               Options.Verbose := True;
 
             --  Help
             when 'h' =>
@@ -728,6 +724,11 @@ package body Parser is
 
             --  Do not display progress messages.
             when 'q' =>
+               Options.Quiet := True;
+
+            --  Do not display any console message.
+            when 'Q' =>
+               Options.Very_Quiet := True;
                Options.Quiet := True;
 
             when 'n' =>
@@ -940,6 +941,10 @@ package body Parser is
             GNAT.OS_Lib.OS_Exit (1);
       end;
 
+      if Options.Verbose and then not Options.Very_Quiet then
+         Print_Version;
+      end if;
+
       --  Once we know the list of input files we can parse the information
       --  which is within these files.
 
@@ -959,7 +964,9 @@ package body Parser is
          --  Process the .ci files extracted from object files
          List_Of_Files.Iterate (Input_Tmp_Files, Parse_Input_File'Access);
 
-         if Global_Data.Entities_Processed (Global_Data.Subprogram) > 0 then
+         if not Options.Very_Quiet and then
+           Global_Data.Entities_Processed (Global_Data.Subprogram) > 0
+         then
             Ada.Text_IO.New_Line;
          end if;
 
@@ -3005,6 +3012,8 @@ package body Parser is
       Put_Line ("      s        stack usage (default)");
       Put_Line ("  -p           display paths for entry points (default)");
       Put_Line ("  -q           quiet: do not display progress messages");
+      Put_Line ("  -Q           very quiet: do not display any console" &
+                               "message");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
       Put_Line ("  -s=section   name of the section where the .ci is " &
