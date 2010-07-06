@@ -368,6 +368,11 @@ entry point (the default mode).
 @cindex @option{-q}
 Be quiet: do not display progression messages.
 
+@item -Q
+@cindex @option{-Q}
+Very quiet: do not display any console message except those indicating
+an error.
+
 @item -np
 @cindex @option{-np}
 Do not print worst-case path for entry points.
