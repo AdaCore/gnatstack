@@ -690,6 +690,13 @@ package body Static_Stack_Analysis is
         (Global_Data.Location_All_Dispatching_Calls, Loc);
    end Location_Is_Dispatching;
 
+   function Location_Is_Dispatching
+     (Locs : List_Of_Locations.Set) return Boolean is
+   begin
+      return not Global_Data.Location_All_Dispatching_Calls.Intersection
+        (Locs).Is_Empty;
+   end Location_Is_Dispatching;
+
    --------------
    -- Node_Key --
    --------------

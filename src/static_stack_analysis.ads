@@ -575,6 +575,11 @@ package Static_Stack_Analysis is
    --  Function which says whether a location corresponds to a dispatching
    --  call.
 
+   function Location_Is_Dispatching
+     (Locs : List_Of_Locations.Set) return Boolean;
+   --  Function which says whether any location in the given set corresponds
+   --  to a dispatching call.
+
    ---------------
    -- Real_Node --
    ---------------
