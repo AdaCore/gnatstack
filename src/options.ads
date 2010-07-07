@@ -30,8 +30,8 @@ package Options is
    Debug : Boolean := False;
    --  Debug output
 
-   Quiet : Boolean := False;
-   --  No interractive output
+   Progress_Information : Boolean := False;
+   --  Print progress information
 
    Very_Quiet : Boolean := False;
    --  No console output at all

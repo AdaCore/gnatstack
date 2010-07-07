@@ -364,14 +364,18 @@ Select alphabetical order.
 Print all the subprograms that make up the worst-case path for every
 entry point (the default mode).
 
+@item -pi
+@cindex @option{-pi}
+Print progress information.
+
 @item -q
 @cindex @option{-q}
-Be quiet: do not display progression messages.
+Be quiet: do not display progress information.
 
 @item -Q
 @cindex @option{-Q}
 Very quiet: do not display any console message except those indicating
-an error.
+an error and the progress information.
 
 @item -np
 @cindex @option{-np}

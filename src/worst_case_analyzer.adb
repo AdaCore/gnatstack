@@ -20,6 +20,9 @@
 ------------------------------------------------------------------------------
 
 with Global_Data;
+with Options;
+with Display;
+with Ada.Text_IO;
 
 package body Worst_Case_Analyzer is
 
@@ -129,6 +132,10 @@ package body Worst_Case_Analyzer is
         Static_Stack_Analysis.List_Of_Edges.Element (Position);
 
    begin
+      if Options.Progress_Information then
+         Display.Increase_Count (Global_Data.Analyze_Call);
+      end if;
+
       --  Mark it under analysis
 
       Explored_Edge.Under_Analysis := True;
@@ -195,6 +202,20 @@ package body Worst_Case_Analyzer is
 
       Static_Stack_Analysis.List_Of_Node_Ids.Iterate
         (Global_Data.Entry_Points, Worst_Case_For_Entry'Access);
+
+      if Options.Progress_Information then
+         --  Make sure that analysis is displayed as finished
+
+         Global_Data.Expected_Entities (Global_Data.Analyze_Call) :=
+           Global_Data.Entities_Processed (Global_Data.Analyze_Call);
+
+         --  Force printing
+
+         Display.Increase_Count (Global_Data.Analyze_Call);
+
+         Ada.Text_IO.New_Line;
+      end if;
+
    end Worst_Case_Analysis;
 
 end Worst_Case_Analyzer;

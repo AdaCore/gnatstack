@@ -1480,28 +1480,57 @@ package body Display is
    --------------------
 
    procedure Increase_Count (Entity : Global_Data.Entities) is
+      Expected_Total  : Natural;
+      Performed_Total : Natural;
+
       use Global_Data;
 
    begin
       Entities_Processed (Entity) := Entities_Processed (Entity) + 1;
 
-      if not Options.Quiet then
-         case Entity is
-            when Subprogram | Call_To_Subprogram =>
-               Ada.Text_IO.Put
-                 ("Parsing" &
-                    Natural'Image (Entities_Processed (Subprogram)) &
-                    " subprograms and" &
-                    Natural'Image (Entities_Processed (Call_To_Subprogram)) &
-                    " calls to subprogram" & ASCII.CR);
+      --  Correct the number of expected entities if we overrun it
 
-            when Cycle =>
-               Ada.Text_IO.Put
-                 ("Detected" &
-                    Natural'Image (Entities_Processed (Cycle)) &
-                    " cycles" & ASCII.CR);
-         end case;
+      if Expected_Entities (Entity) < Entities_Processed (Entity) then
+         Expected_Entities (Entity) := Entities_Processed (Entity);
       end if;
+
+      case Entity is
+         when Parse_Subprogram | Analyze_Subprogram | Parse_Call |
+              Analyze_Call =>
+            --  We are measuring progress according to the parsing of
+            --  subprograms and calls plus the analysis of the calls. Note
+            --  that the part about parsing is accurate (we know the entities
+            --  that need to be parsed) but the analysis is not, because there
+            --  are, for example, unreachable calls.
+
+            Expected_Total :=
+              Expected_Entities (Parse_Subprogram) +
+              Expected_Entities (Parse_Call) +
+              Expected_Entities (Analyze_Subprogram) +
+              Expected_Entities (Analyze_Call);
+
+            Performed_Total :=
+              Entities_Processed (Parse_Subprogram) +
+              Entities_Processed (Parse_Call) +
+              Entities_Processed (Analyze_Subprogram) +
+              Entities_Processed (Analyze_Call);
+
+            Ada.Text_IO.Put
+              ("completed" &
+               Natural'Image (Performed_Total) &
+               " out of" &
+               Natural'Image (Expected_Total) &
+               " (" &
+               Ada.Strings.Fixed.Trim
+                 (Natural'Image
+                    (Performed_Total * 100 / Expected_Total),
+                  Ada.Strings.Both) &
+               "%)" &
+               ASCII.CR);
+
+         when others =>
+            null;
+      end case;
    end Increase_Count;
 
    ------------------------

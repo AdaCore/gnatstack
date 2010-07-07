@@ -184,6 +184,10 @@ package body Call_Graphs is
             Analyze_Detected_Cycle (Position);
 
          else
+            if Options.Progress_Information then
+               Display.Increase_Count (Global_Data.Analyze_Subprogram);
+            end if;
+
             --  Mark node as reachable
 
             Node.Is_Reachable := True;
@@ -326,6 +330,17 @@ package body Call_Graphs is
 
       Static_Stack_Analysis.List_Of_Nodes.Iterate
         (Global_Data.List_Of_Subprograms, Analyze_Subprogram'Access);
+
+      if Options.Progress_Information then
+         --  Make sure that subprogram analysis is displayed as finished
+
+         Global_Data.Expected_Entities (Global_Data.Analyze_Subprogram) :=
+           Global_Data.Entities_Processed (Global_Data.Analyze_Subprogram);
+
+         --  Force printing
+
+         Display.Increase_Count (Global_Data.Analyze_Subprogram);
+      end if;
 
       if Global_Data.Entities_Processed (Global_Data.Cycle) > 0 then
          --  Allocate unique identifiers to the cycles

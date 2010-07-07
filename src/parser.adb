@@ -136,6 +136,41 @@ package body Parser is
    subtype File_Id is List_Of_Files.Cursor;
    --  Unique identifier for files
 
+   procedure Count_Entities (File : File_Id);
+   --  Procedure to get the number of entities to process
+
+   --------------------
+   -- Count_Entities --
+   --------------------
+
+   procedure Count_Entities (File : File_Id) is
+      Matches : GNAT.Regpat.Match_Array (0 .. 3);
+   begin
+      Ada.Text_IO.Open
+        (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
+
+      while not Ada.Text_IO.End_Of_File (Descriptor) loop
+         GNAT.Regpat.Match ("^(node:)|(edge:)|(class)",
+                            Ada.Text_IO.Get_Line (Descriptor),
+                            Matches);
+
+         if Matches (1) /= GNAT.Regpat.No_Match then
+            Global_Data.Expected_Entities (Global_Data.Parse_Subprogram) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Subprogram) + 1;
+
+         elsif Matches (2) /= GNAT.Regpat.No_Match then
+            Global_Data.Expected_Entities (Global_Data.Parse_Call) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Call) + 1;
+
+         elsif Matches (3) /= GNAT.Regpat.No_Match then
+            Global_Data.Expected_Entities (Global_Data.Class) :=
+              Global_Data.Expected_Entities (Global_Data.Class) + 1;
+         end if;
+      end loop;
+
+      Ada.Text_IO.Close (Descriptor);
+   end Count_Entities;
+
    ---------------------------
    -- Deallocate_File_Names --
    ---------------------------
@@ -538,8 +573,8 @@ package body Parser is
          loop
             case
               GNAT.Command_Line.Getopt
-                ("a aO: ca c: d: e: f: files= g h k l: np o= oc= p q r: s= " &
-                 "t! u: v W! x -help -version Q")
+                ("a aO: ca c: d: e: f: files= g h k l: np o= oc= p pi q Q " &
+                 "r: s= t! u: v W! x -help -version")
             is
             when ASCII.NUL =>
                exit;
@@ -592,13 +627,12 @@ package body Parser is
                      raise GNAT.Command_Line.Invalid_Parameter;
                end;
 
-            --  All cycles
             when 'c' =>
-               --  -ca option
+               --  All cycles
                if GNAT.Command_Line.Full_Switch = "ca" then
                   Options.Compute_All_Cycles := True;
 
-               --  -c size option
+               --  Default size for cycles
                elsif GNAT.Command_Line.Full_Switch = "c" then
                   declare
                   begin
@@ -648,15 +682,15 @@ package body Parser is
                   end loop;
                end;
 
-            --  Ordering and objcopy
             when 'o' =>
-               --  -oc
+               --  Objcopy command
                if GNAT.Command_Line.Full_Switch = "oc" then
                   GNAT.Strings.Free (Options.Objcopy_Cmd);
 
                   Options.Objcopy_Cmd :=
                     new String'(GNAT.Command_Line.Parameter);
 
+               --  Ordering
                else
                   declare
                      Parameter : constant String :=
@@ -718,18 +752,28 @@ package body Parser is
                      raise GNAT.Command_Line.Invalid_Parameter;
                end;
 
-            --  Display call chain (paths) for the entry points
             when 'p' =>
-               Options.Display_Call_Chains := True;
+               --  Display call chain paths
+               if GNAT.Command_Line.Full_Switch = "p" then
+                  Options.Display_Call_Chains := True;
+
+               --  Progress information
+               elsif GNAT.Command_Line.Full_Switch = "pi" then
+                  Options.Progress_Information := True;
+
+               --  Wrong option
+               else
+                  raise GNAT.Command_Line.Invalid_Parameter;
+               end if;
 
             --  Do not display progress messages.
             when 'q' =>
-               Options.Quiet := True;
+               Options.Progress_Information := False;
 
-            --  Do not display any console message.
+            --  Do not display any console message (except for progress
+            --  information).
             when 'Q' =>
                Options.Very_Quiet := True;
-               Options.Quiet := True;
 
             when 'n' =>
                --  Do not display call chain (paths) for the entry points
@@ -958,16 +1002,40 @@ package body Parser is
          Print_Usage_And_Exit;
 
       else
+         if Options.Progress_Information then
+            --  Count Entities
+            List_Of_Files.Iterate (Input_Files, Count_Entities'Access);
+            List_Of_Files.Iterate (Input_Tmp_Files, Count_Entities'Access);
+
+            --  Approximate the number of subprograms and calls to analyze by
+            --  the number of subprograms and calls to parse. This is not
+            --  exact because there may be unreachable paths, for example.
+
+            Global_Data.Expected_Entities (Global_Data.Analyze_Subprogram) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Subprogram);
+
+            Global_Data.Expected_Entities (Global_Data.Analyze_Call) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Call);
+         end if;
+
          --  Process the .ci files
          List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
 
          --  Process the .ci files extracted from object files
          List_Of_Files.Iterate (Input_Tmp_Files, Parse_Input_File'Access);
 
-         if not Options.Very_Quiet and then
-           Global_Data.Entities_Processed (Global_Data.Subprogram) > 0
-         then
-            Ada.Text_IO.New_Line;
+         if Options.Progress_Information then
+            --  Make sure that parsing is displayed as finished
+
+            Global_Data.Entities_Processed (Global_Data.Parse_Subprogram) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Subprogram);
+
+            Global_Data.Entities_Processed (Global_Data.Parse_Call) :=
+              Global_Data.Expected_Entities (Global_Data.Parse_Call);
+
+            --  Force printing
+
+            Display.Increase_Count (Global_Data.Parse_Subprogram);
          end if;
 
          --  We do not need this list any more, so we destroy the list of
@@ -1321,6 +1389,10 @@ package body Parser is
       --  First, we want to get the three different fields (title, label, and
       --  shape) so we can process them later.
 
+      if Options.Progress_Information then
+         Display.Increase_Count (Global_Data.Parse_Subprogram);
+      end if;
+
       GNAT.Regpat.Match (Node_Regexp, Input, Matches);
 
       if Matches (0) = GNAT.Regpat.No_Match then
@@ -1397,7 +1469,6 @@ package body Parser is
       declare
          Found_Id   : constant Node_Id := Get_Node (Symbol_Name.all);
          Found_Node : Node_Class_Access := null;
-         New_Node   : Boolean := False;
 
       begin
          --  Indirect call
@@ -1441,8 +1512,6 @@ package body Parser is
                   Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
-
-               New_Node := True;
 
                List_Of_Nodes.Insert
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
@@ -1498,8 +1567,6 @@ package body Parser is
                   Cycles                  => List_Of_Cycles.Empty_Set);
 
                --  Insert new subprogram descriptor
-
-               New_Node := True;
 
                List_Of_Nodes.Insert
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
@@ -1571,10 +1638,6 @@ package body Parser is
 
                end if;
             end if;
-         end if;
-
-         if New_Node then
-            Display.Increase_Count (Global_Data.Subprogram);
          end if;
       end;
    end Parse_Node;
@@ -2015,6 +2078,10 @@ package body Parser is
       --  The pattern of the input line is:
       --  edge: { sourcename: "([^"]*)" targetname: "([^"]*)"
       --  ( label: ".*"| priority: .*)?? }
+
+      if Options.Progress_Information then
+         Display.Increase_Count (Global_Data.Parse_Call);
+      end if;
 
       --  Get source, target and location
 
@@ -2473,10 +2540,6 @@ package body Parser is
             end if;
          end if;
 
-         if New_Node then
-            Display.Increase_Count (Global_Data.Subprogram);
-         end if;
-
          --  Now we need to check whether there is already an edge joining
          --  these two subprograms. We add the new location if the node exists,
          --  or create a new edge otherwise. For indirect calls we keep the
@@ -2560,8 +2623,6 @@ package body Parser is
                     Point_Of_Call  => Locations_Set,
                     Feasible_Call  => True,
                     Under_Analysis => False));
-
-               Display.Increase_Count (Global_Data.Call_To_Subprogram);
             end if;
 
             --  The only possible missing step is the propagation of the edge
@@ -2872,6 +2933,10 @@ package body Parser is
       --  specifying the class identifier to which the overridden method
       --  belongs and its slot in the virtual table.
 
+      if Options.Progress_Information then
+         Display.Increase_Count (Global_Data.Class);
+      end if;
+
       GNAT.Regpat.Match (Class_Regexp, Input, Match_Class_Info);
 
       if Match_Class_Info (0) /= GNAT.Regpat.No_Match then
@@ -3123,16 +3188,18 @@ package body Parser is
       Put_Line ("  -h or --help display help message");
       Put_Line ("  -k           keep temporary files");
       Put_Line ("  -l n         print the n subprograms requiring the " &
-                                "biggest local stack usage");
+                               "biggest local stack usage");
       Put_Line ("  -np          do not display paths for entry points");
       Put_Line ("  -oc=exec     name of the objcopy executable");
       Put_Line ("  -o={a,s}     order for displaying call graphs");
       Put_Line ("      a        alphabetical");
       Put_Line ("      s        stack usage (default)");
       Put_Line ("  -p           display paths for entry points (default)");
-      Put_Line ("  -q           quiet: do not display progress messages");
-      Put_Line ("  -Q           very quiet: do not display any console" &
-                               "message");
+      Put_Line ("  -pi          display progress information");
+      Put_Line ("  -q           quiet: do not display progress information " &
+                               "(default)");
+      Put_Line ("  -Q           very quiet: do not display any console " &
+                               "message (except progress information)");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
       Put_Line ("  -s=section   name of the section where the .ci is " &

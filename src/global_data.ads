@@ -125,11 +125,16 @@ package Global_Data is
    -- Statistics --
    ----------------
 
-   type Entities is (Subprogram, Call_To_Subprogram, Cycle);
+   type Entities is (Parse_Subprogram, Analyze_Subprogram, Parse_Call,
+                     Analyze_Call, Class, Cycle);
    --  Main entities to be analyzed
 
    Entities_Processed : array (Entities) of Natural := (others => 0);
-   --  Number of subprograms, calls-to-subprogram, and cycles taken into
-   --  account for the different parts of the analysis.
+   --  Number of subprograms (parsed and analyzed), calls-to-subprogram (parsed
+   --  and analyzed), classes, and cycles taken into account for the different
+   --  parts of the analysis.
+
+   Expected_Entities : array (Entities) of Natural := (others => 0);
+   --  Number of entities which are expected.
 
 end Global_Data;
