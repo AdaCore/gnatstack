@@ -202,43 +202,50 @@ package body Parser is
    -- Expected patterns --
    -----------------------
 
-   Node_Regexp : constant String :=
-     "^node: {" &
-     " title: ""([^""]+)""" &
-     "( label: ""[^""]*"")?" &
-     "( alias: ""([^""]*)"")?" &
-     "( shape : \w*)?" &
-     "\s*}";
+   Entity_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("^(node:|edge:|class) {([^}]*)$");
+   --  Pattern to detect the entities that are analyzed
+
+   Node_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^node: {" &
+        " title: ""([^""]+)""" &
+        "( label: ""[^""]*"")?" &
+        "( alias: ""([^""]*)"")?" &
+        "( shape : \w*)?" &
+        "\s*}");
    --  The information that is mandatory for a node is the title which
    --  represents the subprogram symbol.
 
-   Edge_Regexp : constant String :=
-     "^edge: {" &
-     "\s*sourcename: ""([^""]*)""" &
-     "\s*targetname: ""([^""]*)""" &
-     "(\s*label: "".*""| priority: .*)?" &
-     "\s*}";
+   Edge_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^edge: {" &
+        "\s*sourcename: ""([^""]*)""" &
+        "\s*targetname: ""([^""]*)""" &
+        "(\s*label: "".*""| priority: .*)?" &
+        "\s*}");
    --  The information that is mandatory for an edge is the symbols associated
    --  to the subprograms acting as caller and callee.
 
-   Class_Regexp : constant String :=
-     "^class {" &
-     "\s*classname: ""([^""]*)""" &
-     "\s*label: ""([^""]*)""" &
-     "(\s*parent: ""([^""]*)"")?" &
-     "\s*virtuals: ""([^""]*)""" &
-     "\s*}";
+   Class_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^class {" &
+        "\s*classname: ""([^""]*)""" &
+        "\s*label: ""([^""]*)""" &
+        "(\s*parent: ""([^""]*)"")?" &
+        "\s*virtuals: ""([^""]*)""" &
+        "\s*}");
    --  The information that is mandatory for a class is its name, location,
    --  set of virtual functions (we represent only the hierarchy of
    --  polymorphic classes and bases), and the list of parents (if any).
 
-   Header_Regexp : constant String :=
-     "^graph: { title: ""([^""]*)""";
+   Header_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("^graph: { title: ""([^""]*)""");
    --  It indicates that it is a compiler-generated file, and not one created
    --  by the user.
 
-   Allowed_Lines_Regexp : constant String :=
-     "^\s*(}|--|$)";
+   Allowed_Lines_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("^\s*(}|--|$)");
    --  Ada comments and blank lines are allowed
 
    Location_Regexp : constant String :=
@@ -257,33 +264,39 @@ package body Parser is
      "(\d+) bytes( \(static\)| \(dynamic\)| \(dynamic,bounded\))?";
    --  At least the size in bytes
 
-   Node_Label_Regexp : constant String :=
-     "^ label: " &
-     """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=|" &  -- Unary operators
-     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*)\\n)?" &  -- Demangled name
-     "((" & Location_Regexp & ",?)*(\\n)?)?" &
-     "(" & Stack_Regexp & ")?" &
-     "(\\n\d+ dynamic objects(\\n .*)?)?""$";
+   Node_Label_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^ label: " &
+        """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=|" &  -- Unary operators
+        "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*)\\n)?" &  -- Demangled name
+        "((" & Location_Regexp & ",?)*(\\n)?)?" &
+        "(" & Stack_Regexp & ")?" &
+        "(\\n\d+ dynamic objects(\\n .*)?)?""$");
    --  Extra information about a node
 
-   Edge_Label_Regexp : constant String :=
-     "^\s*label: ""(" & Location_Regexp & "( \[.+\])?)" & """$";
+   Edge_Label_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^\s*label: ""(" & Location_Regexp & "( \[.+\])?)" & """$");
    --  Extra information about an edge
 
-   Class_Label_Regexp : constant String :=
-     "(([^\\]+)\\n)?(" & Location_Regexp & "( \[.+\])?)$";
+   Class_Label_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("(([^\\]+)\\n)?(" & Location_Regexp & "( \[.+\])?)$");
    --  Demangled name and location information in classes
 
-   Subprogram_Location_Regexp : constant String :=
-     "^(" & Location_Regexp & ")(,.+)*$";
+   Subprogram_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^(" & Location_Regexp & ")(,.+)*$");
    --  Comma-separated list of locations
 
-   Data_Location_Regexp : constant String :=
-     "^\\n ([\w \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$";
+   Data_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^\\n ([\w \+\-\[\]\(\)<>]+) (" & Location_Regexp & ")(\\n .+)*$");
    --  Location of an unbounded object
 
-   Front_End_Location_Regexp : constant String :=
-     "^(" & Location_Regexp & ")( \[.+\])?$";
+   Front_End_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("^(" & Location_Regexp & ")( \[.+\])?$");
    --  List of locations using [] for nesting
 
    Create_Task : constant String := "system__tasking__stages__create_task";
@@ -291,8 +304,9 @@ package body Parser is
      "system__tasking__restricted__stages__create_restricted_task";
    --  Subprograms called to create tasks
 
-   Dispatching_Regexp : constant String :=
-     "([\-]?\d+):([^:,]+),([^:]+)";
+   Dispatching_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("([\-]?\d+):([^:,]+),([^:]+)");
    --  Look for triple slot:base_class,static_class
 
    ------------------------
@@ -2694,7 +2708,8 @@ package body Parser is
       --  Get the list of virtual methods for the class
 
       procedure Get_Parents (Input : String) is
-         Name_Regexp   : constant String := "([^,]+)(, .*)?$";
+         Name_Regexp   : constant GNAT.Regpat.Pattern_Matcher :=
+           GNAT.Regpat.Compile ("([^,]+)(, .*)?$");
 
          Match_Parents : GNAT.Regpat.Match_Array (0 .. 2);
 
@@ -2768,11 +2783,13 @@ package body Parser is
       end Get_Parents;
 
       procedure Get_Virtuals (Input : String) is
-         Virtual_Set_Regexp  : constant String := "([^\\]+)(\\n\s*.+)?$";
+         Virtual_Set_Regexp  : constant GNAT.Regpat.Pattern_Matcher :=
+           GNAT.Regpat.Compile ("([^\\]+)(\\n\s*.+)?$");
          --  The information for each virtual method is separated by \n
 
-         Virtual_Info_Regexp : constant String :=
-           "([\-]?\d+):([^,]+)(,(\d+):([^,]+))?(,(\d+):([^,]+))?$";
+         Virtual_Info_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+           GNAT.Regpat.Compile
+             ("([\-]?\d+):([^,]+)(,(\d+):([^,]+))?(,(\d+):([^,]+))?$");
          --  For a given virtual method we have the slot_number:symbol_name,
          --  and possibly the primary and secondary vtables that it overrides.
 
@@ -3066,9 +3083,7 @@ package body Parser is
          begin
             --  Look for non-terminated node/edge/class lines. In that case
             --  we merge the following lines until we find the end "}".
-            if GNAT.Regpat.Match
-              ("^(node:|edge:|class) {([^}]*)$", Complete_Line.all)
-            then
+            if GNAT.Regpat.Match (Entity_Regexp, Complete_Line.all) then
                --  Remove Windows CR character
                if Complete_Line (Complete_Line'Last) = ASCII.CR then
                   Reconstructed_Line :=
