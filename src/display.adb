@@ -1482,6 +1482,7 @@ package body Display is
    procedure Increase_Count (Entity : Global_Data.Entities) is
       Expected_Total  : Natural;
       Performed_Total : Natural;
+      Percentage      : Integer range 0 .. 100;
 
       use Global_Data;
 
@@ -1515,6 +1516,11 @@ package body Display is
               Entities_Processed (Analyze_Subprogram) +
               Entities_Processed (Analyze_Call);
 
+            Percentage := (if Expected_Total = 0 then
+                              100
+                           else
+                              Performed_Total * 100 / Expected_Total);
+
             Ada.Text_IO.Put
               ("completed" &
                Natural'Image (Performed_Total) &
@@ -1522,8 +1528,7 @@ package body Display is
                Natural'Image (Expected_Total) &
                " (" &
                Ada.Strings.Fixed.Trim
-                 (Natural'Image
-                    (Performed_Total * 100 / Expected_Total),
+                 (Natural'Image (Percentage),
                   Ada.Strings.Both) &
                "%)" &
                ASCII.CR);

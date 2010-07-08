@@ -209,6 +209,11 @@ package body Worst_Case_Analyzer is
          Global_Data.Expected_Entities (Global_Data.Analyze_Call) :=
            Global_Data.Entities_Processed (Global_Data.Analyze_Call);
 
+         --  -1 because it will be later increased by 1
+
+         Global_Data.Entities_Processed (Global_Data.Analyze_Call) :=
+           Global_Data.Entities_Processed (Global_Data.Analyze_Call) - 1;
+
          --  Force printing
 
          Display.Increase_Count (Global_Data.Analyze_Call);

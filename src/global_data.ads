@@ -129,12 +129,18 @@ package Global_Data is
                      Analyze_Call, Class, Cycle);
    --  Main entities to be analyzed
 
-   Entities_Processed : array (Entities) of Natural := (others => 0);
+   Entities_Processed : array (Entities) of Integer := (others => 0);
    --  Number of subprograms (parsed and analyzed), calls-to-subprogram (parsed
    --  and analyzed), classes, and cycles taken into account for the different
-   --  parts of the analysis.
+   --  parts of the analysis. This value is logically a natural, but there are
+   --  situations in which it may contain a -1 (when the expected number is
+   --  0 but we decrease it temporarily because we know it will be artificially
+   --  increased later).
 
-   Expected_Entities : array (Entities) of Natural := (others => 0);
-   --  Number of entities which are expected.
+   Expected_Entities : array (Entities) of Integer := (others => 0);
+   --  Number of entities which are expected. This value is logically a
+   --  natural, but there are situations in which it may contain a -1 (when the
+   --  expected number is 0 but we decrease it temporarily because we know it
+   --  will be artificially increased later).
 
 end Global_Data;

@@ -337,6 +337,11 @@ package body Call_Graphs is
          Global_Data.Expected_Entities (Global_Data.Analyze_Subprogram) :=
            Global_Data.Entities_Processed (Global_Data.Analyze_Subprogram);
 
+         --  -1 because it will be later increased by 1
+
+         Global_Data.Entities_Processed (Global_Data.Analyze_Subprogram) :=
+           Global_Data.Entities_Processed (Global_Data.Analyze_Subprogram) - 1;
+
          --  Force printing
 
          Display.Increase_Count (Global_Data.Analyze_Subprogram);
