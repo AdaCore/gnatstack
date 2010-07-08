@@ -75,7 +75,7 @@ for file in $files; do
 	tar xzf ../../tests/$name.tgz
     fi;
 
-    $GNATMAKE -fcallgraph-info=su,da --RTS=zfp -gnatd.Z \
+    $GNATMAKE -O1 -gnatn -fcallgraph-info=su,da --RTS=zfp -gnatd.Z \
        -I$testsuite_dir/support \
        -I$testsuite_dir/support/target-support/$TARGET \
        $EXTRA_FLAGS test > $name.build 2>&1
