@@ -1530,7 +1530,7 @@ package body Display is
                Ada.Strings.Fixed.Trim
                  (Natural'Image (Percentage),
                   Ada.Strings.Both) &
-               "%)" &
+               "%)..." &
                ASCII.LF);
 
          when others =>
