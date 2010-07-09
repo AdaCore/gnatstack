@@ -366,7 +366,7 @@ entry point (the default mode).
 
 @item -pi
 @cindex @option{-pi}
-Print progress information.
+Print progress information (for GPS).
 
 @item -q
 @cindex @option{-q}
