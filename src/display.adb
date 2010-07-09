@@ -1531,7 +1531,7 @@ package body Display is
                  (Natural'Image (Percentage),
                   Ada.Strings.Both) &
                "%)" &
-               ASCII.CR);
+               ASCII.LF);
 
          when others =>
             null;
