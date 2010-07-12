@@ -1,11 +1,22 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                          GNATSTACK TEST SUITE                            --
+--                                                                          --
+--                                                                          --
+--                       Copyright (C) 2010, AdaCore                        --
+--                                                                          --
+------------------------------------------------------------------------------
 
 package Dispatching is
    type Base is tagged null record;
    procedure Foo (X : Base);
+   procedure Bar (X : Base);
 
    type Base_CA is access all Base'Class;
 
    type Intermediate is new Base with null record;
+   procedure Bar (X : Intermediate);
+   procedure Bunk (X : Intermediate);
 
    type Intermediate_CA is access all Intermediate'Class;
 
