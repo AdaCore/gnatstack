@@ -794,6 +794,14 @@ package body Display is
            (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
+         if Node.all in Static_Stack_Analysis.Real_Node'Class then
+            Open_Tag ("linkername type=""strings""");
+            Report_XML (Message => "<value>", New_Line => False);
+            Ada.Text_IO.Put (XML_Descriptor, Node.Get_Subprogram_Name.all);
+            Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
+            Close_Tag ("linkername");
+         end if;
+
          Open_Tag ("locationset");
          Static_Stack_Analysis.List_Of_Locations.Iterate
            (Locations, Print_XML_Location'Access);
