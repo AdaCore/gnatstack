@@ -2332,7 +2332,7 @@ else
 fi
 
 
-if test ${TEXI2PDF} != "" -a ${TEXI2HTML} != ""; then
+if test "${TEXI2PDF}" != "" -a "${TEXI2HTML}" != ""; then
    maybe_doc=doc
 else
    maybe_doc=""
