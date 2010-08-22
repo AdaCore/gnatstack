@@ -2795,7 +2795,8 @@ package body Parser is
 
          Virtual_Info_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
            GNAT.Regpat.Compile
-             ("([\-]?\d+):([^,]+)(,(\d+):([^,]+))?(,(\d+):([^,]+))?$");
+             ("([\-]?\d+):([^,]+)(,([\-]?\d+):([^,]+))?" &
+              "(,([\-]?\d+):([^,]+))?$");
          --  For a given virtual method we have the slot_number:symbol_name,
          --  and possibly the primary and secondary vtables that it overrides.
 
