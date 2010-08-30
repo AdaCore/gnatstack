@@ -598,6 +598,20 @@ tool the set of @file{.ci} files that correspond to the units that
 belong to the project. When adding the @option{-U} option all projects
 in the project tree will be taken into account.
 
+If one or more user-defined @file{.ci} files need to be taken into account
+for the analysis, the appropriate place to specify them is in the
+@code{Switches} attribute of the project file.
+
+@smallexample @c projectfile
+@group
+project Prj is
+   package Stack is
+      for Switches use (..., "user1.ci", "user2.ci");
+   end Stack;
+end Prj;
+@end group
+@end smallexample
+
 @node Information in Non-Loadable Section
 @section Information in Non-Loadable Section
 
