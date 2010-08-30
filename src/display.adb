@@ -77,6 +77,14 @@ package body Display is
    --  Boolean to know whether we have already displayed information about
    --  indirect calls.
 
+   Indirect_Call : constant GNAT.Strings.String_Access :=
+     new String'("indirect call");
+   --  String used to identify an indirect call in the text/file output
+
+   Dispatching_Call : constant GNAT.Strings.String_Access :=
+     new String'("dispatching call");
+   --  String used to identify a dispatching call in the text/file output
+
    -----------------------
    -- Local subprograms --
    -----------------------
@@ -100,8 +108,8 @@ package body Display is
    --  the symbol name and its location.
 
    procedure Print_Source_Name
-     (Node : Static_Stack_Analysis.Node_Class_Access;
-      File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output);
+     (Node   : Static_Stack_Analysis.Node_Class_Access;
+      To_XML : Boolean := False);
    --  Print the subprogram name associated to the node. It will use the
    --  demangled Ada/C++ name, if possible, remove path information, and use
    --  task names for task entries.
@@ -243,6 +251,10 @@ package body Display is
    --  Puts into XML file string <Tag_Name> or </Tag_Name>. The indentation is
    --  automatically handled by the level of open tags.
 
+   procedure Escape_XML_Characters (Str : String);
+   --  Handle escape characters for XML (& => &amp;, " => &quot;, ' => &apos;,
+   --  < => &lt;, > => &gt;).
+
    procedure Report_XML (Message : String; New_Line : Boolean := True);
    --  Sends the message into the XML output file. The message is appended with
    --  platform-specific EOL if New_Line is True. Does nothing if
@@ -297,6 +309,51 @@ package body Display is
 
       Report_XML ("</" & Tag_Name & '>');
    end Close_Tag;
+
+   ---------------------------
+   -- Escape_XML_Characters --
+   ---------------------------
+
+   procedure Escape_XML_Characters (Str : String) is
+      Init : Positive := Str'First;
+
+   begin
+      for Index in Str'Range loop
+         case Str (Index) is
+            when '&' =>
+               Ada.Text_IO.Put
+                 (XML_Descriptor, Str (Init .. Index - 1) & "&amp;");
+               Init := Index + 1;
+
+            when '"' =>
+               Ada.Text_IO.Put
+                 (XML_Descriptor, Str (Init .. Index - 1) & "&quot;");
+               Init := Index + 1;
+
+            when ''' =>
+               Ada.Text_IO.Put
+                 (XML_Descriptor, Str (Init .. Index - 1) & "&apos;");
+               Init := Index + 1;
+
+            when '<' =>
+               Ada.Text_IO.Put
+                 (XML_Descriptor, Str (Init .. Index - 1) & "&lt;");
+               Init := Index + 1;
+
+            when '>' =>
+               Ada.Text_IO.Put
+                 (XML_Descriptor, Str (Init .. Index - 1) & "&gt;");
+               Init := Index + 1;
+
+            when others =>
+               null;
+         end case;
+      end loop;
+
+      if Init <= Str'Last then
+         Ada.Text_IO.Put (XML_Descriptor, Str (Init .. Str'Last));
+      end if;
+   end Escape_XML_Characters;
 
    ---------------------
    -- Expand_Location --
@@ -789,15 +846,14 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Node, XML_Descriptor);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
+         Print_Source_Name (Node, To_XML => True);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
          if Node.all in Static_Stack_Analysis.Real_Node'Class then
             Open_Tag ("linkername type=""strings""");
             Report_XML (Message => "<value>", New_Line => False);
-            Ada.Text_IO.Put (XML_Descriptor, Node.Get_Subprogram_Name.all);
+            Escape_XML_Characters (Node.Get_Subprogram_Name.all);
             Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
             Close_Tag ("linkername");
          end if;
@@ -986,22 +1042,34 @@ package body Display is
    -----------------------
 
    procedure Print_Source_Name
-     (Node : Static_Stack_Analysis.Node_Class_Access;
-      File : Ada.Text_IO.File_Type := Ada.Text_IO.Standard_Output)
+     (Node   : Static_Stack_Analysis.Node_Class_Access;
+      To_XML : Boolean := False)
    is
+      Str : GNAT.Strings.String_Access;
+
    begin
       --  Print the symbol name (demangled), removing file information. If it
       --  is an Ada/C++ subprogram we demangle the subprogram name.
 
       if Node.all in Static_Stack_Analysis.Indirect_Node'Class then
-         Ada.Text_IO.Put (File, "indirect call");
+         Str := Indirect_Call;
 
       elsif Node.all in Static_Stack_Analysis.Dispatching_Node'Class then
-         Ada.Text_IO.Put (File, "dispatching call");
+         Str := Dispatching_Call;
 
       else
-         Ada.Text_IO.Put
-           (File, Static_Stack_Analysis.Get_Demangled_Name (Node.all).all);
+         Str :=
+           GNAT.Strings.String_Access
+             (Static_Stack_Analysis.Get_Demangled_Name (Node.all));
+      end if;
+
+      if To_XML then
+         --  For XML we need to escape possible special XML characters
+
+         Escape_XML_Characters (Str.all);
+
+      else
+         Ada.Text_IO.Put (Str.all);
       end if;
    end Print_Source_Name;
 
@@ -1368,9 +1436,8 @@ package body Display is
 
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Node, XML_Descriptor);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
+         Print_Source_Name (Node, To_XML => True);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
          Open_Tag ("locationset");
@@ -1632,9 +1699,8 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Root, XML_Descriptor);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
+         Print_Source_Name (Root, To_XML => True);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
          Open_Tag ("locationset");
@@ -2013,16 +2079,15 @@ package body Display is
 
                Open_Tag ("file type=""strings""");
                Report_XML (Message => "<value>", New_Line => False);
-               Ada.Text_IO.Put_Line
-                 (XML_Descriptor, Location.File.all & "</value>");
+               Escape_XML_Characters (Location.File.all);
+               Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
                Close_Tag ("file");
 
                Open_Tag ("line type=""integers""");
                Report_XML (Message => "<value>", New_Line => False);
                Ada.Integer_Text_IO.Put
                  (XML_Descriptor, Location.Line_Number, 0);
-               Ada.Text_IO.Put_Line
-                 (XML_Descriptor, "</value>");
+               Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
                Close_Tag ("line");
 
                Close_Tag ("indirectcall");
@@ -2120,39 +2185,35 @@ package body Display is
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
    begin
-         Open_Tag ("unboundedobject");
+      Open_Tag ("unboundedobject");
 
-         Open_Tag ("object type=""strings""");
+      Open_Tag ("object type=""strings""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Escape_XML_Characters (Location.Demangled.all);
+      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
+      Close_Tag ("object");
+
+      Open_Tag ("file type=""strings""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Escape_XML_Characters (Location.File.all);
+      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
+      Close_Tag ("file");
+
+      Open_Tag ("line type=""integers""");
+      Report_XML (Message => "<value>", New_Line => False);
+      Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Line_Number, 0);
+      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
+      Close_Tag ("line");
+
+      if Location.Column_Number > 0 then
+         Open_Tag ("column type=""integers""");
          Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.Demangled.all & "</value>");
-         Close_Tag ("object");
+         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Column_Number, 0);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
+         Close_Tag ("column");
+      end if;
 
-         Open_Tag ("file type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.File.all & "</value>");
-         Close_Tag ("file");
-
-         Open_Tag ("line type=""integers""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put
-           (XML_Descriptor, Location.Line_Number, 0);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
-         Close_Tag ("line");
-
-         if Location.Column_Number > 0 then
-            Open_Tag ("column type=""integers""");
-            Report_XML (Message => "<value>", New_Line => False);
-            Ada.Integer_Text_IO.Put
-              (XML_Descriptor, Location.Column_Number, 0);
-            Ada.Text_IO.Put_Line
-              (XML_Descriptor, "</value>");
-            Close_Tag ("column");
-         end if;
-
-         Close_Tag ("unboundedobject");
+      Close_Tag ("unboundedobject");
    end Print_XML_Dynamic_Objects;
 
    --------------------
@@ -2172,9 +2233,8 @@ package body Display is
 
       Open_Tag ("prefixname type=""strings""");
       Report_XML (Message => "<value>", New_Line => False);
-      Print_Source_Name (Target, XML_Descriptor);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, "</value>");
+      Print_Source_Name (Target, To_XML => True);
+      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
       Close_Tag ("prefixname");
 
       Open_Tag ("locationset");
@@ -2203,32 +2263,28 @@ package body Display is
       if Location.Demangled /= null then
          Open_Tag ("subprogramname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.Demangled.all & "</value>");
+         Escape_XML_Characters (Location.Demangled.all);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("subprogramname");
       end if;
 
       if Location.File /= null then
          Open_Tag ("file type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, Location.File.all & "</value>");
+         Escape_XML_Characters (Location.File.all);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("file");
 
          Open_Tag ("line type=""integers""");
          Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put
-           (XML_Descriptor, Location.Line_Number, 0);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
+         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Line_Number, 0);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("line");
 
          Open_Tag ("column type=""integers""");
          Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put
-           (XML_Descriptor, Location.Column_Number, 0);
-         Ada.Text_IO.Put_Line
-           (XML_Descriptor, "</value>");
+         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Column_Number, 0);
+         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("column");
       end if;
 
@@ -2247,8 +2303,7 @@ package body Display is
       Report_XML (Message => "<value>", New_Line => False);
       Ada.Integer_Text_IO.Put
         (XML_Descriptor, Integer (Stack_Usage.Static_Usage), 0);
-      Ada.Text_IO.Put_Line
-        (XML_Descriptor, "</value>");
+      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
       Close_Tag ("size");
 
       Open_Tag ("qualifier");
