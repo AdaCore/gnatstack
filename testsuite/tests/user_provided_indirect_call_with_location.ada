@@ -11,16 +11,15 @@ with Test_Proc;
 procedure Test is
    use type Test_Proc.Access_Procedure;
 
-   Ptr : Test_Proc.Access_Procedure;
 begin
    Initialize_Stack;
-   Ptr := Test_Proc.Do_Something'Access;
-   Ptr.all;
+   Test_Proc.Ptr1 := Test_Proc.Do_Something'Access;
+   Test_Proc.Ptr1.all;
 
    --  This procedure should never execute
 
-   if Test_Proc.Ptr /= null then
-      Test_Proc.Ptr.all;
+   if Test_Proc.Ptr2 /= null then
+      Test_Proc.Ptr2.all;
    end if;
 
    Print_Stack_Usage;
@@ -33,7 +32,8 @@ package Test_Proc is
 
    procedure Direct_Call;
 
-   Ptr : Access_Procedure := null;
+   Ptr1 : Access_Procedure := null;
+   Ptr2 : Access_Procedure := null;
 
    Size : constant := 64;
 
@@ -45,7 +45,6 @@ end Test_Proc;
 package body Test_Proc is
 
    procedure Do_Something is
-
          Use_Stack : Buffer_Type;
    begin
       --  Modify data on the stack

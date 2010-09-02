@@ -75,7 +75,7 @@ for file in $files; do
 	tar xzf ../../tests/$name.tgz
     fi;
 
-    $GNATMAKE -O1 -gnatn -fcallgraph-info=su,da --RTS=zfp -gnatd.Z \
+    $GNATMAKE -O1 -gnatn -fcallgraph-info=su,da --RTS=zfp \
        -I$testsuite_dir/support \
        -I$testsuite_dir/support/target-support/$TARGET \
        $EXTRA_FLAGS test > $name.build 2>&1
@@ -152,6 +152,13 @@ for file in $files; do
         fi;
     else
 	echo "Test error: not enough information"
+    fi;
+
+    # Check whether there is any unexpected warning in the stack output
+    # of GNATstack. This is indicated by an stack usage of "total X+? bytes"
+
+    if [ "`egrep 'total [0-9]+\+\? bytes' $name.gnatstack_result`" != "" ]; then
+       echo "WARNING: GNATstack indicated computation not accurate"
     fi;
 
     echo "========================================================";

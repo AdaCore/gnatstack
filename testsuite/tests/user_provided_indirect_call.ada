@@ -8,16 +8,17 @@ with Test_Proc;
 --  enabling GNATstack to find the actual worst-case path.
 
 procedure Test is
-   Ptr : Test_Proc.Access_Procedure;
 begin
    Initialize_Stack;
-   Ptr := Test_Proc.Do_Something'Access;
-   Ptr.all;
+   Test_Proc.Ptr := Test_Proc.Do_Something'Access;
+   Test_Proc.Ptr.all;
    Print_Stack_Usage;
 end Test;
 
 package Test_Proc is
    type Access_Procedure is access procedure;
+
+   Ptr : Access_Procedure;
 
    procedure Do_Something;
 
