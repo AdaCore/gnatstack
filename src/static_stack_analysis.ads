@@ -682,7 +682,7 @@ package Static_Stack_Analysis is
 
    overriding function Get_Stack_Usage
      (Target : Fake_Node) return Stack_Usage_Info;
-   --  This function returns the stack requirements for the any fake node
+   --  This function returns the stack requirements for any fake node
 
    overriding function Get_Subprogram_Name (Target : Fake_Node) return Name;
    --  This function returns the internal name associated to a fake node.
@@ -723,7 +723,7 @@ package Static_Stack_Analysis is
 
    overriding function Get_Stack_Usage
      (Target : Dispatching_Node) return Stack_Usage_Info;
-   --  This function returns the stack requirements for the any dispatching
+   --  This function returns the stack requirements for any dispatching
    --  node.
 
    -------------------
@@ -734,6 +734,11 @@ package Static_Stack_Analysis is
    --  Indirect calls are the result of dereferences of access-to-subprogram
    --  values, and hence their target depend on the values stored in the
    --  pointer.
+
+   overriding function Get_Stack_Usage
+     (Target : Indirect_Node) return Stack_Usage_Info;
+   --  This function returns the stack requirements for any indirect
+   --  node.
 
 private
 
