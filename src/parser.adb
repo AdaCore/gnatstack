@@ -2560,10 +2560,14 @@ package body Parser is
             end if;
          end if;
 
-         --  Now we need to check whether there is already an edge joining
-         --  these two subprograms. We add the new location if the node exists,
-         --  or create a new edge otherwise. For indirect calls we keep the
-         --  different edges.
+         --  There may be already an edge joining these two subprograms. We
+         --  always create a new edge for a new call, which is desirable in
+         --  case we want to treat calls in a different way, and it is
+         --  mandatory for user-defined information. For example, if there are
+         --  two indirect calls from the same subprogram, and these two
+         --  indirect calls are resolved to the same target, we want to keep
+         --  these two instances separate so that we can later place them
+         --  where they belong.
 
          declare
             Index  : Static_Stack_Analysis.Edge_Id;
@@ -2571,36 +2575,17 @@ package body Parser is
             Call   : Static_Stack_Analysis.Edge;
 
          begin
-            --  For indirect calls we created a new node, and hence we will
-            --  create a new edge.
-
-            if
-              Input (Matches (2).First .. Matches (2).Last) = Indirect_Call.all
-            then
-               Index := Static_Stack_Analysis.List_Of_Edges.No_Element;
-
-            else
-               Index := Source_Ptr.Target_Calls.First;
-            end if;
+            Index := Source_Ptr.Target_Calls.First;
 
             while Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) loop
                Call := Static_Stack_Analysis.List_Of_Edges.Element (Index);
-
-               if Static_Stack_Analysis."=" (Call.Target, Target_Id) then
-                  --  Add new location.
-
-                  Call.Point_Of_Call.Union (Locations_Set);
-
-                  --  We found the edge so that we leave
-
-                  exit;
 
                --  The edge that we are inserting may need to be located at two
                --  different places. It will usually be added as an edge for
                --  the Source node but, in the case of edges added manually by
                --  the user to resolve indirect calls, it will need to be
                --  placed in the node representing the indirect call.
-               elsif
+               if
                  Ada_File_Name = null
                    and then
                  Target_Ptr.all in Real_Node'Class
@@ -2612,10 +2597,6 @@ package body Parser is
                   not Call.Point_Of_Call.Intersection (Locations_Set).Is_Empty)
                then
                   --  ??? Do I need to use Fake_Node'Class?
-
-                  --  Force the creation of the edge
-
-                  Index := Static_Stack_Analysis.List_Of_Edges.No_Element;
 
                   --  Modify the source to be located at the indirect node
 
@@ -2629,21 +2610,19 @@ package body Parser is
                end if;
             end loop;
 
-            if not Static_Stack_Analysis.List_Of_Edges.Has_Element (Index) then
-               --  Create new edge with the information that we have about the
-               --  source and the target.
+            --  Create new edge with the information that we have about the
+            --  source and the target.
 
-               pragma Assert (List_Of_Nodes.Has_Element (Target_Id));
+            pragma Assert (List_Of_Nodes.Has_Element (Target_Id));
 
-               Static_Stack_Analysis.List_Of_Edges.Append
-                 (Source_Ptr.Target_Calls,
-                  new Static_Stack_Analysis.Edge_Element'(
-                    Ada_File_Name  => Ada_File_Name,
-                    Target         => Target_Id,
-                    Point_Of_Call  => Locations_Set,
-                    Feasible_Call  => True,
-                    Under_Analysis => False));
-            end if;
+            Static_Stack_Analysis.List_Of_Edges.Append
+              (Source_Ptr.Target_Calls,
+               new Static_Stack_Analysis.Edge_Element'(
+                 Ada_File_Name  => Ada_File_Name,
+                 Target         => Target_Id,
+                 Point_Of_Call  => Locations_Set,
+                 Feasible_Call  => True,
+                 Under_Analysis => False));
 
             --  The only possible missing step is the propagation of the edge
             --  to all indirect calls when we add manually an edge without
@@ -2679,7 +2658,6 @@ package body Parser is
                   Static_Stack_Analysis.List_Of_Edges.Next (Index);
                end loop;
             end if;
-
          end;
       else
          raise Parser_Error;

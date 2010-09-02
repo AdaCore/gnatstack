@@ -729,13 +729,6 @@ package body Static_Stack_Analysis is
    -------------------------
 
    procedure Move_Indirect_Calls (Source, Target : Node_Class_Access) is
-      Target_Location : constant Location :=
-        (if Target.Location_List.Is_Empty then
-           Null_Location
-         else
-           Target.Location_List.First_Element);
-      --  ??? We are just taking the first location. Do we need to take more?
-
       Calls : List_Of_Edges.Vector renames Source.Target_Calls;
 
       procedure Replace_Indirect_Calls (Position : Natural);
@@ -750,7 +743,7 @@ package body Static_Stack_Analysis is
             --  candidate to fulfill the indirect call we are analyzing.
 
             if Call.Point_Of_Call.Is_Empty or else
-              Target_Location = Null_Location
+              Target.Location_List.Is_Empty
             then
                --  The user defined manually a target for any indirect call
                --  (no explicit location) originating from Source. Therefore
@@ -762,7 +755,8 @@ package body Static_Stack_Analysis is
             elsif
               List_Of_Nodes.Element (Call.Target).all in Real_Node'Class
                  and then
-              List_Of_Locations.Contains (Call.Point_Of_Call, Target_Location)
+              not Call.Point_Of_Call.Intersection
+                (Target.Location_List).Is_Empty
             then
                --  The user defined manually some targets for this call so we
                --  move it to the appropriate place.
