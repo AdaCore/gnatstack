@@ -3,6 +3,8 @@ AC_INIT(Makefile.in)
 
 AC_CANONICAL_SYSTEM
 
+objdir=`pwd`
+
 EXEC_PREFIX="$prefix"
 AC_PROG_CC(gcc)
 AC_CHECK_TOOL(GNATBIND,gnatbind,"no")
@@ -23,12 +25,49 @@ fi
 AC_CHECK_TOOL(TEXI2HTML,texi2html)
 AC_CHECK_TOOL(TEXI2PDF,texi2pdf)
 
-if test ${TEXI2PDF} != "" -a ${TEXI2HTML} != ""; then
+if test "${TEXI2PDF}" != "" -a "${TEXI2HTML}" != ""; then
    maybe_doc=doc
 else
    maybe_doc=""
 fi
+
+AC_ARG_WITH(libiberty, 
+            [AC_HELP_STRING(
+              [--with-libiberty=<dir>],
+              [Specify the directory in which libiberty is])],
+            LIBIBERTY_PATH=$withval,
+            LIBIBERTY_PATH=auto)
+
+BUILD_LIBIBERTY="no"
+
+if test "${LIBIBERTY_PATH}" = "auto"; then
+   # check if we should compile libiberty
+   AC_MSG_CHECKING([for libiberty automatic build])
+   if test -d "$srcdir/libiberty"; then
+      AC_MSG_RESULT(yes)
+      LIBIBERTY_PATH=$objdir/build-libiberty
+      BUILD_LIBIBERTY="yes"
+   else
+      AC_MSG_RESULT(no)
+      # check if libiberty is available by default
+      AC_CHECK_LIB(iberty, ada_demangle, true,
+                   [AC_MSG_FAILURE([cannot find libiberty])])
+      AC_CHECK_LIB(iberty, cplus_demangle, true,
+                   [AC_MSG_FAILURE([cannot find libiberty])])
+      # We don't need to pass explicitely the path to libiberty so put a fake path
+      LIBIBERTY_PATH="/foo"
+   fi
+else
+   LDFLAGS="-L$LIBIBERTY_PATH"
+   AC_CHECK_LIB(iberty, ada_demangle, true, [AC_MSG_FAILURE([cannot find libiberty])])
+   AC_CHECK_LIB(iberty, cplus_demangle, true, [AC_MSG_FAILURE([cannot find libiberty])])
+fi
+
+AC_SUBST(build)
+AC_SUBST(objdir)
+AC_SUBST(LIBIBERTY_PATH) 
+AC_SUBST(BUILD_LIBIBERTY)
 AC_SUBST(maybe_doc)
 AC_SUBST(EXEEXT)
 AC_SUBST(prefix)
-AC_OUTPUT(Makefile)
+AC_OUTPUT(Makefile ssat.gpr)

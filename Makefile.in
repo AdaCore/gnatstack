@@ -1,9 +1,16 @@
 prefix=@prefix@
+build=@build@
 EXEEXT=@EXEEXT@
-
+BUILD_LIBIBERTY=@BUILD_LIBIBERTY@
 MAYBE_DOC=@maybe_doc@
 
-bin/gnatstack$(EXEEXT): force
+ifeq ($(BUILD_LIBIBERTY), yes)
+  EXTRA=build-libiberty/libiberty.a
+else
+  EXTRA=
+endif
+
+bin/gnatstack$(EXEEXT): force $(EXTRA) 
 	gnatmake -Pssat.gpr
 
 all: bin/gnatstack$(EXEEXT) $(MAYBE_DOC)
@@ -16,6 +23,13 @@ docs/ug/gnatstack_ug.pdf: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 	(cd docs/ug && texi2pdf gnatstack_ug.texi)
 docs/ug/gnatstack_ug.txt: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 	makeinfo --force --no-headers --no-split -o $@ $<
+
+build-libiberty/Makefile:
+	mkdir -p build-libiberty
+	(cd build-libiberty && ../libiberty/configure --build=$(build))
+
+build-libiberty/libiberty.a: build-libiberty/Makefile
+	(cd build-libiberty && make)
 
 install: all
 	if [ ! -d $(prefix) ]; then mkdir $(prefix); fi
@@ -42,4 +56,4 @@ install: all
 	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.txt; \
 	fi
 
-.PHONY: force
+.PHONY: force install all
