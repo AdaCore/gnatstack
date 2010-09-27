@@ -31,7 +31,7 @@ build-libiberty/Makefile:
 build-libiberty/libiberty.a: build-libiberty/Makefile
 	(cd build-libiberty && make)
 
-install: all
+install: 
 	if [ ! -d $(prefix) ]; then mkdir $(prefix); fi
 	if [ ! -d $(prefix)/bin ]; then mkdir $(prefix)/bin; fi
 	cp -p  bin/gnatstack$(EXEEXT) $(prefix)/bin
