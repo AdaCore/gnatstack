@@ -2875,7 +2875,7 @@ if test "${LIBIBERTY_PATH}" = "auto"; then
    # check if we should compile libiberty
    { echo "$as_me:$LINENO: checking for libiberty automatic build" >&5
 echo $ECHO_N "checking for libiberty automatic build... $ECHO_C" >&6; }
-   if test -d "$srcdir/libiberty"; then
+   if test -d "$srcdir/binutils"; then
       { echo "$as_me:$LINENO: result: yes" >&5
 echo "${ECHO_T}yes" >&6; }
       LIBIBERTY_PATH=$objdir/build-libiberty

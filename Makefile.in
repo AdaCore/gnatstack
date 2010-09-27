@@ -26,7 +26,7 @@ docs/ug/gnatstack_ug.txt: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
 
 build-libiberty/Makefile:
 	mkdir -p build-libiberty
-	(cd build-libiberty && ../libiberty/configure --build=$(build))
+	(cd build-libiberty && ../binutils/libiberty/configure --build=$(build))
 
 build-libiberty/libiberty.a: build-libiberty/Makefile
 	(cd build-libiberty && make)

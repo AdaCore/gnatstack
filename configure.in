@@ -43,7 +43,7 @@ BUILD_LIBIBERTY="no"
 if test "${LIBIBERTY_PATH}" = "auto"; then
    # check if we should compile libiberty
    AC_MSG_CHECKING([for libiberty automatic build])
-   if test -d "$srcdir/libiberty"; then
+   if test -d "$srcdir/binutils"; then
       AC_MSG_RESULT(yes)
       LIBIBERTY_PATH=$objdir/build-libiberty
       BUILD_LIBIBERTY="yes"
