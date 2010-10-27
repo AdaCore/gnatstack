@@ -2249,35 +2249,30 @@ package body Display is
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
    begin
-      Open_Tag ("unboundedobject");
-
-      Open_Tag ("object type=""strings""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Escape_XML_Characters (Location.Demangled.all);
-      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-      Close_Tag ("object");
-
-      Open_Tag ("file type=""strings""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Escape_XML_Characters (Location.File.all);
-      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-      Close_Tag ("file");
-
-      Open_Tag ("line type=""integers""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Line_Number, 0);
-      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-      Close_Tag ("line");
-
       if Location.Column_Number > 0 then
-         Open_Tag ("column type=""integers""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Column_Number, 0);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("column");
-      end if;
+         Empty_Tag
+           ("unboundedobject",
+            "object="""
+            & Escape_XML_Characters (Location.Demangled.all)
+            & """ file="""
+            & Escape_XML_Characters (Location.File.all)
+            & """ line="""
+            & Trim (Integer'Image (Location.Line_Number), Ada.Strings.Both)
+            & """ column="""
+            & Trim (Integer'Image (Location.Column_Number), Ada.Strings.Both)
+            & '"');
 
-      Close_Tag ("unboundedobject");
+      else
+         Empty_Tag
+           ("unboundedobject",
+            "object="""
+            & Escape_XML_Characters (Location.Demangled.all)
+            & """ file="""
+            & Escape_XML_Characters (Location.File.all)
+            & """ line="""
+            & Trim (Integer'Image (Location.Line_Number), Ada.Strings.Both)
+            & '"');
+      end if;
    end Print_XML_Dynamic_Objects;
 
    --------------------
