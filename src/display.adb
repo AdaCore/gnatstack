@@ -920,10 +920,12 @@ package body Display is
             Close_Tag ("linkername");
          end if;
 
-         Open_Tag ("locationset");
-         Static_Stack_Analysis.List_Of_Locations.Iterate
-           (Locations, Print_XML_Location'Access);
-         Close_Tag ("locationset");
+         if not Locations.Is_Empty then
+            Open_Tag ("locationset");
+            Static_Stack_Analysis.List_Of_Locations.Iterate
+              (Locations, Print_XML_Location'Access);
+            Close_Tag ("locationset");
+         end if;
       end if;
    end Print_Name;
 
@@ -1518,16 +1520,18 @@ package body Display is
          Print_XML_Stack_Usage (Stack);
          Close_Tag ("localstackusage");
 
-         Open_Tag ("unboundedobjectset");
-         Static_Stack_Analysis.List_Of_Locations.Iterate
-           (Static_Stack_Analysis.Get_Dynamic_Objects (Node.all),
-            Print_XML_Dynamic_Objects'Access);
-         Close_Tag ("unboundedobjectset");
+         if not Node.Get_Dynamic_Objects.Is_Empty then
+            Open_Tag ("unboundedobjectset");
+            Node.Get_Dynamic_Objects.Iterate
+              (Print_XML_Dynamic_Objects'Access);
+            Close_Tag ("unboundedobjectset");
+         end if;
 
-         Open_Tag ("subprogramcalledset");
-         Static_Stack_Analysis.List_Of_Edges.Iterate
-           (Node.Target_Calls, Print_XML_Edge'Access);
-         Close_Tag ("subprogramcalledset");
+         if not Node.Target_Calls.Is_Empty then
+            Open_Tag ("subprogramcalledset");
+            Node.Target_Calls.Iterate (Print_XML_Edge'Access);
+            Close_Tag ("subprogramcalledset");
+         end if;
 
          Close_Tag ("subprogram");
       end if;
