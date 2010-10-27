@@ -109,9 +109,9 @@ package body Display is
    --  active verbosity it will print only the Ada name or it will print also
    --  the symbol name and its location.
 
-   procedure Print_Source_Name
+   function Print_Source_Name
      (Node   : Static_Stack_Analysis.Node_Class_Access;
-      To_XML : Boolean := False);
+      To_XML : Boolean := False) return String;
    --  Print the subprogram name associated to the node. It will use the
    --  demangled Ada/C++ name, if possible, remove path information, and use
    --  task names for task entries.
@@ -876,7 +876,7 @@ package body Display is
       if not Options.Very_Quiet then
          --  Print subprogram name
 
-         Print_Source_Name (Node);
+         Ada.Text_IO.Put (Print_Source_Name (Node));
 
          --  Print symbol name in debug mode
          if Options.Debug and then
@@ -902,7 +902,9 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Node, To_XML => True);
+         Ada.Text_IO.Put
+           (XML_Descriptor,
+            Print_Source_Name (Node, To_XML => True));
          Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
@@ -1100,9 +1102,9 @@ package body Display is
    -- Print_Source_Name --
    -----------------------
 
-   procedure Print_Source_Name
+   function Print_Source_Name
      (Node   : Static_Stack_Analysis.Node_Class_Access;
-      To_XML : Boolean := False)
+      To_XML : Boolean := False) return String
    is
       Str : GNAT.Strings.String_Access;
 
@@ -1125,10 +1127,10 @@ package body Display is
       if To_XML then
          --  For XML we need to escape possible special XML characters
 
-         Escape_XML_Characters (Str.all);
+         return Escape_XML_Characters (Str.all);
 
       else
-         Ada.Text_IO.Put (Str.all);
+         return Str.all;
       end if;
    end Print_Source_Name;
 
@@ -1493,13 +1495,11 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag
            ("subprogram",
-            "id=""" & System.Address_Image (Node.all'Address) & """");
-
-         Open_Tag ("prefixname type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Node, To_XML => True);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("prefixname");
+            "id="""
+            & System.Address_Image (Node.all'Address)
+            & """ prefixname="""
+            & Print_Source_Name (Node, To_XML => True)
+            & '"');
 
          Open_Tag ("locationset");
          Static_Stack_Analysis.List_Of_Locations.Iterate
@@ -1724,7 +1724,7 @@ package body Display is
             Ada.Text_IO.Put ("Task ");
          end if;
 
-         Print_Source_Name (Root);
+         Ada.Text_IO.Put (Print_Source_Name (Root));
 
          Ada.Text_IO.Put (" : total ");
       end if;
@@ -1759,7 +1759,9 @@ package body Display is
       if Options.Generate_XML_Output then
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
-         Print_Source_Name (Root, To_XML => True);
+         Ada.Text_IO.Put
+           (XML_Descriptor,
+            Print_Source_Name (Root, To_XML => True));
          Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
          Close_Tag ("prefixname");
 
@@ -1807,9 +1809,10 @@ package body Display is
 
          Ada.Text_IO.Put (" ");
 
-         Print_Source_Name
-           (Static_Stack_Analysis.List_Of_Nodes.Element
-              (Static_Stack_Analysis.Paths.Element (Root).Source_Node));
+         Ada.Text_IO.Put
+           (Print_Source_Name
+              (Static_Stack_Analysis.List_Of_Nodes.Element
+                 (Static_Stack_Analysis.Paths.Element (Root).Source_Node)));
 
          Ada.Text_IO.New_Line;
       end if;
@@ -2290,13 +2293,11 @@ package body Display is
    begin
       Open_Tag
         ("subprogram",
-         "id=""" & System.Address_Image (Target.all'Address) & """");
-
-      Open_Tag ("prefixname type=""strings""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Print_Source_Name (Target, To_XML => True);
-      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-      Close_Tag ("prefixname");
+         "id="""
+         & System.Address_Image (Target.all'Address)
+         & """ prefixname="""
+         & Print_Source_Name (Target, To_XML => True)
+         & '"');
 
       Open_Tag ("locationset");
       Static_Stack_Analysis.List_Of_Locations.Iterate
