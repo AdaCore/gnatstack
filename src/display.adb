@@ -208,14 +208,10 @@ package body Display is
    --   <location subprogramname="C" file="a-b.adb" line="1" column="1"/>
 
    procedure Print_XML_Stack_Usage
-     (Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info);
+     (Tag_Name    : String;
+      Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info);
    --  Print the stack usage using the format:
-   --   <size type="integers">
-   --     <value>102</value>
-   --   </size>
-   --   <qualifier>
-   --     <value>STATIC</value>
-   --   </qualifier>
+   --  <Tag_Name size="102" qualifier="STATIC"/>
 
    procedure Print_XML_Dynamic_Objects
      (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
@@ -678,9 +674,7 @@ package body Display is
          --  Send stack information to the XML file if needed
 
          if Options.Generate_XML_Output then
-            Open_Tag ("localstackusage");
-            Print_XML_Stack_Usage (Stack_Info);
-            Close_Tag ("localstackusage");
+            Print_XML_Stack_Usage ("localstackusage", Stack_Info);
          end if;
 
          Close_Tag ("frame");
@@ -1512,13 +1506,10 @@ package body Display is
            (Locations, Print_XML_Location'Access);
          Close_Tag ("locationset");
 
-         Open_Tag ("globalstackusage");
-         Print_XML_Stack_Usage (Node.Accumulated_Stack_Usage);
-         Close_Tag ("globalstackusage");
+         Print_XML_Stack_Usage
+           ("globalstackusage", Node.Accumulated_Stack_Usage);
 
-         Open_Tag ("localstackusage");
-         Print_XML_Stack_Usage (Stack);
-         Close_Tag ("localstackusage");
+         Print_XML_Stack_Usage ("localstackusage", Stack);
 
          if not Node.Get_Dynamic_Objects.Is_Empty then
             Open_Tag ("unboundedobjectset");
@@ -1778,9 +1769,7 @@ package body Display is
             Print_XML_Location'Access);
          Close_Tag ("locationset");
 
-         Open_Tag ("localstackusage");
-         Print_XML_Stack_Usage (Accumulated_Stack);
-         Close_Tag ("localstackusage");
+         Print_XML_Stack_Usage ("localstackusage", Accumulated_Stack);
       end if;
 
       --  Note that this Tag is closed in Print_Longest_Path
@@ -2370,22 +2359,18 @@ package body Display is
    ---------------------------
 
    procedure Print_XML_Stack_Usage
-     (Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info)
-   is
+     (Tag_Name    : String;
+      Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info) is
    begin
-      Open_Tag ("size type=""integers""");
-      Report_XML (Message => "<value>", New_Line => False);
-      Ada.Integer_Text_IO.Put
-        (XML_Descriptor, Integer (Stack_Usage.Static_Usage), 0);
-      Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-      Close_Tag ("size");
-
-      Open_Tag ("qualifier");
-      Report_XML
-        ("<value>" &
-         Static_Stack_Analysis.Stack_Usage'Image (Stack_Usage.Frame_Type) &
-         "</value>");
-      Close_Tag ("qualifier");
+      Empty_Tag
+        (Tag_Name,
+         "size="""
+         & Trim
+           (Integer'Image (Integer (Stack_Usage.Static_Usage)),
+            Ada.Strings.Both)
+         & """ qualifier="""
+         & Static_Stack_Analysis.Stack_Usage'Image (Stack_Usage.Frame_Type)
+         & '"');
    end Print_XML_Stack_Usage;
 
    ----------------
