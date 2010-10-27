@@ -28,6 +28,7 @@ with Ada.Containers;
 with Ada.Text_IO;
 with Ada.Integer_Text_IO;
 with Ada.Strings.Fixed;
+with System.Address_Image;
 
 with GNAT.OS_Lib;
 with GNAT.Strings;
@@ -246,7 +247,7 @@ package body Display is
    --     </column>
    --   </unboundedobject>
 
-   procedure Open_Tag (Tag_Name : String);
+   procedure Open_Tag (Tag_Name : String; Attributes : String := "");
    procedure Close_Tag (Tag_Name : String);
    --  Puts into XML file string <Tag_Name> or </Tag_Name>. The indentation is
    --  automatically handled by the level of open tags.
@@ -501,9 +502,14 @@ package body Display is
    -- Open_Tag --
    --------------
 
-   procedure Open_Tag (Tag_Name : String) is
+   procedure Open_Tag (Tag_Name : String; Attributes : String := "") is
    begin
-      Report_XML ('<' & Tag_Name & '>');
+      if Attributes'Length = 0 then
+         Report_XML ('<' & Tag_Name & '>');
+
+      else
+         Report_XML ('<' & Tag_Name & ' ' & Attributes & '>');
+      end if;
 
       --  Increase indentation
       XML_Indentation := XML_Indentation + 1;
@@ -756,7 +762,13 @@ package body Display is
 
          Worst_Case_Analyzer.Get_Longest_Path (Path, Position);
 
-         Open_Tag ("entry");
+         Open_Tag
+           ("entry",
+            "id="""
+            & System.Address_Image
+              (Static_Stack_Analysis.List_Of_Nodes.Element
+                 (Position).all'Address)
+            & '"');
 
          --  Print a summary of the worst-case stack usage
 
@@ -968,7 +980,9 @@ package body Display is
 
       --  Normal node
       else
-         Open_Tag ("subprogram");
+         Open_Tag
+           ("subprogram",
+            "id=""" & System.Address_Image (Node.all'Address) & """");
 
          --  Indentation
 
@@ -989,7 +1003,6 @@ package body Display is
                Ada.Text_IO.Put ("dereferencing to ");
             end if;
             Indirect_Call_Mark := False;
-
          end if;
 
          --  Subprogram name
@@ -1432,7 +1445,9 @@ package body Display is
       --  Send subprogram information to the XML file
 
       if Options.Generate_XML_Output then
-         Open_Tag ("subprogram");
+         Open_Tag
+           ("subprogram",
+            "id=""" & System.Address_Image (Node.all'Address) & """");
 
          Open_Tag ("prefixname type=""strings""");
          Report_XML (Message => "<value>", New_Line => False);
@@ -1720,7 +1735,9 @@ package body Display is
 
       if Task_Wrapper /= null then
          --  Print the frame for the task wrapper
-         Open_Tag ("subprogram");
+         Open_Tag
+           ("subprogram",
+            "id=""" & System.Address_Image (Task_Wrapper.all'Address) & """");
          Print_Node (Task_Wrapper);
          Close_Tag ("subprogram");
       end if;
@@ -1805,7 +1822,9 @@ package body Display is
             Ada.Text_IO.Put ("  ");
          end if;
 
-         Open_Tag ("external");
+         Open_Tag
+           ("external",
+            "id=""" & System.Address_Image (Node.all'Address) & '"');
 
          Print_Name (Node);
 
@@ -2113,7 +2132,9 @@ package body Display is
             end if;
          end if;
 
-         Open_Tag ("indirect");
+         Open_Tag
+           ("indirect",
+            "id=""" & System.Address_Image (Node.all'Address) & '"');
 
          Print_Name (Node);
 
@@ -2229,7 +2250,9 @@ package body Display is
            Static_Stack_Analysis.Get_Location_List (Target.all);
 
    begin
-      Open_Tag ("subprogram");
+      Open_Tag
+        ("subprogram",
+         "id=""" & System.Address_Image (Target.all'Address) & """");
 
       Open_Tag ("prefixname type=""strings""");
       Report_XML (Message => "<value>", New_Line => False);
