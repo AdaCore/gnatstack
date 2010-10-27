@@ -28,6 +28,7 @@ with Ada.Containers;
 with Ada.Text_IO;
 with Ada.Integer_Text_IO;
 with Ada.Strings.Fixed;
+with Ada.Strings.Unbounded;
 with System.Address_Image;
 
 with GNAT.OS_Lib;
@@ -204,20 +205,7 @@ package body Display is
    procedure Print_XML_Location
      (Position : Static_Stack_Analysis.List_Of_Locations.Cursor);
    --  Print the location using the format:
-   --   <location>
-   --     <subprogramname type="strings">
-   --       <value>C</value>
-   --     </subprogramname>
-   --     <file type="strings">
-   --       <value>a-b.adb</value>
-   --     </file>
-   --     <line type="integers">
-   --       <value>1</value>
-   --     </line>
-   --     <column type="integers">
-   --       <value>1</value>
-   --     </column>
-   --   </location>
+   --   <location subprogramname="C" file="a-b.adb" line="1" column="1"/>
 
    procedure Print_XML_Stack_Usage
      (Stack_Usage : Static_Stack_Analysis.Stack_Usage_Info);
@@ -252,7 +240,15 @@ package body Display is
    --  Puts into XML file string <Tag_Name> or </Tag_Name>. The indentation is
    --  automatically handled by the level of open tags.
 
+   procedure Empty_Tag (Tag_Name : String; Attributes : String := "");
+   --  Puts into XML file string <Tag_Name/>. The indentation is automatically
+   --  handled by the level of open tags.
+
    procedure Escape_XML_Characters (Str : String);
+   --  Handle escape characters for XML (& => &amp;, " => &quot;, ' => &apos;,
+   --  < => &lt;, > => &gt;).
+
+   function Escape_XML_Characters (Str : String) return String;
    --  Handle escape characters for XML (& => &amp;, " => &quot;, ' => &apos;,
    --  < => &lt;, > => &gt;).
 
@@ -310,6 +306,60 @@ package body Display is
 
       Report_XML ("</" & Tag_Name & '>');
    end Close_Tag;
+
+   ---------------
+   -- Empty_Tag --
+   ---------------
+
+   procedure Empty_Tag (Tag_Name : String; Attributes : String := "") is
+   begin
+      if Attributes'Length = 0 then
+         Report_XML ('<' & Tag_Name & "/>");
+
+      else
+         Report_XML ('<' & Tag_Name & ' ' & Attributes & "/>");
+      end if;
+   end Empty_Tag;
+
+   ---------------------------
+   -- Escape_XML_Characters --
+   ---------------------------
+
+   function Escape_XML_Characters (Str : String) return String is
+      Buffer : String (1 .. Str'Length * 6);
+      Last   : Natural := 0;
+
+   begin
+      for J in Str'Range loop
+         case Str (J) is
+            when '&' =>
+               Last := Last + 5;
+               Buffer (Last - 4 .. Last) := "&amp;";
+
+            when '"' =>
+               Last := Last + 6;
+               Buffer (Last - 5 .. Last) := "&quot;";
+
+            when ''' =>
+               Last := Last + 6;
+               Buffer (Last - 5 .. Last) := "&apos;";
+
+            when '<' =>
+               Last := Last + 4;
+               Buffer (Last - 3 .. Last) := "&lt;";
+
+            when '>' =>
+               Last := Last + 4;
+               Buffer (Last - 3 .. Last) := "&gt;";
+
+            when others =>
+               Last := Last + 1;
+               Buffer (Last) := Str (J);
+         end case;
+      end loop;
+
+      return Buffer (Buffer'First .. Last);
+   end Escape_XML_Characters;
 
    ---------------------------
    -- Escape_XML_Characters --
@@ -2275,43 +2325,40 @@ package body Display is
    procedure Print_XML_Location
      (Position : Static_Stack_Analysis.List_Of_Locations.Cursor)
    is
-      Location : constant Static_Stack_Analysis.Location :=
+      Location   : constant Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
+      Attributes : Ada.Strings.Unbounded.Unbounded_String;
 
       use type Static_Stack_Analysis.File_Name;
 
    begin
-      Open_Tag ("location");
-
       if Location.Demangled /= null then
-         Open_Tag ("subprogramname type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Escape_XML_Characters (Location.Demangled.all);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("subprogramname");
+         Ada.Strings.Unbounded.Append
+           (Attributes,
+            "subprogramname="""
+            & Escape_XML_Characters (Location.Demangled.all)
+            & '"');
       end if;
 
       if Location.File /= null then
-         Open_Tag ("file type=""strings""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Escape_XML_Characters (Location.File.all);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("file");
+         if Ada.Strings.Unbounded.Length (Attributes) /= 0 then
+            Ada.Strings.Unbounded.Append (Attributes, ' ');
+         end if;
 
-         Open_Tag ("line type=""integers""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Line_Number, 0);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("line");
-
-         Open_Tag ("column type=""integers""");
-         Report_XML (Message => "<value>", New_Line => False);
-         Ada.Integer_Text_IO.Put (XML_Descriptor, Location.Column_Number, 0);
-         Ada.Text_IO.Put_Line (XML_Descriptor, "</value>");
-         Close_Tag ("column");
+         Ada.Strings.Unbounded.Append
+           (Attributes,
+            "file="""
+            & Escape_XML_Characters (Location.File.all)
+            & """ line="""
+            & Trim (Integer'Image (Location.Line_Number), Ada.Strings.Both)
+            & """ column="""
+            & Trim (Integer'Image (Location.Column_Number), Ada.Strings.Both)
+            & '"');
       end if;
 
-      Close_Tag ("location");
+      Empty_Tag
+        ("location",
+         Ada.Strings.Unbounded.To_String (Attributes));
    end Print_XML_Location;
 
    ---------------------------
