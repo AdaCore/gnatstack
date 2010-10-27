@@ -69,7 +69,7 @@ package body Display is
    XML_Indentation : Natural := 0;
    --  Global variable that contains the required indentation in the XML file
 
-   Indent_String : constant String := "  ";
+   Indent_String : constant String := " ";
 
    First_Dispatching : Boolean := True;
    --  Boolean to know whether we have already displayed information about
