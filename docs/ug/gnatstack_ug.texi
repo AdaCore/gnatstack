@@ -778,6 +778,20 @@ targets specified are only for the indirect call at that location. If no
 location is put then the user-defined call will be user for every indirect
 call from  @code{source}.
 
+If there is an unbounded frame for which a maximal size can be derived
+by any kind of analysis, this information can be manually added to a
+user-defined @file{.ci} file. In this case, @value{gnatstack} will take
+the user-defined (more concrete) information, ignoring the
+compiler-generated information. The entry in the @file{.ci} would have
+the following pattern:
+@smallexample
+node: @{ title: "dyn_proc" label: "XXX bytes (static)" @}
+@end smallexample
+
+@noindent
+where @code{XXX} needs to be replaced by the stack size obtained by
+analysis.
+
 When there is some missing information the result of the static stack
 analysis is not accurate. This situation is indicated by
 @value{gnatstack} when displaying the results with the following
