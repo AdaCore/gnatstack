@@ -9,7 +9,7 @@
 @c                                                                            o
 @c                          G N A T S T A C K _ U G                           o
 @c                                                                            o
-@c                      Copyright (C) 2006-2010, AdaCore                      o
+@c                      Copyright (C) 2006-2011, AdaCore                      o
 @c                                                                            o
 @c  GNAT is free software;  you can  redistribute it  and/or modify it under  o
 @c  terms of the  GNU General Public License as published  by the Free Soft-  o
@@ -30,7 +30,7 @@
 
 @set gnatstack GNATstack
 
-@set gnatstack_version 1.4.0w
+@set gnatstack_version 1.4.1
 
 @settitle @value{gnatstack} User's Guide
 @setchapternewpage odd
