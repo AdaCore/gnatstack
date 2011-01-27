@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2010, AdaCore                     --
+--                     Copyright (C) 2005-2011, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1685,7 +1685,7 @@ package body Parser is
             begin
                --  Remove prefix and suffix if we find it
 
-               GNAT.Regpat.Match ("^(.*:)?([^:\.]+)(.\d+)?$", Input, Matches);
+               GNAT.Regpat.Match ("^(.*:)?([^:]+)(\.\d+)?$", Input, Matches);
 
                pragma Assert
                  (Matches (0) /= GNAT.Regpat.No_Match and then
