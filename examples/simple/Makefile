@@ -1,5 +1,5 @@
 all:
-	$(PREFIX)gnatmake $(RUNTIME) main_unit -cargs -fcallgraph-info=su
+	-$(PREFIX)gnatmake $(RUNTIME) main_unit -cargs -fcallgraph-info=su
 	gnatstack -p *.ci
 
 clean:
