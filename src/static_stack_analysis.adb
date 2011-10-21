@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2010, AdaCore                     --
+--                     Copyright (C) 2005-2011, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -21,6 +21,8 @@
 
 with Global_Data;
 with Options;
+
+with GNAT.Regpat;
 
 package body Static_Stack_Analysis is
 
@@ -710,19 +712,105 @@ package body Static_Stack_Analysis is
    -- Location_Is_Dispatching --
    -----------------------------
 
-   function Location_Is_Dispatching (Loc : Location) return Boolean is
-   begin
-      --  Look at the location of every dispatching call
+   function Location_Is_Dispatching (Loc : in out Location) return Boolean is
+      Exact_Match : constant Boolean :=
+        Global_Data.Location_All_Dispatching_Calls.Contains (Loc);
+      --  First result of the search without doing anything with the file
+      --  location. It compares against every registered dispatching call,
+      --  but looking for exact matches (if we have registered a dispatching
+      --  call like "file.adb:9:7" a location like "/my/location/file.adb:9:7"
+      --  does not match).
 
-      return List_Of_Locations.Contains
-        (Global_Data.Location_All_Dispatching_Calls, Loc);
+   begin
+      if Exact_Match then
+         return True;
+
+      else
+         --  If we have not found any exact match there could still be a match
+         --  for a location removing the file path information. It means that
+         --  a location like "/my/location/file.adb:9:7" should also match
+         --  "file.adb:9:7".
+
+         declare
+            use type GNAT.Regpat.Match_Location;
+
+            File_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+              GNAT.Regpat.Compile ("^(.*[\\/])([^\\/]*)$");
+
+            Matches : GNAT.Regpat.Match_Array (0 .. 2);
+
+            Old_Name : File_Name := null;
+
+            Result : Boolean := False;
+
+         begin
+
+            GNAT.Regpat.Match (File_Regexp, Loc.File.all, Matches);
+
+            if Matches (0) /= GNAT.Regpat.No_Match then
+               pragma Assert
+                 (Matches (1) /= GNAT.Regpat.No_Match and then
+                  Matches (2) /= GNAT.Regpat.No_Match);
+
+               --  Store old pointer
+
+               Old_Name := Loc.File;
+
+               --  Try with the new name
+
+               Loc.File :=
+                 new String'(Loc.File (Matches (2).First .. Matches (2).Last));
+
+               --  Search again with the file name excluding the path
+
+               Result :=
+                 Global_Data.Location_All_Dispatching_Calls.Contains (Loc);
+
+               if Result then
+                  --  Remove old name
+
+                  GNAT.Strings.Free (GNAT.Strings.String_Access (Old_Name));
+
+               else
+                  --  Restore previous name and destroy the one created
+                  --  temporarily.
+
+                  GNAT.Strings.Free (GNAT.Strings.String_Access (Loc.File));
+                  Loc.File := Old_Name;
+               end if;
+            end if;
+
+            return Result;
+         end;
+      end if;
    end Location_Is_Dispatching;
 
    function Location_Is_Dispatching
-     (Locs : List_Of_Locations.Set) return Boolean is
+     (Locs : in out List_Of_Locations.Set) return Boolean
+   is
+      Index  : List_Of_Locations.Cursor := Locs.First;
+      Loc    : Location;
+      Result : Boolean := False;
+
    begin
-      return not Global_Data.Location_All_Dispatching_Calls.Intersection
-        (Locs).Is_Empty;
+      --  Look for each individual location
+
+      while not Result and then List_Of_Locations.Has_Element (Index) loop
+         Loc := List_Of_Locations.Element (Index);
+         Result := Location_Is_Dispatching (Loc);
+
+         if Result then
+            --  It is *very* important to do this replacement, because the
+            --  string Loc.File may have been freed.
+
+            Locs.Replace_Element (Index, Loc);
+
+         else
+            List_Of_Locations.Next (Index);
+         end if;
+      end loop;
+
+      return Result;
    end Location_Is_Dispatching;
 
    --------------

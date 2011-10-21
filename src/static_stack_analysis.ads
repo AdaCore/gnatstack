@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2010, AdaCore                     --
+--                     Copyright (C) 2005-2011, AdaCore                     --
 --                                                                          --
 -- GNATStack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -571,14 +571,16 @@ package Static_Stack_Analysis is
    --  the Target node is the one that will determine the indirect calls that
    --  need to be moved.
 
-   function Location_Is_Dispatching (Loc : Location) return Boolean;
+   function Location_Is_Dispatching (Loc : in out Location) return Boolean;
    --  Function which says whether a location corresponds to a dispatching
-   --  call.
+   --  call. The location passed as parameter may be modified because we may
+   --  need to remove the file location.
 
    function Location_Is_Dispatching
-     (Locs : List_Of_Locations.Set) return Boolean;
+     (Locs : in out List_Of_Locations.Set) return Boolean;
    --  Function which says whether any location in the given set corresponds
-   --  to a dispatching call.
+   --  to a dispatching call. The location passed as parameter may be modified
+   --  because we may need to remove the file location.
 
    ---------------
    -- Real_Node --
