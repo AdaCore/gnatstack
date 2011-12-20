@@ -5,18 +5,18 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                        Copyright (C) 2010, AdaCore                       --
+--                     Copyright (C) 2010-2011, AdaCore                     --
 --                                                                          --
--- GNATStack  is free  software;  you can redistribute  it and/or modify it --
+-- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
--- Software  Foundation;  either version 2,  or (at your option)  any later --
+-- Software  Foundation;  either version 3,  or (at your option)  any later --
 -- version.  GNATstack is distributed  in the hope that it will be  useful, --
 -- but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANT- --
 -- ABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public --
 -- License for  more details.  You should have  received  a copy of the GNU --
--- General Public License distributed with GNATStack;  see file COPYING. If --
--- not, write to the  Free Software Foundation,  51 Franklin Street,  Fifth --
--- Floor, Boston, MA 02110-1301, USA.                                       --
+-- General Public License distributed with GNATstack; see file COPYING3. If --
+-- not,  go to  http://www.gnu.org/licenses  for a  complete  copy  of  the --
+-- license.                                                                 --
 ------------------------------------------------------------------------------
 
 with Global_Data;
