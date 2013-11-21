@@ -1,3 +1,5 @@
+with "gnatcoll.gpr";
+
 project Ssat is
 
    Libiberty_Path := external ("LIBIBERTY_PATH", "@LIBIBERTY_PATH@");
@@ -5,6 +7,10 @@ project Ssat is
    for Object_Dir use "obj";
    for Exec_Dir use "bin";
    for Main use ("gnatstack.adb");
+
+   package Naming is
+      for Specification ("Elf_Arch") use "elf_arch__32.ads";
+   end Naming;
 
    package Compiler is
       for Default_Switches ("ada") use ("-gnatf", "-g", "-gnata", "-gnatg", "-gnat12");

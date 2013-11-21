@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2013, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -18,6 +18,46 @@
 -- not,  go to  http://www.gnu.org/licenses  for a  complete  copy  of  the --
 -- license.                                                                 --
 ------------------------------------------------------------------------------
+
+--  This file, in particular, is in a transitional state due to an
+--  an interruption on Nov. 21, 2013 of the work being done on
+--  IC15-033.
+--
+--  This comment is a quick recording of the status, for the purpose
+--  of future guidance on continuing that work. The bigger picture
+--  might be to only use the executable file as the source of callgraph
+--  information, but the code is structured in a way to easily allow an
+--  intermediate implementation which accepts .ci files, .o files
+--  or executable files as sources of callgraph info. This would
+--  support the original interface wherein .ci files from every
+--  compilation are provided, while allowing object files to be
+--  used instead.
+--
+--  In Parse_Arguments, after dealing with switches and options,
+--  all the input files are processed. The .ci files are put into
+--  one list, and other files are presumed to be object files.
+--  In previous versions, the object files were processed by a
+--  spawned objdump to create a temporary .ci file which was placed
+--  on the second list. The work that is partially done, is towards
+--  using packages which process ELF files to get the callgraph
+--  info directly from the program section of an ELF file
+--  (instead of dumping it to a temp .ci file). The name of the
+--  object file will go in the second list in place of the temp .ci
+--  extracted from it.
+--
+--  There are two routines which are called for every file on
+--  the 2 lists: Count_Entities and Parse_Input_File. Count_Entities
+--  has been split into Count_Entities_CI and Count_Entities_ELF;
+--  the former is called for the .ci files on the first list, and
+--  the latter for the ELF files in the second list. Both of these
+--  routines get the entire contents of the callgraph info (entire
+--  file, or entire program section) into a buffer and then call
+--  Count_Entities_Buf to process that buffer. This part is done,
+--  except for some error checking while processing ELF files.
+--
+--  The intention is to split Parse_Input_File the same way as
+--  Count_Entities, and get rid of the external extraction (spawing
+--  objdump) of callgraph info into temp .ci files.
 
 with System.OS_Lib;
 
@@ -33,6 +73,11 @@ with GNAT.Regpat;
 with GNAT.Command_Line;
 with GNAT.Strings;
 with GNAT.OS_Lib;
+
+with Elf_Common; use Elf_Common;
+with Elf_Files; use Elf_Files;
+
+with GNATCOLL.Mmap; use GNATCOLL.Mmap;
 
 with Global_Data;
 with Static_Stack_Analysis;
@@ -136,23 +181,68 @@ package body Parser is
    subtype File_Id is List_Of_Files.Cursor;
    --  Unique identifier for files
 
-   procedure Count_Entities (File : File_Id);
-   --  Procedure to get the number of entities to process
+   procedure Count_Entities_CI  (File : File_Id);
+   procedure Count_Entities_ELF (File : File_Id);
+   procedure Count_Entities_Buf (Buf  : GNATCOLL.Mmap.Str_Access;
+                                 Last : Integer);
+   --  Procedures to get the number of entities to process.
+   --  The CI version takes the name of a callgraph info file.
+   --  The ELF version takes the name of an ELF file containing
+   --    a .ci??? section containing callgraph info.
+   --  The BUF version is called by both of the other versions.
+   --    Both of the others create a string containing the
+   --    ci info, and then call _BUF to do the actual parsing
+   --    and counting.
 
    --------------------
    -- Count_Entities --
    --------------------
 
-   procedure Count_Entities (File : File_Id) is
-      Matches : GNAT.Regpat.Match_Array (0 .. 3);
+   procedure Count_Entities_CI (File : File_Id) is
+      Mfile : Mapped_File;
+      File_Contents : GNATCOLL.Mmap.Str_Access;
+      File_Len : Integer;
    begin
-      Ada.Text_IO.Open
-        (Descriptor, Ada.Text_IO.In_File, List_Of_Files.Element (File).all);
+      Mfile := Open_Read (List_Of_Files.Element (File).all);
+      Read (Mfile);
+      File_Contents := Data (Mfile);
+      File_Len := Last (Mfile);
+      Count_Entities_Buf (File_Contents, File_Len);
+      Close (Mfile);
+   end Count_Entities_CI;
 
-      while not Ada.Text_IO.End_Of_File (Descriptor) loop
+   procedure Count_Entities_ELF (File : File_Id) is
+      Bin : Elf_File;
+      CI_Index : Elf_Half;
+      CI_Section : Mapped_Region;
+      CI_Contents : GNATCOLL.Mmap.Str_Access;
+      CI_Size : Integer;
+   begin
+      Open_File (Bin, List_Of_Files.Element (File).all);
+      Load_Shdr (Bin);
+      CI_Index := Get_Shdr_By_Name (Bin, ".GNU.callgraph");
+      CI_Section := Load_Section (Bin, CI_Index);
+      CI_Contents := Data (CI_Section);
+      CI_Size := Last (CI_Section);
+      Count_Entities_Buf (CI_Contents, CI_Size);
+      Close_File (Bin);
+   end Count_Entities_ELF;
+
+   procedure Count_Entities_Buf (Buf  : GNATCOLL.Mmap.Str_Access;
+                                 Last : Integer) is
+      Matches : GNAT.Regpat.Match_Array (0 .. 3);
+      BOL, EOL : Positive;
+   begin
+      BOL := 1;
+      while BOL <= Last loop
+         EOL := BOL;
+         loop
+            exit when EOL = Last or else Buf (EOL) = ASCII.LF;
+            EOL := EOL + 1;
+         end loop;
+
          GNAT.Regpat.Match ("^(node:)|(edge:)|(class)",
-                            Ada.Text_IO.Get_Line (Descriptor),
-                            Matches);
+                            String (Buf (BOL .. EOL)), Matches);
 
          if Matches (1) /= GNAT.Regpat.No_Match then
             Global_Data.Expected_Entities (Global_Data.Parse_Subprogram) :=
@@ -166,10 +256,9 @@ package body Parser is
             Global_Data.Expected_Entities (Global_Data.Class) :=
               Global_Data.Expected_Entities (Global_Data.Class) + 1;
          end if;
+         BOL := EOL + 1;
       end loop;
-
-      Ada.Text_IO.Close (Descriptor);
-   end Count_Entities;
+   end Count_Entities_Buf;
 
    ---------------------------
    -- Deallocate_File_Names --
@@ -575,7 +664,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2011, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2013, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
@@ -1018,8 +1107,8 @@ package body Parser is
       else
          if Options.Progress_Information then
             --  Count Entities
-            List_Of_Files.Iterate (Input_Files, Count_Entities'Access);
-            List_Of_Files.Iterate (Input_Tmp_Files, Count_Entities'Access);
+            List_Of_Files.Iterate (Input_Files, Count_Entities_CI'Access);
+            List_Of_Files.Iterate (Input_Tmp_Files, Count_Entities_ELF'Access);
 
             --  Approximate the number of subprograms and calls to analyze by
             --  the number of subprograms and calls to parse. This is not
