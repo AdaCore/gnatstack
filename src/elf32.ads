@@ -2,7 +2,7 @@
 --                                                                          --
 --                               GNATcoverage                               --
 --                                                                          --
---                     Copyright (C) 2006-2013, AdaCore                     --
+--                     Copyright (C) 2006-2014, AdaCore                     --
 --                                                                          --
 -- GNATcoverage is free software; you can redistribute it and/or modify it  --
 -- under terms of the GNU General Public License as published by the  Free  --
@@ -43,6 +43,8 @@ package Elf32 is
       E_Shnum     : Elf32_Half;
       E_Shstrndx  : Elf32_Half;
    end record;
+   for Elf32_Ehdr'Alignment use 1;
+   --  Needed to match mapped region alignment on strict hosts.
 
    Elf32_Ehdr_Size : constant Natural := Elf32_Ehdr'Size / System.Storage_Unit;
 
@@ -60,6 +62,8 @@ package Elf32 is
       Sh_Addralign : Elf32_Word;
       Sh_Entsize   : Elf32_Word;
    end record;
+   for Elf32_Shdr'Alignment use 1;
+   --  Needed to match mapped region alignment on strict hosts.
    Elf32_Shdr_Size : constant Natural := Elf32_Shdr'Size / System.Storage_Unit;
 
    procedure Elf32_Shdr_Swap (Shdr : in out Elf32_Shdr);
