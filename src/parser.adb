@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2013, AdaCore                     --
+--                     Copyright (C) 2005-2014, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -133,7 +133,11 @@ package body Parser is
 
    procedure Print_Usage_And_Exit;
    pragma Inline (Print_Usage_And_Exit);
-   --  Print how to use the tool and exit
+   --  Print how to get usage information and exit
+
+   procedure Print_Help_And_Exit;
+   pragma Inline (Print_Help_And_Exit);
+   --  Print detailed help information and exit
 
    procedure Get_Task_Wrapper (Position : Static_Stack_Analysis.Node_Id);
    --  Get a pointer to this node if it contains the task wrapper (used for
@@ -664,7 +668,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2013, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2014, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
@@ -694,12 +698,11 @@ package body Parser is
 
                   --  --help
                   elsif Full = "-help" then
-                     Print_Usage_And_Exit;
+                     Print_Help_And_Exit;
 
                   --  Wrong option
                   else
-                     raise GNAT.Command_Line.Invalid_Parameter with
-                       "Invalid switch -" & Full;
+                     raise GNAT.Command_Line.Invalid_Switch;
                   end if;
                end;
 
@@ -709,7 +712,7 @@ package body Parser is
 
             --  Help
             when 'h' =>
-               Print_Usage_And_Exit;
+               Print_Help_And_Exit;
 
             --  Debug
             when 'g' =>
@@ -866,7 +869,7 @@ package body Parser is
 
                --  Wrong option
                else
-                  raise GNAT.Command_Line.Invalid_Parameter;
+                  raise GNAT.Command_Line.Invalid_Switch;
                end if;
 
             --  Do not display progress messages.
@@ -925,7 +928,7 @@ package body Parser is
 
                --  Wrong option
                else
-                  raise GNAT.Command_Line.Invalid_Parameter;
+                  raise GNAT.Command_Line.Invalid_Switch;
                end if;
 
             --  XML output
@@ -1070,16 +1073,14 @@ package body Parser is
       exception
          when GNAT.Command_Line.Invalid_Switch =>
             Ada.Text_IO.Put_Line
-              ("Invalid Switch " & GNAT.Command_Line.Full_Switch);
-            Ada.Text_IO.New_Line;
+              ("unrecognized option '" & GNAT.Command_Line.Full_Switch & "'");
 
             Print_Usage_And_Exit;
 
          when GNAT.Command_Line.Invalid_Parameter =>
             Ada.Text_IO.Put_Line
-              ("Missing or wrong parameter for " &
-               GNAT.Command_Line.Full_Switch);
-            Ada.Text_IO.New_Line;
+              ("missing or wrong parameter for '-" &
+               GNAT.Command_Line.Full_Switch & "'");
 
             Print_Usage_And_Exit;
 
@@ -1100,7 +1101,6 @@ package body Parser is
       then
          Ada.Text_IO.Put_Line
            ("Specify at least one .ci (callgraph information) or .o file");
-         Ada.Text_IO.New_Line;
 
          Print_Usage_And_Exit;
 
@@ -3264,13 +3264,24 @@ package body Parser is
               (Get_Demangled_Name (Explored_Node.all).all));
    end Pattern_In_Node;
 
+   -------------------------
+   -- Print_Help_And_Exit --
+   -------------------------
+
+   procedure Print_Help_And_Exit is
+   begin
+      Usage;
+      GNAT.OS_Lib.OS_Exit (1);
+   end Print_Help_And_Exit;
+
    --------------------------
    -- Print_Usage_And_Exit --
    --------------------------
 
    procedure Print_Usage_And_Exit is
    begin
-      Usage;
+      Ada.Text_IO.Put_Line
+        ("Use `gnatstack --help` for more information");
       GNAT.OS_Lib.OS_Exit (1);
    end Print_Usage_And_Exit;
 
