@@ -240,9 +240,9 @@ externals calls, and user-defined bounds for unbounded frames.
 @chapter Getting Started with GNATstack
 
 @noindent
-Two steps are needed to analyze stack usage: generation of the basic
-stack consumption and call-graph information and worst-case stack
-analysis.
+Two steps are needed to analyze stack usage: 1) generation of the basic
+stack consumption and call-graph information, followed by 2) analysis
+and report generation.
 
 The first step is to compile the application with the required options
 to generate the information about per-subprogram stack consumption and
@@ -266,7 +266,7 @@ locating the objects that introduce potentially unbounded stack
 requirements.
 @cindex @code{-fcallgraph-info=su,da}
 
-@value{gnatstack} can then parse these files to generate the
+In the second step, @value{gnatstack} can then parse these files to generate the
 complete call graph decorated with stack usage information, so it can
 look for the longest paths in terms of stack usage.
 
