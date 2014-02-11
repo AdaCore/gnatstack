@@ -9,7 +9,7 @@
 @c                                                                            o
 @c                          G N A T S T A C K _ U G                           o
 @c                                                                            o
-@c                      Copyright (C) 2006-2010, AdaCore                      o
+@c                      Copyright (C) 2006-2014, AdaCore                      o
 @c                                                                            o
 @c  GNAT is free software;  you can  redistribute it  and/or modify it under  o
 @c  terms of the  GNU General Public License as published  by the Free Soft-  o
@@ -910,7 +910,7 @@ point) -> @code{main_unit} (the main Ada program) ->
 consumption following this path is 376 bytes, and this bound can be
 trusted.
 
-Focussing on the capability of detecting problems related to the
+Focusing on the capability of detecting problems related to the
 computation of stack requirements we can use the following example:
 
 @smallexample @c ada
@@ -1069,7 +1069,7 @@ interface with code written in assembly you may need extra details.
 @section AVR
 
 The stack used by the @code{call}, @code{rcall}, @code{icall} or @code{eicall}
-instructions is counted in the callee. That is all subprograms use at leat
+instructions is counted in the callee. That is all subprograms use at least
 3 bytes on avr6 architecture (@code{atmega256x}) and 2 bytes or avr5
 architecture.
 
