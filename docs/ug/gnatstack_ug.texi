@@ -152,6 +152,9 @@ to execution time.
 supported, including both native and cross compilers. It requires GNAT
 Pro 5.04a or later.
 
+Support for Ada, C, and C++ is included.  Note
+that analysis of dynamic dispatching calls in C++ is limited.
+
 Support in the Project Manager for @value{gnatstack} (see @ref{Use of
 Project Files}) and detailed information about dynamically allocated
 local objects (using the @code{-fcallgraph-info=da} compiler switch)
@@ -178,7 +181,7 @@ flow analysis.
 This is a static tool in the sense that its computation is based on
 information known at compile time. It implies that when the tool
 indicates that the result is accurate then the computed bound can
-never overflow. The tool does not rely on empiric run-time
+never overflow. The tool does not rely on empirical run-time
 information.
 
 The main output of the tool is the worst-case stack requirements for
