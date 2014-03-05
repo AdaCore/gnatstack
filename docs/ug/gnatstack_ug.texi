@@ -782,7 +782,7 @@ location is put then the user-defined call will be user for every indirect
 call from  @code{source}.
 
 If there is an unbounded frame for which a maximal size can be derived
-by any kind of analysis, this information can be manually added to a
+by some other kind of analysis, this information can be manually added to a
 user-defined @file{.ci} file. In this case, @value{gnatstack} will take
 the user-defined (more concrete) information, ignoring the
 compiler-generated information. The entry in the @file{.ci} would have
@@ -792,8 +792,90 @@ node: @{ title: "dyn_proc" label: "XXX bytes (static)" @}
 @end smallexample
 
 @noindent
-where @code{XXX} needs to be replaced by the stack size obtained by
+where @code{XXX} needs to be replaced by the stack size obtained by some other
 analysis.
+
+The subprogram names specified in these user-defined @file{.ci} files are
+the symbolic names used by the compiler rather than simple Ada identifiers.
+These symbolic names are not identical to the Ada identifiers.
+
+The most typical scenario is that of subprograms declared in packages.  In this
+case, the names are specified with the fully qualified name, but in lower case and with
+two consecutive underscores replacing the dots in the full name.
+For example, given the following package:
+
+@smallexample @c ada
+@group
+package P is
+   procedure R;
+   procedure Q (This : Integer);
+   procedure Q (This : Float);
+end P;
+@end smallexample
+
+@noindent
+The fully qualified names in Ada would be @code{P.R} and @code{P.Q} but the names
+specified in a user-defined @file{.ci} file would be @code{p__r} and @code{p__q}.
+
+Additional characters make up the symbolic names for overloaded units. Specifically,
+unique numbers are appended to the symbolic names by the compiler, again using double
+underscore characters as separators.  The first overloaded unit does not get a numeric
+suffix, but all others in that scope do, starting at two. Hence the corresponding
+symbolic names specified would be @code{p__q} and @code{p__q__2}, respectively.
+
+For subprograms declared in scopes other than packages, such as subprograms
+nested within other subprograms, a similar format is used as for overloaded
+units.  An additional numeric suffix is added by the compiler, but in this case
+the separator is a leading dot instead of two underscore characters.  Moreover,
+these numeric suffixes are not deducible simply by counting the overloaded units
+in the scope. Therefore, the most convenient approach is to use a tool to show
+the symbolic names chosen by the compiler.  These symbolic names appear in the
+object code so we can use objdump or nm to show the symbols within.
+Consider the following:
+
+@smallexample @c ada
+@group
+procedure Demo is
+
+   type Index is new Integer;
+
+   procedure Silly (Upper : Index) is
+      Data_List : array (1 .. Upper) of Integer;
+   begin
+      for Value of Data_List loop
+         Value := 0;
+      end loop;
+   end Silly;
+
+begin
+   Silly (Upper => 1024);
+end Demo;
+@end smallexample
+
+@noindent
+We need to specify the stack requirements for procedure @code{Silly}. The full name is
+@code{Demo.Silly}, so the symbolic name starts with @code{demo__silly} but there will
+be a numeric suffix as well.  Once compiled, we can examine the object code for Demo
+to get the symbolic name:
+
+@smallexample
+$powerpc-elf-objdump --syms demo.o
+
+demo.o:     file format elf32-powerpc
+
+SYMBOL TABLE:
+00000000 l    df *ABS*  00000000 demo.adb
+00000000 l    d  .text  00000000 .text
+00000000 l    d  .data  00000000 .data
+00000000 l    d  .bss   00000000 .bss
+00000000 l     F .text  00000120 demo__silly.1435
+00000000 l    d  .debug_info    00000000 .debug_info
+00000000 l    d  .debug_abbrev  00000000 .debug_abbrev
+...
+@end smallexample
+
+@noindent
+We can see that the symbolic name for @code{Demo.Silly} is @code{demo__silly.1435} and that is what would be specified in the user-defined @file{.ci} file.
 
 When there is some missing information the result of the static stack
 analysis is not accurate. This situation is indicated by
