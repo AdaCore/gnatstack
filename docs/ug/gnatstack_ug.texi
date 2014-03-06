@@ -778,7 +778,7 @@ edge: @{ sourcename: "source" targetname: "target3" label: "file.adb:6:15" @}
 @noindent
 The use of @code{label} with the concrete location indicates that the
 targets specified are only for the indirect call at that location. If no
-location is put then the user-defined call will be user for every indirect
+location is put then the user-defined call will be used for every indirect
 call from  @code{source}.
 
 If there is an unbounded frame for which a maximal size can be derived
