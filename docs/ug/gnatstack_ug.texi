@@ -322,7 +322,7 @@ Generate internal debug information.
 @cindex @option{-aO}
 Load @file{.ci} files from @var{dir}.
 
-@item -e @var{entry_point[,...]}
+@item -e @var{entry_point}[,...]
 @cindex @option{-e}
 Name of symbols to be used as entry points for the analysis. It accepts both
 symbol and demangled names, and it performs a case-insensitive search.
@@ -863,11 +863,14 @@ If we look in the @file{demo.ci} file we will see the following:
 
 @smallexample
 @group
-graph: {title: "demo.adb"
-node: {title: "_ada_demo" label: "Demo\ndemo.adb:1:1\n16 bytes (static)\n0 dynamic objects" }
-edge: {sourcename: "_ada_demo" targetname: "demo.adb:demo__silly.1435" label: "demo.adb:14:4" }
-node: {title: "demo.adb:demo__silly.1435" label:"Silly\ndemo.adb:5:4\n80 bytes (dynamic)\n1 dynamic objects\n Data_List demo.adb:6:7" }
-}
+graph: @{title: "demo.adb"
+node: @{title: "_ada_demo" label: "Demo\ndemo.adb:1:1\n16 bytes (static)\n0
+dynamic objects" @}
+edge: @{sourcename: "_ada_demo" targetname: "demo.adb:demo__silly.1435"
+label: "demo.adb:14:4" @}
+node: @{title: "demo.adb:demo__silly.1435" label:"Silly\ndemo.adb:5:4\n80 bytes
+(dynamic)\n1 dynamic objects\n Data_List demo.adb:6:7" @}
+@}
 @end group
 @end smallexample
 
@@ -876,7 +879,7 @@ We can see in the last node that the symbolic name for @code{Demo.Silly} is @cod
 that is what would be specified in the user-defined @file{.ci} file:
 
 @smallexample
-node: { title: "demo__silly.1435" label: "4128 bytes (static)" }
+node: @{ title: "demo__silly.1435" label: "4128 bytes (static)" @}
 @end smallexample
 
 @noindent
