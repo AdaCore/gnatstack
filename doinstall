@@ -1,35 +1,15 @@
 #!/bin/sh
 
-get_gnat_dir () {
-   ggd_prefix=$1
-   if [ "x$ggd_prefix" = "x" ]; then
-      ggd_prog="gnatmake"
-   else
-      ggd_prog="$ggd_prefix-gnatmake"
-   fi
-
-   type $ggd_prog > /dev/null 2>&1
-   if [ "$?" -ne 0 ]; then
-      # GNAT Pro installation not found
-      echo ""
-   else
-      # Return the location of the GNAT Pro installation
-      echo `type $ggd_prog | cut -d' ' -f3 | sed 's%/bin.*$%%'`
-   fi
-}
-
-prefix=`get_gnat_dir`
-machine=`$prefix/bin/gcc -dumpmachine`
+prefix=
 gnatstack="gnatstack"
 
 clear
 cat << EOF
 
 
-  This script is provided to simplify the installation of the $machine
-  binary distribution of the $gnatstack static analysis tool. This
-  includes the $gnatstack binary as well as the corresponding documentation
-  and examples.
+  This script is provided to simplify the installation of the binary
+  distribution of the $gnatstack static analysis tool. This includes the
+  $gnatstack binary as well as the corresponding documentation and examples.
 
   For more information about the commercial support of $gnatstack, please
   contact sales@adacore.com.
@@ -103,7 +83,10 @@ EOF
 
   # ------------------ Regular installation ---------------------------
   1)
-    if [ "X$prefix" = "X" ]; then
+    prefix=`type gprbuild 2>/dev/null| cut -d' ' -f3`
+    prefix=`dirname $prefix 2>/dev/null`
+
+    if [ "$prefix" = "" -o "$prefix" = "." ]; then
        cat << EOF
 
 
@@ -115,7 +98,7 @@ EOF
 EOF
        exit 1
     else
-       installdir=$prefix
+       installdir=`dirname $prefix`
        break
     fi
     ;;
