@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2014, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,9 +20,11 @@
 ------------------------------------------------------------------------------
 
 with GNAT.Strings;
+
 with Static_Stack_Analysis;
 
 package Options is
+   use type GNAT.Strings.String_Access;
 
    Verbose : Boolean := False;
    --  Verbose output
@@ -121,5 +123,14 @@ package Options is
    Section_Name : GNAT.Strings.String_Access := new String'(".GNU.callgraph");
    --  Name of the section where the .ci information is stored in the object
    --  file. This value can be changed with the -s option.
+
+   Runtime : GNAT.Strings.String_Access := null;
+   --  Name of the run-time library used
+
+   Project : GNAT.Strings.String_Access := null;
+   --  Name of the project file used
+
+   Target : GNAT.Strings.String_Access := null;
+   --  Name of the prefix for cross compilers
 
 end Options;

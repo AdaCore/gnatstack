@@ -79,6 +79,9 @@ with Elf_Files; use Elf_Files;
 
 with GNATCOLL.Mmap; use GNATCOLL.Mmap;
 
+with GNATCOLL.Projects;
+with GNATCOLL.VFS;
+
 with Global_Data;
 with Static_Stack_Analysis;
 with Options;
@@ -92,6 +95,7 @@ package body Parser is
    use type Static_Stack_Analysis.Stack_Usage_Info;
    use type Static_Stack_Analysis.Location;
    use type GNAT.Regpat.Match_Location;
+   use type GNAT.Strings.String_Access;
 
    ----------------
    -- Local data --
@@ -197,6 +201,33 @@ package body Parser is
    --    Both of the others create a string containing the
    --    ci info, and then call _BUF to do the actual parsing
    --    and counting.
+
+   package Project is
+
+      Env : GNATCOLL.Projects.Project_Environment_Access;
+      --  Environment
+
+      procedure Get_Project_Info;
+      --  This procedure does an initial parsing of the command-line switches.
+      --  The goal is to insert GNATstack switches coming from project files
+      --  (if any) and to get stack information from the run-time library:
+      --   - Process project-related switches: -P, -X
+      --   - Extract the list of GNATstack switches from project files
+      --   - Add .ci files coming from the object directories belonging to the
+      --     hierarchy of projects
+      --  Values from the command line take precedence over those in the
+      --  project file.
+
+      function Get_Option return Character;
+      function Get_Switch return String;
+      function Get_Parameter return String;
+      --  Three functions to get the switches from both the project file and
+      --  the command line. Enforce preference of values from command line over
+      --  project files.
+
+   end Project;
+
+   package body Project is separate;
 
    --------------------
    -- Count_Entities --
@@ -555,8 +586,6 @@ package body Parser is
    -----------
 
    function Equal (Left, Right : GNAT.Strings.String_Access) return Boolean is
-      use type GNAT.Strings.String_Access;
-
    begin
       --  The two pointers will be considered equal if both are null pointers
       --  or else if both contain the same String.
@@ -656,8 +685,6 @@ package body Parser is
    ---------------------
 
    procedure Parse_Arguments is
-      use type GNAT.Strings.String_Access;
-
       Entries : Integer;
       --  Number of entry points defined in the command line
 
@@ -673,23 +700,25 @@ package body Parser is
       end Print_Version;
 
    begin
+      --  First we get the projects related switches
+
+      Parser.Project.Get_Project_Info;
+
       --  Get options
 
       declare
+         Predef_Obj_Dirs : GNATCOLL.VFS.File_Array_Access;
+
       begin
          loop
-            case
-              GNAT.Command_Line.Getopt
-                ("a aO: ca c: d: e: f: files= g h k l: np o= oc= p pi q Q " &
-                 "r: s= t! u: v W! x -help -version")
-            is
+            case Project.Get_Option is
             when ASCII.NUL =>
                exit;
 
             -- long option names --
             when '-' =>
                declare
-                  Full : constant String := GNAT.Command_Line.Full_Switch;
+                  Full : constant String := Project.Get_Switch;
                begin
                   --  --version
                   if Full = "-version" and then not Options.Verbose then
@@ -699,6 +728,13 @@ package body Parser is
                   --  --help
                   elsif Full = "-help" then
                      Print_Help_And_Exit;
+
+                  elsif Full = "-target" then
+                     Options.Target := new String'(Project.Get_Parameter);
+
+                  --  --RTS
+                  elsif Full = "-RTS" then
+                     Options.Runtime := new String'(Project.Get_Parameter);
 
                   --  Wrong option
                   else
@@ -727,37 +763,41 @@ package body Parser is
                declare
                begin
                   Options.Number_Of_Biggest_Frames :=
-                    Natural'Value (GNAT.Command_Line.Parameter);
+                    Natural'Value (Project.Get_Parameter);
                exception
                   when Constraint_Error =>
                      raise GNAT.Command_Line.Invalid_Parameter;
                end;
 
             when 'c' =>
-               --  All cycles
-               if GNAT.Command_Line.Full_Switch = "ca" then
-                  Options.Compute_All_Cycles := True;
+               declare
+                  Switch : constant String := Project.Get_Switch;
+               begin
+                  --  All cycles
+                  if Switch = "ca" then
+                     Options.Compute_All_Cycles := True;
 
-               --  Default size for cycles
-               elsif GNAT.Command_Line.Full_Switch = "c" then
-                  declare
-                  begin
-                     Options.Default_Cycle :=
-                       Natural'Value (GNAT.Command_Line.Parameter);
-                  exception
-                     when Constraint_Error =>
-                        raise GNAT.Command_Line.Invalid_Parameter;
-                  end;
+                  --  Default size for cycles
+                  elsif Switch = "c" then
+                     declare
+                     begin
+                        Options.Default_Cycle :=
+                          Natural'Value (Project.Get_Parameter);
+                     exception
+                        when Constraint_Error =>
+                           raise GNAT.Command_Line.Invalid_Parameter;
+                     end;
 
-               --  Wrong option
-               else
-                  raise GNAT.Command_Line.Invalid_Parameter;
-               end if;
+                  --  Wrong option
+                  else
+                     raise GNAT.Command_Line.Invalid_Parameter;
+                  end if;
+               end;
 
             --  Warnings
             when 'W' =>
                declare
-                  Parameter : constant String := GNAT.Command_Line.Parameter;
+                  Parameter : constant String := Project.Get_Parameter;
                begin
                   for Index in Parameter'Range loop
                      case Parameter (Index) is
@@ -790,17 +830,15 @@ package body Parser is
 
             when 'o' =>
                --  Objcopy command
-               if GNAT.Command_Line.Full_Switch = "oc" then
+               if Project.Get_Switch = "oc" then
                   GNAT.Strings.Free (Options.Objcopy_Cmd);
 
-                  Options.Objcopy_Cmd :=
-                    new String'(GNAT.Command_Line.Parameter);
+                  Options.Objcopy_Cmd := new String'(Project.Get_Parameter);
 
                --  Ordering
                else
                   declare
-                     Parameter : constant String :=
-                       GNAT.Command_Line.Parameter;
+                     Parameter : constant String := Project.Get_Parameter;
                   begin
                      --  -oa
                      if Parameter = "a" then
@@ -818,30 +856,33 @@ package body Parser is
                end if;
 
             when 'a' =>
-               --  Consider all subprograms as potential entry points
-               if GNAT.Command_Line.Full_Switch = "a" then
-                  Options.Explore_All := True;
+               declare
+                  Switch : constant String := Project.Get_Switch;
+               begin
+                  --  Consider all subprograms as potential entry points
+                  if Switch = "a" then
+                     Options.Explore_All := True;
 
-               --  Directory containing the .ci files
-               elsif GNAT.Command_Line.Full_Switch = "aO" then
-                  declare
-                     Directory : constant String :=
-                       GNAT.Command_Line.Parameter;
-                  begin
-                     Append_Files_From_Directory (Input_Files, Directory);
-                  end;
+                  --  Directory containing the .ci files
+                  elsif Switch = "aO" then
+                     declare
+                        Directory : constant String := Project.Get_Parameter;
+                     begin
+                        Append_Files_From_Directory (Input_Files, Directory);
+                     end;
 
-               --  Wrong option
-               else
-                  raise GNAT.Command_Line.Invalid_Switch;
-               end if;
+                  --  Wrong option
+                  else
+                     raise GNAT.Command_Line.Invalid_Switch;
+                  end if;
+               end;
 
             --  Default stack requirements for unknown (external) calls
             when 'u' =>
                declare
                begin
                   Options.Default_Unknown :=
-                    Natural'Value (GNAT.Command_Line.Parameter);
+                    Natural'Value (Project.Get_Parameter);
                exception
                   when Constraint_Error =>
                      raise GNAT.Command_Line.Invalid_Parameter;
@@ -852,25 +893,29 @@ package body Parser is
                declare
                begin
                   Options.Default_Unbounded :=
-                    Natural'Value (GNAT.Command_Line.Parameter);
+                    Natural'Value (Project.Get_Parameter);
                exception
                   when Constraint_Error =>
                      raise GNAT.Command_Line.Invalid_Parameter;
                end;
 
             when 'p' =>
-               --  Display call chain paths
-               if GNAT.Command_Line.Full_Switch = "p" then
-                  Options.Display_Call_Chains := True;
+               declare
+                  Switch : constant String := Project.Get_Switch;
+               begin
+                  --  Display call chain paths
+                  if Switch = "p" then
+                     Options.Display_Call_Chains := True;
 
-               --  Progress information
-               elsif GNAT.Command_Line.Full_Switch = "pi" then
-                  Options.Progress_Information := True;
+                  --  Progress information
+                  elsif Switch = "pi" then
+                     Options.Progress_Information := True;
 
-               --  Wrong option
-               else
-                  raise GNAT.Command_Line.Invalid_Switch;
-               end if;
+                  --  Wrong option
+                  else
+                     raise GNAT.Command_Line.Invalid_Switch;
+                  end if;
+               end;
 
             --  Do not display progress messages.
             when 'q' =>
@@ -883,7 +928,7 @@ package body Parser is
 
             when 'n' =>
                --  Do not display call chain (paths) for the entry points
-               if GNAT.Command_Line.Full_Switch = "np" then
+               if Project.Get_Switch = "np" then
                   Options.Display_Call_Chains := False;
 
                --  Wrong option
@@ -899,7 +944,7 @@ package body Parser is
                --  being used.
 
                Options.List_Of_Entry_Points :=
-                 new String'(GNAT.Command_Line.Parameter);
+                 new String'(Project.Get_Parameter);
 
             --  Pattern for subprograms to be considered entry points
             when 'r' =>
@@ -909,27 +954,30 @@ package body Parser is
                --  being used.
 
                Options.Entry_Point_Pattern :=
-                 new String'(GNAT.Command_Line.Parameter);
+                 new String'(Project.Get_Parameter);
 
             when 'f' =>
-               --  Output graph file
-               if GNAT.Command_Line.Full_Switch = "f" then
-                  GNAT.Strings.Free (Options.Output_VCG);
+               declare
+                  Switch : constant String := Project.Get_Switch;
+               begin
+                  --  Output graph file
+                  if Switch = "f" then
+                     GNAT.Strings.Free (Options.Output_VCG);
 
-                  --  This dynamically allocated String is later destroyed
-                  --  after being used.
+                     --  This dynamically allocated String is later destroyed
+                     --  after being used.
 
-                  Options.Output_VCG :=
-                    new String'(GNAT.Command_Line.Parameter);
+                     Options.Output_VCG := new String'(Project.Get_Parameter);
 
-               --  File containing a list of .ci files
-               elsif GNAT.Command_Line.Full_Switch = "files" then
-                  Get_Stack_Usage_Files (GNAT.Command_Line.Parameter);
+                  --  File containing a list of .ci files
+                  elsif Switch = "files" then
+                     Get_Stack_Usage_Files (Project.Get_Parameter);
 
-               --  Wrong option
-               else
-                  raise GNAT.Command_Line.Invalid_Switch;
-               end if;
+                  --  Wrong option
+                  else
+                     raise GNAT.Command_Line.Invalid_Switch;
+                  end if;
+               end;
 
             --  XML output
             when 'x' =>
@@ -939,13 +987,12 @@ package body Parser is
             when 's' =>
                GNAT.Strings.Free (Options.Section_Name);
 
-               Options.Section_Name :=
-                 new String'(GNAT.Command_Line.Parameter);
+               Options.Section_Name := new String'(Project.Get_Parameter);
 
             --  Resolution of indirect and dispatching calls
             when 't' =>
                declare
-                  Parameter : constant String := GNAT.Command_Line.Parameter;
+                  Parameter : constant String := Project.Get_Parameter;
 
                   use type Options.Target_Resolution_Options;
 
@@ -989,6 +1036,11 @@ package body Parser is
                      end case;
                   end loop;
                end;
+
+            --  Ignore project related switches (-P <prj>, -X<name>=<val>)
+            --  because they have already been treated.
+            when 'X' | 'P' =>
+               null;
 
             when others =>
                raise GNAT.Command_Line.Invalid_Switch;
@@ -1068,19 +1120,63 @@ package body Parser is
             end;
          end loop;
 
+         if List_Of_Files.Is_Empty (Input_Files) and then
+           List_Of_Files.Is_Empty (Input_Tmp_Files)
+         then
+            Ada.Text_IO.Put_Line
+              ("Specify at least one .ci (callgraph information) or .o file");
+
+            Print_Usage_And_Exit;
+         end if;
+
+         --  Add .ci files coming from the object directories belonging to the
+         --  run-time library
+
+         declare
+            Tgt : GNAT.Strings.String_Access renames Options.Target;
+            Rt : GNAT.Strings.String_Access renames Options.Runtime;
+
+            GNAT_Version : GNAT.Strings.String_Access;
+
+            GNATls_Command : constant String :=
+              (if Tgt = null then "" else Tgt.all & '-') &
+              "gnatls" &
+              (if Rt = null then "" else " --RTS=" & Rt.all);
+            --  Command to call gnatls to use. It is "gnatls" for a native
+            --  compiler or "<prefix>-gnatls" for a cross compiler.
+            --  Additionally, it can contain a specific run-time library
+            --  "<prefix>-gnatls --RTS=<runtime>"
+
+         begin
+            Project.Env.Set_Path_From_Gnatls
+              (Gnatls       => GNATls_Command,
+               GNAT_Version => GNAT_Version);
+            GNAT.Strings.Free (GNAT_Version);
+         end;
+
+         Predef_Obj_Dirs :=
+           new GNATCOLL.VFS.File_Array'(Project.Env.Predefined_Object_Path);
+
+         for OD of Predef_Obj_Dirs.all loop
+            Append_Files_From_Directory
+              (Input_Files, OD.Display_Full_Name);
+         end loop;
+
+         GNATCOLL.VFS.Unchecked_Free (Predef_Obj_Dirs);
+
       --  Exception handling for the part in charge of parsing the command
       --  line.
       exception
          when GNAT.Command_Line.Invalid_Switch =>
             Ada.Text_IO.Put_Line
-              ("unrecognized option '" & GNAT.Command_Line.Full_Switch & "'");
+              ("unrecognized option '" & Project.Get_Switch & "'");
 
             Print_Usage_And_Exit;
 
          when GNAT.Command_Line.Invalid_Parameter =>
             Ada.Text_IO.Put_Line
               ("missing or wrong parameter for '-" &
-               GNAT.Command_Line.Full_Switch & "'");
+               Project.Get_Switch & "'");
 
             Print_Usage_And_Exit;
 
@@ -1096,76 +1192,65 @@ package body Parser is
       --  Once we know the list of input files we can parse the information
       --  which is within these files.
 
-      if List_Of_Files.Is_Empty (Input_Files) and then
-        List_Of_Files.Is_Empty (Input_Tmp_Files)
-      then
-         Ada.Text_IO.Put_Line
-           ("Specify at least one .ci (callgraph information) or .o file");
+      if Options.Progress_Information then
+         --  Count Entities
+         List_Of_Files.Iterate (Input_Files, Count_Entities_CI'Access);
+         List_Of_Files.Iterate (Input_Tmp_Files, Count_Entities_ELF'Access);
 
-         Print_Usage_And_Exit;
+         --  Approximate the number of subprograms and calls to analyze by
+         --  the number of subprograms and calls to parse. This is not
+         --  exact because there may be unreachable paths, for example.
 
-      else
-         if Options.Progress_Information then
-            --  Count Entities
-            List_Of_Files.Iterate (Input_Files, Count_Entities_CI'Access);
-            List_Of_Files.Iterate (Input_Tmp_Files, Count_Entities_ELF'Access);
+         Global_Data.Expected_Entities (Global_Data.Analyze_Subprogram) :=
+           Global_Data.Expected_Entities (Global_Data.Parse_Subprogram);
 
-            --  Approximate the number of subprograms and calls to analyze by
-            --  the number of subprograms and calls to parse. This is not
-            --  exact because there may be unreachable paths, for example.
-
-            Global_Data.Expected_Entities (Global_Data.Analyze_Subprogram) :=
-              Global_Data.Expected_Entities (Global_Data.Parse_Subprogram);
-
-            Global_Data.Expected_Entities (Global_Data.Analyze_Call) :=
-              Global_Data.Expected_Entities (Global_Data.Parse_Call);
-         end if;
-
-         --  Process the .ci files
-         List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
-
-         --  Process the .ci files extracted from object files
-         List_Of_Files.Iterate (Input_Tmp_Files, Parse_Input_File'Access);
-
-         if Options.Progress_Information then
-            --  Make sure that parsing is displayed as finished
-
-            Global_Data.Expected_Entities (Global_Data.Parse_Subprogram) :=
-              Global_Data.Entities_Processed (Global_Data.Parse_Subprogram);
-
-            --  -1 because it will be later increased by 1
-
-            Global_Data.Entities_Processed (Global_Data.Parse_Subprogram) :=
-              Global_Data.Entities_Processed (Global_Data.Parse_Subprogram) -
-              1;
-
-            Global_Data.Expected_Entities (Global_Data.Parse_Call) :=
-              Global_Data.Entities_Processed (Global_Data.Parse_Call);
-
-            --  Force printing
-
-            Display.Increase_Count (Global_Data.Parse_Subprogram);
-         end if;
-
-         --  We do not need this list any more, so we destroy the list of
-         --  .ci files. For the list of temporary .ci files (those coming
-         --  from .o files) we delete the files unless the option -k was used
-         --  to keep temporary files.
-
-         List_Of_Files.Iterate (Input_Files, Deallocate_File_Names'Access);
-
-         List_Of_Files.Clear (Input_Files);
-
-         --  Remove temporary files if needed
-
-         if Options.Remove_Temporary_Files then
-            List_Of_Files.Iterate (Input_Tmp_Files, Remove_Files'Access);
-         end if;
-
-         List_Of_Files.Iterate (Input_Tmp_Files, Deallocate_File_Names'Access);
-
-         List_Of_Files.Clear (Input_Tmp_Files);
+         Global_Data.Expected_Entities (Global_Data.Analyze_Call) :=
+           Global_Data.Expected_Entities (Global_Data.Parse_Call);
       end if;
+
+      --  Process the .ci files
+      List_Of_Files.Iterate (Input_Files, Parse_Input_File'Access);
+
+      --  Process the .ci files extracted from object files
+      List_Of_Files.Iterate (Input_Tmp_Files, Parse_Input_File'Access);
+
+      if Options.Progress_Information then
+         --  Make sure that parsing is displayed as finished
+
+         Global_Data.Expected_Entities (Global_Data.Parse_Subprogram) :=
+           Global_Data.Entities_Processed (Global_Data.Parse_Subprogram);
+
+         --  -1 because it will be later increased by 1
+
+         Global_Data.Entities_Processed (Global_Data.Parse_Subprogram) :=
+           Global_Data.Entities_Processed (Global_Data.Parse_Subprogram) - 1;
+
+         Global_Data.Expected_Entities (Global_Data.Parse_Call) :=
+           Global_Data.Entities_Processed (Global_Data.Parse_Call);
+
+         --  Force printing
+
+         Display.Increase_Count (Global_Data.Parse_Subprogram);
+      end if;
+
+      --  We do not need this list any more, so we destroy the list of
+      --  .ci files. For the list of temporary .ci files (those coming
+      --  from .o files) we delete the files unless the option -k was used
+      --  to keep temporary files.
+
+      List_Of_Files.Iterate (Input_Files, Deallocate_File_Names'Access);
+
+      List_Of_Files.Clear (Input_Files);
+
+      --  Remove temporary files if needed
+
+      if Options.Remove_Temporary_Files then
+         List_Of_Files.Iterate (Input_Tmp_Files, Remove_Files'Access);
+      end if;
+
+      List_Of_Files.Iterate (Input_Tmp_Files, Deallocate_File_Names'Access);
+
+      List_Of_Files.Clear (Input_Tmp_Files);
 
       --  Get the list of subprograms to be considered as entry points
 
@@ -3316,12 +3401,14 @@ package body Parser is
       Put_Line ("      s        stack usage (default)");
       Put_Line ("  -p           display paths for entry points (default)");
       Put_Line ("  -pi          display progress information");
+      Put_Line ("  -P=project   load the given project");
       Put_Line ("  -q           quiet: do not display progress information " &
                                "(default)");
       Put_Line ("  -Q           very quiet: do not display any console " &
                                "message (except progress information)");
       Put_Line ("  -r <reg-exp> use all subprograms matching reg-exp as " &
                                "entry points");
+      Put_Line ("  --RTS=rt     use the specified run-time library");
       Put_Line ("  -s=section   name of the section where the .ci is " &
                                "in the object");
       Put_Line ("  -txx         print targets for indirect and dispatching " &
@@ -3329,6 +3416,8 @@ package body Parser is
       Put_Line ("    i          only for indirect calls");
       Put_Line ("    d          only for dispatching calls");
       Put_Line ("    a          for both indirect and dispatching calls");
+      Put_Line ("  --target=tgt computing stack usage for the specified " &
+                                "target (program prefix of the toolchain)");
       Put_Line ("  -u size      default for unknown (external) calls");
       Put_Line ("  -v           verbose");
       Put_Line ("  --version    version information");
@@ -3339,6 +3428,7 @@ package body Parser is
       Put_Line ("    e          turn on warnings for external calls");
       Put_Line ("    i          turn on warnings for indirect calls");
       Put_Line ("  -x           generate the XML output");
+      Put_Line ("  -Xname=val   Set project variable name to val");
       New_Line;
       Put_Line ("  <files>      list of call-graph, object, executable " &
                                "files (a.ci b.o c ...)");
