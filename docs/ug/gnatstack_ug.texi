@@ -1118,6 +1118,18 @@ this case), and the dynamic size of the frame for subprogram @code{Q}.
 Because stack usage information is only generated for Ada or C code, if you
 interface with code written in assembly you may need extra details.
 
+When using a cross compiler with restricted run-time libraries, the
+stack usage information for the run-time libraries is stored together
+with the libraries. The options @option{--target} and @option{--RTS} can
+be used to retrieve the information for the run-time library. These
+options are used the same way as for building the application, as shown
+in the following example:
+
+@smallexample
+$ gprbuild --target=powerpc-elf --RTS=powerpc-elf/zfp-prep -P prj.gpr
+$ gnatstack --target=powerpc-elf --RTS=powerpc-elf/zfp-prep -P prj.gpr
+@end smallexample
+
 @noindent
 @menu
 * AVR::
