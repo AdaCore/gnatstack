@@ -28,7 +28,7 @@ all: ada c++
 ada: $(ADA_TARGETS)
 
 $(ADA_TARGETS):
-	make -C $@ PREFIX=$(PREFIX) RUNTIME=$(RUNTIME)
+	make -C $@ PREFIX=$(PREFIX) RUNTIME=$(RUNTIME) TARGET=$(TARGET)
 
 c++: $(CPLUSPLUS_TARGETS)
 

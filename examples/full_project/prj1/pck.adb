@@ -8,8 +8,10 @@ package body Pck is
 
    procedure Process is
       procedure Inner is
+         function Inc (D : Integer) return Integer;
+         pragma Import (C, Inc, "inc");
       begin
-         Local (10);
+         Local (Inc (10));
       end Inner;
    begin
       Inner;

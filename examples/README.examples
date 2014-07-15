@@ -68,14 +68,14 @@ simple:
 
 simple_project:
 
-    This directory is an introduction to the use of the GNAT Project Manager
-    with GNATstack.
+    This directory is an introduction to the use of project files with
+    GNATstack.
 
 full_project:
 
     This directory is a follow-up to the previous one. It demonstrates how to
-    use some advanced features of the GNAT Project Manager, such as project
-    hierarchies.
+    use some advanced features of project files, such as project hierarchies
+    and mixed-language applications.
 
 problem_detection:
 

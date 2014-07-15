@@ -1,6 +1,12 @@
+ifeq ($(TARGET),)
+TOOL_TARGET=
+else
+TOOL_TARGET=--target=$(TARGET)
+endif
+
 all:
-	$(PREFIX)gnatmake $(RUNTIME) -P prj
-	gnat stack -P prj -U
+	gprbuild $(TOOL_TARGET) $(RUNTIME) -P prj
+	gnatstack $(TOOL_TARGET) $(RUNTIME) -P prj
 
 clean:
 	$(PREFIX)gnatclean -r -P prj

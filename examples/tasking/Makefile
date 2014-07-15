@@ -3,16 +3,22 @@
 IS_ZFP_DIR:=$(shell $(PREFIX)gnatls $(RUNTIME) -v | fgrep adalib | fgrep rts-zfp)
 
 ifeq ($(IS_ZFP_DIR),)
-TARGET=test
+EXEC=test
 else
-TARGET=unsupported
+EXEC=unsupported
 endif
 
-all: $(TARGET)
+ifeq ($(TARGET),)
+GNATSTACK_TARGET=
+else
+GNATSTACK_TARGET=--target=$(TARGET)
+endif
+
+all: $(EXEC)
 
 test:
 	$(PREFIX)gnatmake $(RUNTIME) -P prj;
-	gnat stack -P prj;
+	gnatstack $(GNATSTACK_TARGET) $(RUNTIME) -P prj;
 
 unsupported:
 	echo "Tasking not supported with this run time"
