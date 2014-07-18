@@ -15,14 +15,8 @@ bin/gnatstack$(EXEEXT): force $(EXTRA)
 
 all: bin/gnatstack$(EXEEXT) $(MAYBE_DOC)
 
-doc: docs/ug/gnatstack_ug.html docs/ug/gnatstack_ug.pdf  docs/ug/gnatstack_ug.txt
-
-docs/ug/gnatstack_ug.html: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
-	(cd docs/ug && texi2html  gnatstack_ug.texi)
-docs/ug/gnatstack_ug.pdf: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
-	(cd docs/ug && texi2pdf gnatstack_ug.texi)
-docs/ug/gnatstack_ug.txt: docs/ug/gnatstack_ug.texi docs/ug/gfdl.texi
-	makeinfo --force --no-headers --no-split -o $@ $<
+doc:
+	make -C docs/ug html latexpdf
 
 build-libiberty/Makefile:
 	mkdir -p build-libiberty
@@ -43,17 +37,17 @@ install:
 	if [ ! -d $(prefix)/share/doc/gnatstack ]; then \
 	   mkdir -p $(prefix)/share/doc/gnatstack; \
 	fi
-	if [ -f docs/ug/gnatstack_ug.html ]; then \
-	   cp -p docs/ug/gnatstack_ug.html $(prefix)/share/doc/gnatstack; \
-	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.html; \
+	if [ -d docs/ug/_build/html ]; then \
+	   if [ ! -d $(prefix)/share/doc/gnatstack/html ]; then \
+	      mkdir -p $(prefix)/share/doc/gnatstack/html; \
+	   fi; \
+	   cp -p -r docs/ug/_build/html/* $(prefix)/share/doc/gnatstack/html; \
+	   cp -p docs/ug/_static/adacore.css \
+	      $(prefix)/share/doc/gnatstack/html/_static/; \
 	fi
-	if [ -f docs/ug/gnatstack_ug.pdf ]; then \
-	   cp -p docs/ug/gnatstack_ug.pdf $(prefix)/share/doc/gnatstack; \
-	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.pdf; \
-	fi
-	if [ -f docs/ug/gnatstack_ug.txt ]; then \
-	   cp -p docs/ug/gnatstack_ug.txt $(prefix)/share/doc/gnatstack; \
-	   chmod 644 $(prefix)/share/doc/gnatstack/gnatstack_ug.txt; \
+	if [ -f docs/ug/_build/latex/gnatstack.pdf ]; then \
+	   cp -p docs/ug/_build/latex/gnatstack.pdf \
+	   $(prefix)/share/doc/gnatstack/gnatstack_ug.pdf; \
 	fi
 
 .PHONY: force install all
