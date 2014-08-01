@@ -45,8 +45,8 @@ install:
 	   cp -p docs/ug/_static/adacore.css \
 	      $(prefix)/share/doc/gnatstack/html/_static/; \
 	fi
-	if [ -f docs/ug/_build/latex/gnatstack.pdf ]; then \
-	   cp -p docs/ug/_build/latex/gnatstack.pdf \
+	if [ -f docs/ug/_build/latex/GNATstack.pdf ]; then \
+	   cp -p docs/ug/_build/latex/GNATstack.pdf \
 	   $(prefix)/share/doc/gnatstack/gnatstack_ug.pdf; \
 	fi
 
