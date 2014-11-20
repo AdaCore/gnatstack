@@ -245,10 +245,11 @@ package body Project is
             end if;
 
             --  Get .ci files from the object directories declared in project
-            --  files.
+            --  files. Get both object and ALI paths for all imported projects.
 
             Obj_Dirs := new File_Array'
-              (Tree.Root_Project.Object_Path (Recursive => True));
+              (Tree.Root_Project.Object_Path
+                 (Recursive => True, Including_Libraries => True));
 
             for OD of Obj_Dirs.all loop
                Append_Files_From_Directory
