@@ -143,11 +143,11 @@ package body Project is
             --  -Xname=val switch
             when 'X' =>
                declare
-                  Arg : constant String := GNAT.Command_Line.Full_Switch;
-                  Name_First, Name_Last : Positive;
+                  Arg       : constant String := GNAT.Command_Line.Parameter;
+                  Name_Last : Positive;
+
                begin
-                  Name_First := Arg'First + 2;
-                  Name_Last := Name_First;
+                  Name_Last := Arg'First;
 
                   while Name_Last < Arg'Last
                     and then Arg (Name_Last + 1) /= '='
@@ -158,7 +158,7 @@ package body Project is
                   if Name_Last < Arg'Last - 2 then
                      GNATCOLL.Projects.Change_Environment
                        (Env.all,
-                        Arg (Name_First .. Name_Last),
+                        Arg (Arg'First .. Name_Last),
                         Arg (Name_Last + 2 .. Arg'Last));
 
                   --  Wrong switch
