@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                        Copyright (C) 2014, AdaCore                       --
+--                     Copyright (C) 2014-2015, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -173,6 +173,21 @@ package body Project is
                Options.Project :=
                  new String'(GNAT.Command_Line.Parameter);
 
+            -- long option names --
+            when '-' =>
+               declare
+                  Full : constant String := Project.Get_Switch;
+               begin
+                  --  --target
+                  if  Full = "-target" then
+                     Options.Target := new String'(Project.Get_Parameter);
+
+                  --  --RTS
+                  elsif  Full = "-RTS" then
+                     Options.Runtime := new String'(Project.Get_Parameter);
+                  end if;
+               end;
+
             --  Ignore other switches
             when others =>
                null;
@@ -206,6 +221,9 @@ package body Project is
             use GNATCOLL.VFS;
             use type GNAT.Strings.String_List_Access;
 
+            Tgt : GNAT.Strings.String_Access renames Options.Target;
+            Rt : GNAT.Strings.String_Access renames Options.Runtime;
+
             GNATstack_Switches : constant Attribute_Pkg_List :=
               Build (Package_Name => "Stack", Attribute_Name => "Switches");
 
@@ -217,6 +235,13 @@ package body Project is
             Obj_Dirs : File_Array_Access;
 
          begin
+            --  Override target and run time attributes if they have been set
+            --  from --target and --RTS command line switches.
+
+            Env.Set_Target_And_Runtime
+              (Target  => (if Tgt = null then "" else Tgt.all),
+               Runtime => (if  Rt = null then "" else Rt.all));
+
             --  Look for the project file
 
             if not Path.Is_Regular_File then

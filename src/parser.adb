@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2014, AdaCore                     --
+--                     Copyright (C) 2005-2015, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -729,12 +729,10 @@ package body Parser is
                   elsif Full = "-help" then
                      Print_Help_And_Exit;
 
-                  elsif Full = "-target" then
-                     Options.Target := new String'(Project.Get_Parameter);
-
-                  --  --RTS
-                  elsif Full = "-RTS" then
-                     Options.Runtime := new String'(Project.Get_Parameter);
+                  --  Ignore project related switches (--target, --RTS) because
+                  --  they have already been treated.
+                  elsif Full = "-target" or else Full = "-RTS" then
+                     null;
 
                   --  Wrong option
                   else
@@ -1131,28 +1129,6 @@ package body Parser is
 
          --  Add .ci files coming from the object directories belonging to the
          --  run-time library
-
-         declare
-            Tgt : GNAT.Strings.String_Access renames Options.Target;
-            Rt : GNAT.Strings.String_Access renames Options.Runtime;
-
-            GNAT_Version : GNAT.Strings.String_Access;
-
-            GNATls_Command : constant String :=
-              (if Tgt = null then "" else Tgt.all & '-') &
-              "gnatls" &
-              (if Rt = null then "" else " --RTS=" & Rt.all);
-            --  Command to call gnatls to use. It is "gnatls" for a native
-            --  compiler or "<prefix>-gnatls" for a cross compiler.
-            --  Additionally, it can contain a specific run-time library
-            --  "<prefix>-gnatls --RTS=<runtime>"
-
-         begin
-            Project.Env.Set_Path_From_Gnatls
-              (Gnatls       => GNATls_Command,
-               GNAT_Version => GNAT_Version);
-            GNAT.Strings.Free (GNAT_Version);
-         end;
 
          Predef_Obj_Dirs :=
            new GNATCOLL.VFS.File_Array'(Project.Env.Predefined_Object_Path);
