@@ -328,6 +328,87 @@ for the analysis, the appropriate place to specify them is in the
      end Stack;
   end Prj;
   
+.. _GNATstack_Output:
+
+GNATstack output
+================
+
+The execution of GNATstack produces the maximum stack space required by every
+entry point (including tasks) in the application, together with the paths that
+lead to these stack needs::
+
+  $ gnatstack -P my_project.gpr
+
+  Accumulated stack usage information for entry points
+
+  main : total 408 bytes
+   +-> main
+   +-> main_unit
+   +-> pck.process
+
+The maximum stack consumption for the *main* entry point is 408 bytes, and this
+is a safe bound that can be trusted. The indicated call chain is the path with
+the longest stack consumption from all possible paths starting from *main*.
+
+More details about the locations of the subprograms and their local stack
+frames is displayed using the *-v* switch::
+
+  $ gnatstack -v -P my_project.gpr
+  [...]
+
+  Accumulated stack usage information for entry points
+
+  main : total 408 bytes
+   +-> main at main:b__main_unit.adb:118:4 : 80 bytes
+   +-> main_unit at Main_Unit:main_unit.adb:3:1 : 16 bytes
+   +-> pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14 : 312 bytes
+
+In this case, the first line indicates the total (global) stack requirement of
+408 bytes for the whole call chain (adding up all the frames in the call chain),
+and the following lines contain the individual (local) stack frames for each of
+the subprograms in the call chain.
+
+When the computed stack consumption cannot be safely bound (because of cycles,
+unbounded frames, external calls, or indirect calls) the total stack
+requirements contain a "+?" indication, plus a "*" indication in the frames
+containing missing information. For example, if we add a dynamic variable to
+the previous example we would have the following GNATstack report::
+
+  $ gnatstack -P my_project.gpr
+
+  Worst case analysis is *not* accurate because of unbounded frames.
+  Use -Wa for details.
+
+  Accumulated stack usage information for entry points
+
+  main : total 576+? bytes
+   +-> main
+   +-> main_unit
+   +-> pck.process *
+
+If we add the "-Wa" and "-v" options to GNATstack we get the following
+additional information::
+
+  $  gnatstack -v -Wa -P my_project.gpr
+  [...]
+  
+   Worst case analysis is *not* accurate because of unbounded frames.
+
+   List of reachable subprograms with dynamic unbounded frames:
+
+     In pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14
+
+   Accumulated stack usage information for entry points
+
+   main : total 576+? bytes (unbounded)
+    +-> main at main:b__main_unit.adb:118:4 : 80 bytes
+    +-> main_unit at Main_Unit:main_unit.adb:3:1 : 16 bytes
+    +-> pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14 : 480+? bytes (unbounded)
+
+This analysis indicates that the computed worst case stack usage is not
+accurate. There are 576 bytes needed, plus the amount required by the dynamic
+object declared by subprogram *Process*.
+
 .. _Information_in_Non-Loadable_Section:
 
 Information in Non-Loadable Section
