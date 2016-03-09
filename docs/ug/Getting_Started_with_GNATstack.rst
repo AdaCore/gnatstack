@@ -350,6 +350,20 @@ The maximum stack consumption for the *main* entry point is 408 bytes, and this
 is a safe bound that can be trusted. The indicated call chain is the path with
 the longest stack consumption from all possible paths starting from *main*.
 
+Within GNAT Programming Studio (GPS) the stack usage information is available
+via the :menuselection:`Tools --> Stack Analysis --> Analyze Stack Usage` menu.
+For each of the subprograms the information is displayed in the form of
+annotations containing *local* stack requirements, which refers to a single
+stack frame, and *global* stack requirements, which refers to the worst case
+(with respect to stack usage) call chain starting from the subprogram. In the
+previous example, *local* is the 80 bytes of the *main* subprogram, and
+*global* is 408 bytes (for the call chain where *main* calls *Main_Unit* and
+*Main_Unit* calls *Process*)::
+
+  --  main
+  --
+  --  Stack usage: local: 80 bytes, global: 408 bytes
+
 More details about the locations of the subprograms and their local stack
 frames is displayed using the *-v* switch::
 
@@ -391,23 +405,36 @@ additional information::
 
   $  gnatstack -v -Wa -P my_project.gpr
   [...]
-  
-   Worst case analysis is *not* accurate because of unbounded frames.
+ 
+  Worst case analysis is *not* accurate because of unbounded frames.
 
-   List of reachable subprograms with dynamic unbounded frames:
+  List of reachable subprograms with dynamic unbounded frames:
 
-     In pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14
+    In pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14
 
-   Accumulated stack usage information for entry points
+  Accumulated stack usage information for entry points
 
-   main : total 576+? bytes (unbounded)
-    +-> main at main:b__main_unit.adb:118:4 : 80 bytes
-    +-> main_unit at Main_Unit:main_unit.adb:3:1 : 16 bytes
-    +-> pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14 : 480+? bytes (unbounded)
+  main : total 576+? bytes (unbounded)
+   +-> main at main:b__main_unit.adb:118:4 : 80 bytes
+   +-> main_unit at Main_Unit:main_unit.adb:3:1 : 16 bytes
+   +-> pck.process at Process:pck.adb:2:4,Process:pck.ads:2:14 : 480+? bytes (unbounded)
 
 This analysis indicates that the computed worst case stack usage is not
 accurate. There are 576 bytes needed, plus the amount required by the dynamic
 object declared by subprogram *Process*.
+
+Within GPS, this missing information is expressed with annotations indicating
+the reasons behind the inaccuracy. For the *main* entry point we would have::
+
+  --  main
+  --
+  --  Stack usage: local: 80 bytes, global: 576 bytes (unbounded)
+
+and for the *Process* subprogram we would have::
+
+  --  pck.process
+  --
+  --  Stack usage: local: 480 bytes (unbounded), global: 480 bytes (unbounded)
 
 .. _Information_in_Non-Loadable_Section:
 
