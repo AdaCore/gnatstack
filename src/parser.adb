@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2015, AdaCore                     --
+--                     Copyright (C) 2005-2016, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -695,7 +695,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2014, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2016, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
