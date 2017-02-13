@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2010-2011, AdaCore                     --
+--                     Copyright (C) 2010-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -94,15 +94,15 @@ package body Dispatching_Calls is
 
       begin
          if
-           Static_Class.Derived.Contains (Explored_Method.Vtable_Entry.Class)
-              and then
            Explored_Method /= null
+              and then
+           Static_Class.Derived.Contains (Explored_Method.Vtable_Entry.Class)
               and then
            Explored_Method.Symbol_Name /= null
          then
-            --  The method is overloaded in a class which is a descencent
+            --  The method is overloaded in a class which is a descendent
             --  of the static class used for dispatching, so it is a potential
-            --  canditate for dispatching and we add it to the list.
+            --  candidate for dispatching and we add it to the list.
             --
             --  If we do not have information about the subprogram associated
             --  to the method, it means that the method is abstract, so it
