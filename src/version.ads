@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2015, AdaCore                     --
+--                     Copyright (C) 2005-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,6 +20,6 @@
 ------------------------------------------------------------------------------
 
 package Version is
-   Version_String : constant String := "17.0w";
+   Version_String : constant String := "18.0w";
    --  Static string identifying this version
 end Version;
