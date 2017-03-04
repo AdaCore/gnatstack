@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2015, AdaCore                     --
+--                     Copyright (C) 2005-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -56,7 +56,7 @@
 --  except for some error checking while processing ELF files.
 --
 --  The intention is to split Parse_Input_File the same way as
---  Count_Entities, and get rid of the external extraction (spawing
+--  Count_Entities, and get rid of the external extraction (spawning
 --  objdump) of callgraph info into temp .ci files.
 
 with System.OS_Lib;
@@ -552,7 +552,7 @@ package body Parser is
       use Ada.Directories;
 
       procedure Callback (Directory_Entry : Directory_Entry_Type);
-      --  Subprogram called for each file in the diretory.
+      --  Subprogram called for each file in the directory.
 
       --------------
       -- Callback --
@@ -695,7 +695,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2014, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2017, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
