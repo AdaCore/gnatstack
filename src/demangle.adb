@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2006-2011, AdaCore                     --
+--                     Copyright (C) 2006-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -24,6 +24,8 @@
 with GNAT.Regpat;
 
 with Interfaces.C.Strings;
+with Ada.Directories;
+with Ada.Characters.Handling; use Ada.Characters.Handling;
 
 package body Demangle is
 
@@ -151,12 +153,16 @@ package body Demangle is
    function Is_Ada (File : Static_Stack_Analysis.File_Name) return Boolean is
       use type Static_Stack_Analysis.File_Name;
 
+      File_Extension : constant String :=
+        (if File = null then ""
+         else Ada.Directories.Extension (File.all));
+
    begin
       --  Detected very conservatively by simply looking at the file
-      --  extension and considering it an Ada source file if its extension
-      --  is ".ad?".
-      return File /= null
-        and then File'Length >= 4
-        and then File (File'Last - 3 .. File'Last - 1) = ".ad";
+      --  extension and considering it an Ada source file if it is not a C
+      --  source file.
+
+      return File_Extension'Length < 1 or else
+        To_Lower (File_Extension (File_Extension'First)) /= 'c';
    end Is_Ada;
 end Demangle;
