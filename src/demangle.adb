@@ -31,6 +31,22 @@ package body Demangle is
 
    use type GNAT.Regpat.Match_Location;
 
+   -----------------------
+   -- Expected patterns --
+   -----------------------
+
+   File_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  --  file name
+        ":"                                        &  --  separator
+        "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]+)$");    --  symbol name
+   --  Accepted locations are Unix-style (directories separated by slashes),
+   --  Windows UNC-style (drive_letter:\path or \\server\path), and
+   --  cygwin-style (drive_letter:/path or /path). There is also .extension
+   --  for the file, and file location (:line[:column]). Note that
+   --  sometimes, on cygwin, locations have a pattern with mixed / and \,
+   --  such as /path\file.ext.
+
    ----------------
    -- Ada_Decode --
    ----------------
@@ -109,17 +125,6 @@ package body Demangle is
       Name_First : Integer;
       --  Index to point to the beginning of the subprogram name (removing the
       --  file information).
-
-      File_Regexp : constant String :=
-        "((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &
-        ":" &  -- separator between file name and symbol name
-        "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]+)$";  --  symbol name
-      --  Accepted locations are Unix-style (directories separated by slashes),
-      --  Windows UNC-style (drive_letter:\path or \\server\path), and
-      --  cygwin-style (drive_letter:/path or /path). There is also .extension
-      --  for the file, and file location (:line[:column]). Note that
-      --  sometimes, on cygwin, locations have a pattern with mixed / and \,
-      --  such as /path\file.ext.
 
       Matches : GNAT.Regpat.Match_Array (0 .. 3);
 

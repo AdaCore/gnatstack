@@ -409,8 +409,7 @@ package body Parser is
    --  Demangled name and location information in classes
 
    Subprogram_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
-     GNAT.Regpat.Compile
-       ("^(" & Location_Regexp & ")(,.+)*$");
+     GNAT.Regpat.Compile ("^(" & Location_Regexp & ")(,.+)*$");
    --  Comma-separated list of locations
 
    Data_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
@@ -419,8 +418,7 @@ package body Parser is
    --  Location of an unbounded object
 
    Front_End_Location_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
-     GNAT.Regpat.Compile
-       ("^(" & Location_Regexp & ")( \[.+\])?$");
+     GNAT.Regpat.Compile ("^(" & Location_Regexp & ")( \[.+\])?$");
    --  List of locations using [] for nesting
 
    Create_Task : constant String := "system__tasking__stages__create_task";
@@ -429,9 +427,23 @@ package body Parser is
    --  Subprograms called to create tasks
 
    Dispatching_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
-     GNAT.Regpat.Compile
-       ("([\-]?\d+):([^:,]+),([^:]+)");
+     GNAT.Regpat.Compile ("([\-]?\d+):([^:,]+),([^:]+)");
    --  Look for triple slot:base_class,static_class
+
+   Name_Regexp   : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("([^,]+)(, .*)?$");
+   --  Comma-separated list of names
+
+   Virtual_Set_Regexp  : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("([^\\]+)(\\n\s*.+)?$");
+   --  The information for each virtual method is separated by \n
+
+   Virtual_Info_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile
+       ("([\-]?\d+):([^,]+)(,([\-]?\d+):([^,]+))?" &
+          "(,([\-]?\d+):([^,]+))?$");
+   --  For a given virtual method we have the slot_number:symbol_name,
+   --  and possibly the primary and secondary vtables that it overrides.
 
    ------------------------
    -- Parsing operations --
@@ -2862,9 +2874,6 @@ package body Parser is
       --  Get the list of virtual methods for the class
 
       procedure Get_Parents (Input : String) is
-         Name_Regexp   : constant GNAT.Regpat.Pattern_Matcher :=
-           GNAT.Regpat.Compile ("([^,]+)(, .*)?$");
-
          Match_Parents : GNAT.Regpat.Match_Array (0 .. 2);
 
          Parent        : Class_Access;
@@ -2937,17 +2946,6 @@ package body Parser is
       end Get_Parents;
 
       procedure Get_Virtuals (Input : String) is
-         Virtual_Set_Regexp  : constant GNAT.Regpat.Pattern_Matcher :=
-           GNAT.Regpat.Compile ("([^\\]+)(\\n\s*.+)?$");
-         --  The information for each virtual method is separated by \n
-
-         Virtual_Info_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
-           GNAT.Regpat.Compile
-             ("([\-]?\d+):([^,]+)(,([\-]?\d+):([^,]+))?" &
-              "(,([\-]?\d+):([^,]+))?$");
-         --  For a given virtual method we have the slot_number:symbol_name,
-         --  and possibly the primary and secondary vtables that it overrides.
-
          Match_Virtual       : GNAT.Regpat.Match_Array (0 .. 2);
 
          Match_Info          : GNAT.Regpat.Match_Array (0 .. 8);
