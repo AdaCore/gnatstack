@@ -16,7 +16,7 @@ call-graph information. The *-fcallgraph-info=su* compiler
 switch outputs this information on a per-file basis in the common VCG
 format::
 
-  $ gnatmake main_unit.adb -cargs -fcallgraph-info=su
+  $ gprbuild main_unit.adb -cargs -fcallgraph-info=su
 
 The use of this compiler switch generates a :file:`.ci` file for every
 compilation unit.

@@ -1,7 +1,13 @@
+ifeq ($(TARGET),)
+TOOL_TARGET=
+else
+TOOL_TARGET=--target=$(TARGET)
+endif
+
 all:
-	$(PREFIX)gcc -c -gnatp $(RUNTIME) ext.adb
-	$(PREFIX)gnatmake -gnatp -gnat05 $(RUNTIME) p -cargs -fcallgraph-info=su,da
-	gnatstack -p -Wa -v -x *.ci
+	-gprbuild $(TOOL_TARGET) $(RUNTIME) -P prj
+	gnatstack $(TOOL_TARGET) $(RUNTIME) -P prj
 
 clean:
-	rm -f *.o *.ali b~* *.ci p$(EXE) undefined.ciu graph.vcg
+	gprclean -P prj
+	rm -f *.ci undefined.ciu graph.vcg

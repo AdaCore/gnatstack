@@ -5,7 +5,7 @@ GNATSTACK_TARGET=--target=$(TARGET)
 endif
 
 all:
-	-$(PREFIX)gnatmake $(RUNTIME) main_unit -cargs -fcallgraph-info=su
+	-gprbuild $(GNATSTACK_TARGET) $(RUNTIME) main_unit -cargs -fcallgraph-info=su
 	gnatstack $(GNATSTACK_TARGET) $(RUNTIME) -p *.ci
 
 clean:

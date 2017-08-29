@@ -53,7 +53,7 @@ option for the stack analysis phase:
 We can then easily compile and analyze the application using this
 project file::
 
-  $ gnatmake -P prj.gpr
+  $ gprbuild -P prj.gpr
   [...]
   $ gnatstack -P prj.gpr
   Accumulated stack usage information for entry points
@@ -131,7 +131,7 @@ computation of stack requirements we can use the following example:
 To compile and analyze this program we do::
 
   $ gcc -c ext.adb
-  $ gnatmake p.adb -cargs -fcallgraph-info=su,da
+  $ gprbuild p.adb -cargs -fcallgraph-info=su,da
   [...]
   $ gnatstack *.ci
   [...]

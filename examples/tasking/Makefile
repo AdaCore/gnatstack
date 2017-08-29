@@ -17,12 +17,12 @@ endif
 all: $(EXEC)
 
 test:
-	$(PREFIX)gnatmake $(RUNTIME) -P prj;
+	-gprbuild $(GNATSTACK_TARGET) $(RUNTIME) -P prj;
 	gnatstack $(GNATSTACK_TARGET) $(RUNTIME) -P prj;
 
 unsupported:
 	echo "Tasking not supported with this run time"
 
 clean:
-	$(PREFIX)gnatclean -P prj
+	gprclean -P prj
 	rm -f *.ci undefined.ciu graph.vcg
