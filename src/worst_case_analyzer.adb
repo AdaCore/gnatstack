@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -163,8 +163,6 @@ package body Worst_Case_Analyzer is
       Call : constant Static_Stack_Analysis.Edge_Id :=
         Static_Stack_Analysis.List_Of_Edges.First (Node.Target_Calls);
       --  The longest path is the one in the first position of the sorted list
-
-      use type Static_Stack_Analysis.Edge_Id;
 
    begin
       --  Stop if we find a cycle

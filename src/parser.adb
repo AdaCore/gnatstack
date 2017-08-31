@@ -91,8 +91,6 @@ with Demangle;
 
 package body Parser is
 
-   use type Static_Stack_Analysis.Node_Id;
-   use type Static_Stack_Analysis.Stack_Usage_Info;
    use type Static_Stack_Analysis.Location;
    use type GNAT.Regpat.Match_Location;
    use type GNAT.Strings.String_Access;

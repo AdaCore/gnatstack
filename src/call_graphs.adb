@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -96,7 +96,6 @@ package body Call_Graphs is
      (Cycle : Static_Stack_Analysis.Cycle;
       Node  : Static_Stack_Analysis.Node_Id)
    is
-      use type Static_Stack_Analysis.Edge_Id;
       use type Static_Stack_Analysis.Node_Id;
 
       Explored_Node : constant Static_Stack_Analysis.Node_Class_Access :=

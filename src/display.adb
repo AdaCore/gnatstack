@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -38,7 +38,6 @@ package body Display is
 
    use Ada.Strings.Fixed;
 
-   use type Static_Stack_Analysis.List_Of_Locations.Set;
    use type Static_Stack_Analysis.Name;
    use type Static_Stack_Analysis.Frame_Size;
 
@@ -412,7 +411,6 @@ package body Display is
       Location : constant Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
 
-      use type Ada.Text_IO.File_Access;
       use type Static_Stack_Analysis.File_Name;
 
    begin
@@ -702,8 +700,6 @@ package body Display is
    is
       Location : constant Static_Stack_Analysis.Location :=
         Static_Stack_Analysis.List_Of_Locations.Element (Position);
-
-      use type Ada.Text_IO.File_Access;
 
    begin
       if not Options.Very_Quiet then
@@ -1387,8 +1383,6 @@ package body Display is
 
          Callee : constant String :=
            Static_Stack_Analysis.Get_Subprogram_Name (Target.all).all;
-
-         use type Static_Stack_Analysis.File_Name;
 
       begin
          --  Print both to the VCG file containing the call graph and to the
