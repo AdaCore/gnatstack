@@ -41,7 +41,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'GNATstack'
-copyright = u'2006-2015, AdaCore'
+copyright = u'2006-2017, AdaCore'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
