@@ -710,16 +710,18 @@ package body Parser is
       end Print_Version;
 
    begin
-      --  First we get the projects related switches
-
-      Parser.Project.Get_Project_Info;
-
       --  Get options
 
       declare
          Predef_Obj_Dirs : GNATCOLL.VFS.File_Array_Access;
 
       begin
+         --  First we get the projects related switches
+
+         Parser.Project.Get_Project_Info;
+
+         --  Then, parse switches not related to projects
+
          loop
             case Project.Get_Option is
             when ASCII.NUL =>

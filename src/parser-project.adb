@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2014-2015, AdaCore                     --
+--                     Copyright (C) 2014-2017, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -53,7 +53,8 @@ package body Project is
    -----------------------
 
    procedure Parse_Options;
-   --  Parse the command line options to get the options we want: -X, -P
+   --  Parse the command line options to get the options we want: -X, -P,
+   --  --target, --RTS
 
    procedure Parse_Project_File;
    --  Process project file hierarchy
@@ -123,7 +124,11 @@ package body Project is
 
    procedure Get_Project_Info is
    begin
+      --  Parse command-line to get options needed to handle projects (-X, -P,
+      --  --target, --RTS)
       Parse_Options;
+
+      --  Parse options in package Stack from project file
       Parse_Project_File;
    end Get_Project_Info;
 
@@ -188,7 +193,7 @@ package body Project is
                   end if;
                end;
 
-            --  Ignore other switches
+            --  Ignore other switches (those not related to projects)
             when others =>
                null;
          end case;
