@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2017, AdaCore                     --
+--                     Copyright (C) 2005-2018, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -104,20 +104,8 @@ package body Call_Graphs is
       Next_Node : Static_Stack_Analysis.Node_Id;
       --  Next node to be added to the path that makes up the cycle
 
-      Found : Boolean := False;
-      --  Set to True when the next node in the cycle has been found
-
       Index : Static_Stack_Analysis.Edge_Id;
       --  Index used to explore calls made by this subprogram
-
-      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge);
-      --  Check whether the target of this call is part ot the cycle that we
-      --  are analyzing.
-
-      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge) is
-      begin
-         Found := Target.Under_Analysis;
-      end Is_Under_Analysis;
 
    begin
       --  Get the edge that is under analysis. We start from the last edge
@@ -127,10 +115,11 @@ package body Call_Graphs is
       Index := Explored_Node.Target_Calls.Last;
 
       loop
-         Static_Stack_Analysis.List_Of_Edges.Query_Element
-           (Index, Is_Under_Analysis'Access);
+         --  Check whether the target of this call is part ot the cycle that we
+         --  are analyzing.
 
-         exit when Found;
+         exit when
+           Static_Stack_Analysis.List_Of_Edges.Element (Index).Under_Analysis;
 
          Static_Stack_Analysis.List_Of_Edges.Previous (Index);
 
@@ -310,19 +299,6 @@ package body Call_Graphs is
 
       Cycle_Counter : Natural := 1;
 
-      procedure Tag_Cycle
-        (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor);
-      --  Allocate unique identifiers to the cycles (their position in the
-      --  global list of cycles.
-
-      procedure Tag_Cycle
-        (Cycle : Static_Stack_Analysis.List_Of_Cycles.Cursor) is
-      begin
-         Static_Stack_Analysis.List_Of_Cycles.Element (Cycle).Id :=
-           Cycle_Counter;
-         Cycle_Counter := Cycle_Counter + 1;
-      end Tag_Cycle;
-
    --  Start of processing for Analyze_Call_Graph
    begin
       --  Iterate over all the subprograms
@@ -347,9 +323,13 @@ package body Call_Graphs is
       end if;
 
       if Global_Data.Entities_Processed (Global_Data.Cycle) > 0 then
-         --  Allocate unique identifiers to the cycles
+         --  Allocate unique identifiers to the cycles (their position in the
+         --  global list of cycles).
 
-         Global_Data.Cycles.Iterate (Tag_Cycle'Access);
+         for Cycle of Global_Data.Cycles loop
+            Cycle.Id := Cycle_Counter;
+            Cycle_Counter := Cycle_Counter + 1;
+         end loop;
 
          if not Options.Very_Quiet then
             Ada.Text_IO.New_Line;
@@ -378,31 +358,6 @@ package body Call_Graphs is
       --  Boolean indicating whether the cycle is new or not
       Ignore : Static_Stack_Analysis.List_Of_Cycles.Cursor;
 
-      procedure Mark_Nodes
-        (Position : Static_Stack_Analysis.Paths.Cursor);
-      --  Mark the referenced node as belonging to the detected cycle
-
-      procedure Mark_Nodes
-        (Position : Static_Stack_Analysis.Paths.Cursor)
-      is
-         Element : constant Static_Stack_Analysis.Node_Class_Access :=
-           Static_Stack_Analysis.List_Of_Nodes.Element
-             (Static_Stack_Analysis.Paths.Element
-                  (Position).Source_Node);
-
-         use Static_Stack_Analysis;
-      begin
-         --  Add the cycle to the list of cycles for this node
-
-         Element.Cycles.Insert (New_Cycle);
-
-         --  Its stack usage includes an unspecified part because of the cycle
-         if Element.all in Explicit_Node'Class then
-            Explicit_Node (Element.all).Stack_Info.Cycle_Usage :=
-              Static_Stack_Analysis.Frame_Size (Options.Default_Cycle);
-         end if;
-      end Mark_Nodes;
-
    begin
       --  Now we need to extract and identify this cycle. We need to
       --  follow the path marked by the Under_Analysis flag.
@@ -425,9 +380,30 @@ package body Call_Graphs is
          Free (New_Cycle);
 
       else
-         --  Mark the nodes as belonging to this cycle
+         --  Mark the nodes in the cycle as belonging to this cycle
 
-         New_Cycle.Path.Iterate (Mark_Nodes'Access);
+         for Path_Element of New_Cycle.Path loop
+            declare
+               Node : constant Static_Stack_Analysis.Node_Class_Access :=
+                 Static_Stack_Analysis.List_Of_Nodes.Element
+                   (Path_Element.Source_Node);
+               --  Subprogram in the cycle
+
+               use Static_Stack_Analysis;
+
+            begin
+               --  Add the cycle to the list of cycles for this node
+
+               Node.Cycles.Insert (New_Cycle);
+
+               --  Its stack usage includes an unspecified part because of the
+               --  cycle.
+               if Node.all in Explicit_Node'Class then
+                  Explicit_Node (Node.all).Stack_Info.Cycle_Usage :=
+                    Static_Stack_Analysis.Frame_Size (Options.Default_Cycle);
+               end if;
+            end;
+         end loop;
 
          --  Increase the count of cycles analyzed
 
@@ -454,6 +430,10 @@ package body Call_Graphs is
      (Node     : Static_Stack_Analysis.Node_Class_Access;
       Position : Static_Stack_Analysis.Node_Id) return Boolean
    is
+      Name : constant Static_Stack_Analysis.Name :=
+        Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
+      --  Subprogram name of the node being analyzed
+
       function Ada_Binder_Main return Boolean;
       --  Look for the typical Ada entry point which is identified by the
       --  symbol "main". Sometimes, the main Ada entry point is not "main" but
@@ -461,55 +441,24 @@ package body Call_Graphs is
       --  calling a procedure whose name is its own name prefixed by "_ada_".
 
       function Ada_Binder_Main return Boolean is
-         Index : Static_Stack_Analysis.Edge_Id;
-         --  Index used to explore calls made by this subprogram
-
-         Name : Static_Stack_Analysis.Name;
-
-         Found : Boolean := False;
-
-         procedure Calls_Ada_Main (Call : Static_Stack_Analysis.Edge);
-         --  If this call represents a call from XXX to _ada_XXX then we have
-         --  found the main Ada entry point.
-
-         procedure Calls_Ada_Main (Call : Static_Stack_Analysis.Edge) is
-            Called : constant Static_Stack_Analysis.Node_Class_Access :=
-              Static_Stack_Analysis.List_Of_Nodes.Element (Call.Target);
-         begin
-            Found :=
-              Static_Stack_Analysis.Get_Subprogram_Name (Called.all).all =
-              "_ada_" & Name.all;
-         end Calls_Ada_Main;
-
       begin
+         --  Already found, we do not need to look further
          if Main_Found then
             return False;
 
          --  Look for the main Ada entry point
+         elsif Name.all = "main" then
+            Main_Found := True;
+            return True;
+
+         --  If this call represents a call from XXX to _ada_XXX then we have
+         --  found the main Ada entry point.
          else
-            Name := Static_Stack_Analysis.Get_Subprogram_Name (Node.all);
-
-            if Name.all = "main" then
-               Main_Found := True;
-               return True;
-            else
-               Index := Node.Target_Calls.First;
-
-               while
-                 Static_Stack_Analysis.List_Of_Edges.Has_Element (Index)
-               loop
-                  Static_Stack_Analysis.List_Of_Edges.Query_Element
-                    (Index, Calls_Ada_Main'Access);
-
-                  if Found then
-                     return True;
-                  else
-                     Static_Stack_Analysis.List_Of_Edges.Next (Index);
-                  end if;
-               end loop;
-
-               return False;
-            end if;
+            Main_Found :=
+              (for some Callee of Node.Target_Calls =>
+                 Static_Stack_Analysis.List_Of_Nodes.Element (Callee.Target).
+                   Get_Subprogram_Name.all = "_ada_" & Name.all);
+            return Main_Found;
          end if;
       end Ada_Binder_Main;
 
@@ -554,7 +503,6 @@ package body Call_Graphs is
       --  expression).
       else
          return Global_Data.Entry_Points.Contains (Position);
-
       end if;
    end Is_Entry_Point;
 
@@ -563,20 +511,7 @@ package body Call_Graphs is
    -------------------------------
 
    procedure Mark_Tree_End_Of_Analysis
-     (Node : Static_Stack_Analysis.Node_Class_Access)
-   is
-      procedure Mark_End_Of_Analysis
-        (Position : Static_Stack_Analysis.Edge_Id);
-      --  Mark the target node as analyzed
-
-      procedure Mark_End_Of_Analysis
-        (Position : Static_Stack_Analysis.Edge_Id) is
-      begin
-         Mark_Tree_End_Of_Analysis
-           (Static_Stack_Analysis.List_Of_Nodes.Element
-              (Static_Stack_Analysis.List_Of_Edges.Element (Position).Target));
-      end Mark_End_Of_Analysis;
-
+     (Node : Static_Stack_Analysis.Node_Class_Access) is
    begin
       --  Nothing else to do if the node is already marked as analyzed. If not,
       --  mark this node as analyzed and all the nodes recursively called by
@@ -585,8 +520,10 @@ package body Call_Graphs is
       if not Node.Analysis_Finished then
          Node.Analysis_Finished := True;
 
-         Static_Stack_Analysis.List_Of_Edges.Iterate
-           (Node.Target_Calls, Mark_End_Of_Analysis'Access);
+         for Call of Node.Target_Calls loop
+            Mark_Tree_End_Of_Analysis
+              (Static_Stack_Analysis.List_Of_Nodes.Element (Call.Target));
+         end loop;
       end if;
    end Mark_Tree_End_Of_Analysis;
 
@@ -599,23 +536,11 @@ package body Call_Graphs is
       This_Node : constant Static_Stack_Analysis.Node_Class_Access :=
         Static_Stack_Analysis.List_Of_Nodes.Element (From);
 
-      Found : Boolean := False;
-      --  Set to True when the next node in the path has been found
-
       Next_Node : Static_Stack_Analysis.Node_Id;
       --  Next node in the path to the cycle
 
       Index : Static_Stack_Analysis.Edge_Id;
       --  Index used to explore calls made by this subprogram
-
-      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge);
-      --  Check whether the target of this call is part ot the cycle that we
-      --  are analyzing.
-
-      procedure Is_Under_Analysis (Target : Static_Stack_Analysis.Edge) is
-      begin
-         Found := Target.Under_Analysis;
-      end Is_Under_Analysis;
 
       use type Static_Stack_Analysis.Node_Id;
 
@@ -630,10 +555,10 @@ package body Call_Graphs is
       Index := This_Node.Target_Calls.Last;
 
       loop
-         Static_Stack_Analysis.List_Of_Edges.Query_Element
-           (Index, Is_Under_Analysis'Access);
-
-         exit when Found;
+         --  Check whether the target of this call is part ot the cycle that we
+         --  are analyzing.
+         exit when
+           Static_Stack_Analysis.List_Of_Edges.Element (Index).Under_Analysis;
 
          Static_Stack_Analysis.List_Of_Edges.Previous (Index);
 

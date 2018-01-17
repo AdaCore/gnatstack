@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2017, AdaCore                     --
+--                     Copyright (C) 2005-2018, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -565,7 +565,12 @@ package body Display is
 
    procedure Print_Biggest_Frames (Frames : Natural) is
       function Local_Usage_Ordering
-        (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean;
+        (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean is
+        (Static_Stack_Analysis."<"
+           (Static_Stack_Analysis.Get_Stack_Usage
+              (Static_Stack_Analysis.List_Of_Nodes.Element (Right).all),
+            Static_Stack_Analysis.Get_Stack_Usage
+              (Static_Stack_Analysis.List_Of_Nodes.Element (Left).all)));
       --  Returns True if Left has a local stack usage greater than Right,
       --  False otherwise. It is used for ordering sets of nodes according
       --  to their local stack usage (in decreasing order).
@@ -586,17 +591,6 @@ package body Display is
 
       Big_Frames : Static_Stack_Analysis.List_Of_Node_Ids.Vector;
       --  List of subprograms with the biggest local stack usage
-
-      function Local_Usage_Ordering
-        (Left, Right : Static_Stack_Analysis.Node_Id) return Boolean is
-      begin
-         return
-           Static_Stack_Analysis."<"
-             (Static_Stack_Analysis.Get_Stack_Usage
-                (Static_Stack_Analysis.List_Of_Nodes.Element (Right).all),
-              Static_Stack_Analysis.Get_Stack_Usage
-                (Static_Stack_Analysis.List_Of_Nodes.Element (Left).all));
-      end Local_Usage_Ordering;
 
       procedure Get_Biggest_Frame
         (Position : Static_Stack_Analysis.Node_Id)
@@ -788,10 +782,6 @@ package body Display is
       --  Print the longest path for the specified subprogram
 
       procedure Print_Longest_Path
-        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor);
-      --  Print the longest path for the specified entry point
-
-      procedure Print_Longest_Path
         (Position : Static_Stack_Analysis.Node_Id)
       is
          Path : Static_Stack_Analysis.Paths.Vector :=
@@ -832,13 +822,6 @@ package body Display is
          end if;
       end Print_Longest_Path;
 
-      procedure Print_Longest_Path
-        (Position : Static_Stack_Analysis.List_Of_Node_Ids.Cursor) is
-      begin
-         Print_Longest_Path
-           (Static_Stack_Analysis.List_Of_Node_Ids.Element (Position));
-      end Print_Longest_Path;
-
       use type Options.Order_Type;
 
    begin
@@ -854,8 +837,10 @@ package body Display is
 
       Open_Tag ("entryset");
 
-      Static_Stack_Analysis.List_Of_Node_Ids.Iterate
-        (Global_Data.Entry_Points, Print_Longest_Path'Access);
+      for Entry_Point of Global_Data.Entry_Points loop
+         --  Print the longest path for each entry point
+         Print_Longest_Path (Entry_Point);
+      end loop;
 
       Close_Tag ("entryset");
    end Print_Longest_Paths;
