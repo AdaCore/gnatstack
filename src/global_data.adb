@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2018, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -24,6 +24,14 @@ with GNAT.Regpat;
 
 package body Global_Data is
 
+   Task_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
+     GNAT.Regpat.Compile ("(T(K)?B([\.|\$]([0-9]+))?)$");
+   --  Entry points for library-level tasks are symbols like:
+   --  my_package__tTKB, my_package__tB, or my_package__tB.1.
+   --  Non-library-level tasks have symbols like:
+   --  my_package.adb:my_package__my_proc__tTKB$1 or
+   --  my_package.adb:my_package__my_proc__tTB$1.
+
    -------------------
    -- Is_Task_Entry --
    -------------------
@@ -34,7 +42,7 @@ package body Global_Data is
       --  ??? This pattern matching is not accurate. It will notify as task
       --  entry points subprograms that are not.
 
-      return GNAT.Regpat.Match ("(TKB|[^\\_]B|B\.([0-9]+))$", Name.all);
+      return GNAT.Regpat.Match (Task_Regexp, Name.all);
    end Is_Task_Entry;
 
 end Global_Data;
