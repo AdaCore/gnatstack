@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2017, AdaCore                     --
+--                     Copyright (C) 2005-2018, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -370,6 +370,11 @@ package body Parser is
      GNAT.Regpat.Compile ("^\s*(}|--|$)");
    --  Ada comments and blank lines are allowed
 
+   Demangled_Name_Regexp : constant String :=
+     "&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=|" &  -- Unary operators
+     "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*";
+   --  Accepted subprogram names
+
    Location_Regexp : constant String :=
      "(<no location>)|" &  -- Encoding for no location
      "(<built-in>.*|<internal>.*)|" &  -- Location for built-in functions
@@ -388,9 +393,8 @@ package body Parser is
 
    Node_Label_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
      GNAT.Regpat.Compile
-       ("^ label: " &
-        """((&|\*|\*\*|\+|\-|/|/=|<|<=|>|>=|=|" &  -- Unary operators
-        "[\w \(\):,\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]*)\\n)?" &  -- Demangled name
+       ("^ label: """ &
+        "((" & Demangled_Name_Regexp & ")(\.[\w\d\.]*)?\\n)?" &
         "((" & Location_Regexp & ",?)*(\\n)?)?" &
         "(" & Stack_Regexp & ")?" &
         "(\\n\d+ dynamic objects(\\n .*)?)?""$");
@@ -1881,7 +1885,7 @@ package body Parser is
       Stack           : out Static_Stack_Analysis.Stack_Usage_Info;
       Dynamic_Objects : out Static_Stack_Analysis.List_Of_Locations.Set)
    is
-      Matches : GNAT.Regpat.Match_Array (0 .. 17);
+      Matches : GNAT.Regpat.Match_Array (0 .. 18);
 
    begin
       GNAT.Regpat.Match (Node_Label_Regexp, Input, Matches);
@@ -1927,11 +1931,11 @@ package body Parser is
 
          --  Subprogram location
 
-         if Matches (3) /= GNAT.Regpat.No_Match and then
-           Matches (4) /= GNAT.Regpat.No_Match
+         if Matches (4) /= GNAT.Regpat.No_Match and then
+           Matches (5) /= GNAT.Regpat.No_Match
          then
             Parse_Node_Locations
-              (Input (Matches (4).First .. Matches (4).Last),
+              (Input (Matches (5).First .. Matches (5).Last),
                Demangled,
                Locations);
          else
@@ -1941,9 +1945,9 @@ package body Parser is
 
          --  Stack usage
 
-         if Matches (13) /= GNAT.Regpat.No_Match then
+         if Matches (14) /= GNAT.Regpat.No_Match then
             Parse_Stack_Usage
-              (Input (Matches (13).First .. Matches (13).Last), Stack);
+              (Input (Matches (14).First .. Matches (14).Last), Stack);
          else
             Stack := Static_Stack_Analysis.Unknown_Stack_Usage;
             Stack.Unknown_Usage :=
@@ -1952,9 +1956,9 @@ package body Parser is
 
          --  Dynamic objects
 
-         if Matches (17) /= GNAT.Regpat.No_Match then
+         if Matches (18) /= GNAT.Regpat.No_Match then
             Parse_Dynamic_Objects
-              (Input (Matches (17).First .. Matches (17).Last),
+              (Input (Matches (18).First .. Matches (18).Last),
                Dynamic_Objects);
          else
             Dynamic_Objects :=
