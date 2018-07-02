@@ -25,13 +25,13 @@ with GNAT.Regpat;
 package body Global_Data is
 
    Task_Regexp : constant GNAT.Regpat.Pattern_Matcher :=
-     GNAT.Regpat.Compile ("((TKB|TKBX|B|TB)([\.|\$]([0-9]+))?)$");
+     GNAT.Regpat.Compile ("((TKB|TKBX|B|TB)([\.|\$]??[0-9]+)?)$");
    --  Entry points for library-level tasks are symbols like:
-   --  my_package__tTKB, my_package__tB, my_package__tB.1, or
-   --  my_package__tTKBX.
+   --  my_package__tTKB, my_package__tB, my_package__tB.nn,
+   --  my_package__tTKBX, or my_package__tTKBXnn.
    --  Non-library-level tasks have symbols like:
-   --  my_package.adb:my_package__my_proc__tTKB$1 or
-   --  my_package.adb:my_package__my_proc__tTB$1.
+   --  my_package.adb:my_package__my_proc__tTKB$nn or
+   --  my_package.adb:my_package__my_proc__tTB$nn.
 
    -------------------
    -- Is_Task_Entry --
