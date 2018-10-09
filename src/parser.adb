@@ -709,7 +709,7 @@ package body Parser is
       begin
          Ada.Text_IO.Put      ("GNATstack Pro ");
          Ada.Text_IO.Put_Line (Version.Version_String);
-         Ada.Text_IO.Put_Line ("Copyright 2005-2017, AdaCore");
+         Ada.Text_IO.Put_Line ("Copyright 2005-2018, AdaCore");
          Ada.Text_IO.New_Line;
       end Print_Version;
 
