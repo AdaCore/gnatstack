@@ -1,0 +1,5 @@
+[gerrit]
+host = git.adacore.com
+project = gnatstack
+defaultbranch=17.1
+defaultremote=origin
