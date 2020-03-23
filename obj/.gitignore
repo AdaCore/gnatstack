@@ -1,0 +1,5 @@
+# This file is present to be able to commit the directory obj.
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore
