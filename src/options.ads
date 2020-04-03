@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2017, AdaCore                     --
+--                     Copyright (C) 2005-2020, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,6 +20,8 @@
 ------------------------------------------------------------------------------
 
 with GNAT.Strings;
+
+with GNATCOLL.VFS;
 
 with Static_Stack_Analysis;
 
@@ -132,4 +134,8 @@ package Options is
    Target : GNAT.Strings.String_Access := null;
    --  Name of the prefix for cross compilers
 
+   use GNATCOLL.VFS;
+   Obj_Dir : Virtual_File := No_File;
+   --  Virtual_File corresponding to the 'Object_Dir' of a project.
+   --
 end Options;

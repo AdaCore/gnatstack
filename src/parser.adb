@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2018, AdaCore                     --
+--                     Copyright (C) 2005-2020, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -735,6 +735,8 @@ package body Parser is
             when '-' =>
                declare
                   Full : constant String := Project.Get_Switch;
+                  use GNATCOLL.VFS;
+                  Subdir : Virtual_File := No_File;
                begin
                   --  --version
                   if Full = "-version" and then not Options.Verbose then
@@ -744,6 +746,29 @@ package body Parser is
                   --  --help
                   elsif Full = "-help" then
                      Print_Help_And_Exit;
+
+                  --  Gives the sub directory in which gnatstack will find its
+                  --  artifacts (in our case the .ci files) relative to the
+                  --  project Object_Dir.
+                  elsif Full = "-subdirs=" then
+
+                     if Options.Project = null then
+                        Ada.Text_IO.Put_Line ("--subdirs switch must be" &
+                                              " used with the -P switch");
+                        GNAT.OS_Lib.OS_Exit (1);
+                     end if;
+
+                     Subdir := Options.Obj_Dir / (+Project.Get_Parameter);
+
+                     if not Is_Directory (Subdir) then
+                        Ada.Text_IO.Put_Line ("sub-directory passed to " &
+                                              "--subdirs is not a" &
+                                              " directory or does not exist");
+                        GNAT.OS_Lib.OS_Exit (1);
+                     end if;
+
+                     Append_Files_From_Directory
+                              (Input_Files, Display_Full_Name (Subdir));
 
                   --  Ignore project related switches (--target, --RTS) because
                   --  they have already been treated.
@@ -3389,6 +3414,9 @@ package body Parser is
       Put_Line ("  --RTS=rt     use the specified run-time library");
       Put_Line ("  -s=section   name of the section where the .ci is " &
                                "in the object");
+      Put_Line ("  --subdirs dir name of the subdirectory relative to the" &
+                               "Object_Dir of the project where GNATstack " &
+                               "will find the .ci files");
       Put_Line ("  -txx         print targets for indirect and dispatching " &
                                "calls");
       Put_Line ("    i          only for indirect calls");

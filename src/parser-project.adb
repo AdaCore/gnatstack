@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2014-2017, AdaCore                     --
+--                     Copyright (C) 2014-2020, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -20,9 +20,12 @@
 ------------------------------------------------------------------------------
 
 with Ada.Text_IO;
+with Ada.Strings.Unbounded;
 
 with GNAT.Command_Line;
 with GNAT.Strings;
+
+with GNATCOLL.Strings;
 
 with Options;
 
@@ -35,7 +38,7 @@ package body Project is
 
    Valid_Options : constant String :=
      "a aO: ca c: d: e: f: files= g h -help k l: np o= oc= p pi P: q Q r: " &
-     "-RTS= s= t! -target= u: v -version W! x X!";
+     "-RTS= s= t! -subdirs=: -target= u: v -version W! x X!";
 
    --  Accepted switches
    Tree : GNATCOLL.Projects.Project_Tree;
@@ -273,6 +276,9 @@ package body Project is
 
                Project_Opts_Finished := False;
             end if;
+
+            --  Get the 'Object_Dir' attribute value.
+            Options.Obj_Dir := Object_Dir (Tree.Root_Project);
 
             --  Get .ci files from the object directories declared in project
             --  files. Get both object and ALI paths for all imported projects.
