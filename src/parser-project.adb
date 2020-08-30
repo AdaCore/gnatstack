@@ -25,8 +25,6 @@ with Ada.Strings.Unbounded;
 with GNAT.Command_Line;
 with GNAT.Strings;
 
-with GNATCOLL.Strings;
-
 with Options;
 
 separate (Parser)
