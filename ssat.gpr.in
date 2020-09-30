@@ -26,7 +26,7 @@ project Ssat is
    end Builder;
 
    package Ide is
-      for Vcs_Kind use "Subversion";
+      for Vcs_Kind use "Git";
    end Ide;
 
 end Ssat;
