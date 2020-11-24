@@ -1,20 +1,51 @@
 #!/bin/sh
 
-prefix=
-gnatstack="gnatstack"
+prefix=""
+installdir=""
+
+# --------------------- Actual Installation of Gnatstack --------------
+do_install ()
+{
+    if [ ! -d $installdir ]; then
+        mkdir -p $installdir || exit 1
+    fi
+
+    tar cf - bin share | (cd $installdir && tar xf -)
+
+    echo " "
+    echo "gnatstack has been installed in $installdir"
+    echo "Thank you for using gnatstack !"
+    echo " "
+}
+
+if [ $# -eq 1 ]; then
+  if [ "$1" = "--help" ]; then
+    cat << EOF
+   Usage: $0 [install_dir]
+
+   When no argument is specified, runs the gnatstack installer
+   interactively, otherwise installs automatically under install_dir.
+EOF
+  else
+    echo "    installing gnatstack under $1"
+    installdir="$1"
+    do_install
+  fi
+  exit 0
+fi
 
 clear
 cat << EOF
 
 
   This script is provided to simplify the installation of the binary
-  distribution of the $gnatstack static analysis tool. This includes the
-  $gnatstack binary as well as the corresponding documentation and examples.
+  distribution of the gnatstack static analysis tool. This includes the
+  gnatstack binary as well as the corresponding documentation and examples.
 
-  For more information about the commercial support of $gnatstack, please
+  For more information about the commercial support of gnatstack, please
   contact sales@adacore.com.
 
-  This script will ask a few questions regarding the $gnatstack installation.
+  This script will ask a few questions regarding the gnatstack installation.
 
   Running this configuration script will not modify anything anywhere
   else in your system.  You can break out of it or run it multiple times
@@ -32,12 +63,12 @@ cat << EOF
 
   There are 2 options for installation:
 
-  1) Install $gnatstack in the standard GNAT Pro location.
+  1) Install gnatstack in the standard GNAT Pro location.
 
-  2) Install $gnatstack in non-standard locations that you will
+  2) Install gnatstack in non-standard locations that you will
      specify.
 
-  Option 1 provides simplest use of $gnatstack.
+  Option 1 provides simplest use of gnatstack.
 
 EOF
 
@@ -52,7 +83,7 @@ while [ true ]; do
     cat << EOF
 
 
-    To install $gnatstack in a non-standard location you need to
+    To install gnatstack in a non-standard location you need to
     specify a base directory.  All the files will be installed in
     subdirectories that are created under this directory.
 
@@ -105,17 +136,4 @@ EOF
  esac
 done
 
-# --------------------- Actual Installation of Gnatstack --------------
-
-if [ ! -d $installdir ]; then
-    mkdir -p $installdir
-fi
-
-tar cf - bin share | (cd $installdir && tar xf -)
-
-# --------------------------- End of the script -----------------------
-clear
-echo " "
-echo "$gnatstack has been installed in $installdir"
-echo "Thank you for using $gnatstack !"
-echo " "
+do_install
