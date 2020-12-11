@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2020, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -134,7 +134,7 @@ package Static_Stack_Analysis is
    -- Nodes (subprograms) --
    -------------------------
 
-   type Node;
+   type Node is tagged;
    --  Nodes represent subprograms in the call graph
 
    type Node_Class_Access is access all Node'Class;
@@ -317,12 +317,12 @@ package Static_Stack_Analysis is
      Ada.Containers.Ordered_Sets (Class_Access, Alphabetical_Order, Equal);
    --  Types used to represent classes (tagged types)
 
-   type Method;
+   type Method is tagged;
    type Method_Class_Access is access all Method'Class;
    --  Root class to represent dispatching methods. There are either virtual
    --  or inherited methods.
 
-   type Virtual;
+   type Virtual is tagged;
    type Virtual_Class_Access is access all Virtual'Class;
 
    function Alphabetical_Order
@@ -338,7 +338,7 @@ package Static_Stack_Analysis is
      Ada.Containers.Ordered_Sets
        (Virtual_Class_Access, Alphabetical_Order, Equal);
 
-   type Inherited;
+   type Inherited is tagged;
    type Inherited_Class_Access is access all Inherited'Class;
 
    type Slot_Number is new Integer;
