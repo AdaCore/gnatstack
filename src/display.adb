@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2018, AdaCore                     --
+--                     Copyright (C) 2005-2020, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1504,8 +1504,8 @@ package body Display is
 
       Minimum_Size : constant Integer :=
         Integer (Stack_Info.Static_Usage  + Stack_Info.Dynamic_Usage +
-                   Stack_Info.Unknown_Usage);
-      --  Note: we do not add Cycle_Usage as it is an artificial value.
+                   Stack_Info.Unknown_Usage + Stack_Info.Cycle_Usage);
+      --  Note: we NEED to add Cycle_Usage otherwise it is completely useless.
 
       Uncertain_Part : constant Boolean :=
         Stack_Info.Dynamic_Usage = Unspecified_Value or else
