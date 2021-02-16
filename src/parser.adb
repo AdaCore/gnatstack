@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2020, AdaCore                     --
+--                     Copyright (C) 2005-2021, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -713,6 +713,32 @@ package body Parser is
          Ada.Text_IO.New_Line;
       end Print_Version;
 
+      procedure Print_Categories;
+      --  Print the categories of messages used by GNATstack.
+
+      procedure Print_Categories is
+      begin
+         Ada.Text_IO.Put_Line ("Unknown Global Stack Usage - unknown part of" &
+                               " the total stack usage");
+         Ada.Text_IO.Put_Line ("Static Global Stack Usage - total stack" &
+                               " usage");
+
+         Ada.Text_IO.Put_Line ("Unknown Local Stack Usage - unknown part of" &
+                               " the local stack usage");
+         Ada.Text_IO.Put_Line ("Static Local Stack Usage - local stack usage");
+
+         Ada.Text_IO.Put_Line ("Indirect Call - function pointers");
+         Ada.Text_IO.Put_Line ("External Call - subprograms for which no" &
+                               " stack information is available.");
+         Ada.Text_IO.Put_Line ("Potential Cycle - potential recursive" &
+                               " function call");
+         Ada.Text_IO.Put_Line ("Unbounded Frame - frames of functions that " &
+                               " use dynamically sized local objects");
+         Ada.Text_IO.Put_Line ("Entry point - program entry point from " &
+                               "which to start the analysis");
+         Ada.Text_IO.Put_Line ("Accuracy - stack computation accuracy");
+      end Print_Categories;
+
    begin
       --  Get options
 
@@ -746,6 +772,10 @@ package body Parser is
                   --  --help
                   elsif Full = "-help" then
                      Print_Help_And_Exit;
+
+                  elsif Full = "-list-categories" then
+                     Print_Categories;
+                     GNAT.OS_Lib.OS_Exit (0);
 
                   --  Gives the sub directory in which gnatstack will find its
                   --  artifacts (in our case the .ci files) relative to the
@@ -3417,6 +3447,9 @@ package body Parser is
       Put_Line ("  --subdirs dir name of the subdirectory relative to the" &
                                "Object_Dir of the project where GNATstack " &
                                "will find the .ci files");
+      Put_Line ("  --list-categories prints a list of the kind of messages" &
+                              " issued by GNATstack accompanied by a short" &
+                              " description");
       Put_Line ("  -txx         print targets for indirect and dispatching " &
                                "calls");
       Put_Line ("    i          only for indirect calls");

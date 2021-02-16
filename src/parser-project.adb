@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2014-2020, AdaCore                     --
+--                     Copyright (C) 2014-2021, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -36,7 +36,7 @@ package body Project is
 
    Valid_Options : constant String :=
      "a aO: ca c: d: e: f: files= g h -help k l: np o= oc= p pi P: q Q r: " &
-     "-RTS= s= t! -subdirs=: -target= u: v -version W! x X!";
+     "-RTS= s= t! -subdirs=: -target= u: v -version W! x X! -list-categories";
 
    --  Accepted switches
    Tree : GNATCOLL.Projects.Project_Tree;
