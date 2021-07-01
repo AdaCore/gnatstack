@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2010-2017, AdaCore                     --
+--                     Copyright (C) 2010-2021, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -408,7 +408,7 @@ package body Dispatching_Calls is
             --  verify whether we have all the potential targets. If the
             --  information is not there yet we compute and store it.
 
-            List_Of_Edges.Append
+            List_Of_Edges.Append_Vector
               (Node.Target_Calls,
                Dispatching_Calls.Get_Overriding_Methods
                  (Dispatching_Node (Node.all)));
