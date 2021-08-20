@@ -377,7 +377,8 @@ package body Parser is
 
    Location_Regexp : constant String :=
      "(<no location>)|" &  -- Encoding for no location
-     "(<built-in>.*|<internal>.*)|" &  -- Location for built-in functions
+      --  Location for built-in functions
+     "(?:(<built-in>|<internal>)(?::\d+){0,2})|" &
      "(((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  -- Normal locations
      ":(\d+)(:\d+)?)";  -- line and possibly column number
    --  Accepted locations are Unix-style (directories separated by slashes),
