@@ -78,12 +78,12 @@ while [ true ]; do
 
     Important Note: You should not use ~ or ~username wildcards
     when specifying this directory name.
-                                                                                
+
     Specify the base directory you want to use for installation:
 
 EOF
     read basedir
-    while [ true ]; do 
+    while [ true ]; do
       if [ "X" = "X`echo $basedir|sed -n -e 's%^/.*%/%p'`" ]; then
 	basedir=`pwd`/$basedir
       fi
@@ -94,7 +94,7 @@ EOF
       if [ "X$answer" = "X" ]; then
 	break
       fi
-      basedir = $answer
+      basedir=$answer
     done
     clear
     installdir=$basedir
