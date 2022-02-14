@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2006-2017, AdaCore                     --
+--                     Copyright (C) 2006-2022, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -26,6 +26,7 @@ with GNAT.Regpat;
 with Interfaces.C.Strings;
 with Ada.Directories;
 with Ada.Characters.Handling; use Ada.Characters.Handling;
+with Ada.Strings.Fixed;       use Ada.Strings.Fixed;
 
 package body Demangle is
 
@@ -142,7 +143,7 @@ package body Demangle is
          Name_First := Symbol_Name'First;
       end if;
 
-      if Is_Ada (File) then
+      if Is_Ada (File, Symbol_Name) then
          return Ada_Decode (Symbol_Name (Name_First .. Symbol_Name'Last));
       else
          --  If not Ada code, try to decode it assuming it is C++
@@ -155,19 +156,41 @@ package body Demangle is
    -- Is_Ada --
    ------------
 
-   function Is_Ada (File : Static_Stack_Analysis.File_Name) return Boolean is
-      use type Static_Stack_Analysis.File_Name;
-
-      File_Extension : constant String :=
-        (if File = null then ""
-         else Ada.Directories.Extension (File.all));
+   function Is_Ada
+     (File        : Static_Stack_Analysis.File_Name;
+      Symbol_Name : String := "")
+      return Boolean
+   is
+      Matches : GNAT.Regpat.Match_Array (0 .. 3);
 
    begin
-      --  Detected very conservatively by simply looking at the file
-      --  extension and considering it an Ada source file if it is not a C
-      --  source file.
+      --  Symbol names for static C subprograms contain the file name (like
+      --  /path/file.c:func), so this is used as a first criterion to determine
+      --  whether it comes from a C file.
 
-      return File_Extension'Length < 1 or else
-        To_Lower (File_Extension (File_Extension'First)) /= 'c';
+      --  Look for the ":" separator between file name and subprogram name
+
+      GNAT.Regpat.Match (File_Regexp, Symbol_Name, Matches);
+
+      if Matches (0) /= GNAT.Regpat.No_Match and then
+        Tail (Symbol_Name (Matches (1).First .. Matches (1).Last), 2) = ".c"
+      then
+         return False;
+
+      --  Detected very conservatively by simply looking at the file extension
+      --  and considering it an Ada source file if it is not a C source file.
+      else
+         declare
+            use type Static_Stack_Analysis.File_Name;
+
+            File_Extension : constant String :=
+              (if File = null then ""
+               else Ada.Directories.Extension (File.all));
+
+         begin
+            return File_Extension'Length < 1 or else
+              To_Lower (File_Extension (File_Extension'First)) /= 'c';
+         end;
+      end if;
    end Is_Ada;
 end Demangle;

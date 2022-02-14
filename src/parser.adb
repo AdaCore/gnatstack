@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2021, AdaCore                     --
+--                     Copyright (C) 2005-2022, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1902,7 +1902,7 @@ package body Parser is
          --  For Ada code we remove the file name prefix and .NNN suffix that
          --  may appear in the form: file.adb:package__proc.1560
 
-         if Demangle.Is_Ada (Ada_File_Name) then
+         if Demangle.Is_Ada (Ada_File_Name, Input) then
             declare
                Matches : GNAT.Regpat.Match_Array (0 .. 3);
 

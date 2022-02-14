@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2006-2011, AdaCore                     --
+--                     Copyright (C) 2006-2022, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -33,7 +33,10 @@ package Demangle is
    --  transforms a symbol name (such as _Z4proci) into its corresponding C++
    --  (proc(int)).
 
-   function Is_Ada (File : Static_Stack_Analysis.File_Name) return Boolean;
+   function Is_Ada
+     (File        : Static_Stack_Analysis.File_Name;
+      Symbol_Name : String := "")
+      return Boolean;
    --  This function returns True if the node represents an Ada subprogram
 
    function Decode
