@@ -2830,8 +2830,6 @@ package body Parser is
                --  the user to resolve indirect calls, it will need to be
                --  placed in the node representing the indirect call.
                if
-                 Ada_File_Name = null
-                   and then
                  Target_Ptr.all in Real_Node'Class
                    and then
                  List_Of_Nodes.Element (Call.Target).all in Indirect_Node'Class
