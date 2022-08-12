@@ -379,7 +379,7 @@ package body Parser is
      "(<no location>)|" &  -- Encoding for no location
       --  Location for built-in functions
      "(?:(<built-in>|<internal>)(?::\d+){0,2})|" &
-     "(((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  -- Normal locations
+     "(((\\\\|[a-zA-Z]:[\\/])?[^:]+)" &  -- Normal locations
      ":(\d+)(:\d+)?)";  -- line and possibly column number
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
