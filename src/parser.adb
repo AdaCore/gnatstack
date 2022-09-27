@@ -396,7 +396,16 @@ package body Parser is
      GNAT.Regpat.Compile
        ("^ label: """ &
         "((" & Demangled_Name_Regexp & ")(\.[\w\d\.]*)?\\n)?" &
-        "((" & Location_Regexp & ",?)*(\\n)?)?" &
+        --  ??? The `*` below is non-greedy. It was initially greedy and added
+        --  as part of HC05-009, which refactorized the regexes, spliting them
+        --  in several variables.
+        --  It's not clear to us if the non greediness this will break existing
+        --  .cis. We checked on a .ci file that contained multiple locations
+        --  (path + line/column) from J428-020, and the output didn't change.
+        --  We needed to make it non greedy for a previous patch (V308-013)
+        --  to not break, as we significantly expanded what Location_Regexp
+        --  could match.
+        "((" & Location_Regexp & ",?)*?(\\n)?)?" &
         "(" & Stack_Regexp & ")?" &
         "(\\n\d+ dynamic objects(\\n .*)?)?""$");
    --  Extra information about a node
