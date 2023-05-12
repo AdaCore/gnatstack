@@ -40,7 +40,7 @@ package body Demangle is
      GNAT.Regpat.Compile
        ("((\\\\|[a-zA-Z]:[\\/])?[\w\\/ \.~\-\+]+)" &  --  file name
         ":"                                        &  --  separator
-        "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?/\^]+)$");    --  symbol name
+        "([\w\*\&<>\[\]=~\+\-\|!\{\}\$\?\./\^]+)$");    --  symbol name
    --  Accepted locations are Unix-style (directories separated by slashes),
    --  Windows UNC-style (drive_letter:\path or \\server\path), and
    --  cygwin-style (drive_letter:/path or /path). There is also .extension
