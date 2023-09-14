@@ -292,6 +292,19 @@ package body Project is
 
             Unchecked_Free (Obj_Dirs);
 
+            --  Get the .ci files coming from the run-time library. They are
+            --  located within the "obj" directory located besides the "adalib"
+            --  directory from the runtime.
+
+            for OD of Tree.Root_Project.Get_Environment.Predefined_Object_Path
+            loop
+               if Is_Directory (Create (+OD.Display_Full_Name & "/../obj"))
+               then
+                  Append_Files_From_Directory
+                    (Input_Files, OD.Display_Full_Name & "/../obj");
+               end if;
+            end loop;
+
          exception
             when GNATCOLL.Projects.Invalid_Project =>
                raise GNATCOLL.Projects.Invalid_Project with
