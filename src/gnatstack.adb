@@ -29,6 +29,8 @@ with Options;
 
 with Ada.Text_IO;
 
+with GNAT.OS_Lib;
+
 procedure Gnatstack is
 begin
    --  Get input arguments and generate (and decorate) the callgraph tree
@@ -92,4 +94,5 @@ exception
    when others =>
       Ada.Text_IO.New_Line;
       Ada.Text_IO.Put_Line ("GNATstack: analysis abandoned");
+      GNAT.OS_Lib.OS_Exit (2);
 end Gnatstack;
