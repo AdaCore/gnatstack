@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2025, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -90,9 +90,29 @@ begin
    if not Options.Very_Quiet then
       Ada.Text_IO.Put_Line ("GNATstack: analysis successfully finished");
    end if;
+
 exception
    when others =>
       Ada.Text_IO.New_Line;
-      Ada.Text_IO.Put_Line ("GNATstack: analysis abandoned");
+      Ada.Text_IO.Put ("GNATstack: analysis abandoned while ");
+
+      case Global_Data.Phase is
+         when Global_Data.Parse =>
+            Ada.Text_IO.Put_Line ("parsing stack and callgraph information");
+         when Global_Data.Dispatching_Calls =>
+            Ada.Text_IO.Put_Line ("analyzing dispatching calls");
+         when Global_Data.Call_Graph_Analysis =>
+            Ada.Text_IO.Put_Line ("generating the call graph");
+         when Global_Data.Alias_Analysis =>
+            Ada.Text_IO.Put_Line ("resolving aliasing information");
+         when Global_Data.Print_Warnings =>
+            Ada.Text_IO.Put_Line ("displaying incomplete information");
+         when Global_Data.Worst_Case_Analysis =>
+            Ada.Text_IO.Put_Line
+               ("traversing the call graph for worst case stack usage");
+         when Global_Data.Print_Results =>
+            Ada.Text_IO.Put_Line ("printing stack usage results");
+      end case;
+
       GNAT.OS_Lib.OS_Exit (2);
 end Gnatstack;

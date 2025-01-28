@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
---                     Copyright (C) 2005-2020, AdaCore                     --
+--                     Copyright (C) 2005-2025, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -414,9 +414,12 @@ package Static_Stack_Analysis is
    --  Return the method by its class:slot information
 
    function Insert_Method
-     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access;
+     (Id : Vtable_Loc; Symbol : String; Input : String)
+      return Virtual_Class_Access;
    --  Insert the method. It creates the descriptor for the method if it has
-   --  not yet been registered, or return the existing one.
+   --  not yet been registered, or return the existing one. Input is the line
+   --  that is being parsed, and it is passed only for error message in case
+   --  of problem.
 
    type Class is
       record
