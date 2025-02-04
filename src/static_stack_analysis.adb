@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2011, AdaCore                     --
+--                     Copyright (C) 2005-2025, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -547,8 +547,6 @@ package body Static_Stack_Analysis is
          --  usage of 0. The actual stack consumption comes from the alias
          --  target.
 
-         pragma Assert (Target.Alias /= null);
-
          return Stack_Usage_Info'
            (Frame_Type    => Static,
             Static_Usage  => 0,
@@ -666,7 +664,8 @@ package body Static_Stack_Analysis is
    -------------------
 
    function Insert_Method
-     (Id : Vtable_Loc; Symbol : String) return Virtual_Class_Access
+     (Id : Vtable_Loc; Symbol : String; Input : String)
+      return Virtual_Class_Access
    is
       Method : Virtual_Class_Access := Get_Method (Id);
 
@@ -692,15 +691,19 @@ package body Static_Stack_Analysis is
          --  at least the owner class and slot number. The symbol name must be
          --  either void or the same as we are inserting.
 
-         pragma Assert
-           (Method.Vtable_Entry = Id and then
-              (Method.Symbol_Name = null or else
-               Method.Symbol_Name.all = Symbol));
+         pragma Assert (Method.Vtable_Entry = Id);
 
          --  Update the symbol name if needed
 
          if Method.Symbol_Name = null then
             Method.Symbol_Name := new String'(Symbol);
+
+         --  Check that the symbol name matches with what we have already
+         elsif Method.Symbol_Name.all /= Symbol then
+            raise Parser_Error with
+              "There is already a primitive subprogram on slot" &
+              Id.Slot'Image & " with name """ & Method.Symbol_Name.all &
+              """ that does not match the symbol name here: " & Input;
          end if;
 
       end if;
@@ -884,8 +887,9 @@ package body Static_Stack_Analysis is
       end Replace_Indirect_Calls;
 
    begin
-      pragma Assert (Source.all in Real_Node'Class);
-      pragma Assert (Target.all in Indirect_Node'Class);
+      pragma Assert
+        (Source.all in Real_Node'Class and then
+         Target.all in Indirect_Node'Class);
 
       for Index in reverse Calls.First_Index .. Calls.Last_Index loop
          Replace_Indirect_Calls (Index);

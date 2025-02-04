@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2022, AdaCore                     --
+--                     Copyright (C) 2005-2025, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1466,6 +1466,11 @@ package body Parser is
          Static_Stack_Analysis.List_Of_Nodes.Iterate
            (Global_Data.List_Of_Subprograms, Get_Task_Wrapper'Access);
       end if;
+
+   exception
+         when E : others =>
+            Ada.Text_IO.Put_Line (Ada.Exceptions.Exception_Message (E));
+            raise;
    end Parse_Arguments;
 
    ---------------------------
@@ -1550,7 +1555,7 @@ package body Parser is
          end if;
 
       else
-         raise Parser_Error;
+         raise Parser_Error with "Cannot parse dynamic object: " & Input;
       end if;
    end Parse_Dynamic_Objects;
 
@@ -1586,7 +1591,7 @@ package body Parser is
 
       --  Error otherwise
       else
-         raise Parser_Error;
+         raise Parser_Error with "Unknown type of line: " & Input;
       end if;
    end Parse_Input_Line;
 
@@ -1649,7 +1654,7 @@ package body Parser is
       GNAT.Regpat.Match (Node_Regexp, Input, Matches);
 
       if Matches (0) = GNAT.Regpat.No_Match then
-         raise Parser_Error;
+         raise Parser_Error with "Cannot parse node: " & Input;
 
       else
          --  Get the unique symbol name corresponding to the subprogram
@@ -1770,7 +1775,8 @@ package body Parser is
                  (Global_Data.List_Of_Subprograms, Node_Ptr);
 
             --  The only additional information may be the alias, which can
-            --  only happen for unresolved nodes.
+            --  only happen for unresolved nodes (nodes that may show up in a
+            --  edge line).
             elsif Alias /= null then
                --  Get the node that we previously found
 
@@ -1779,10 +1785,15 @@ package body Parser is
                --  The alias information must either be missing or equal to
                --  the one we are inserting.
 
-               pragma Assert
-                 (Node_Ptr.all in Unresolved_Node'Class and then
-                    (Unresolved_Node (Node_Ptr.all).Alias = null or else
-                     Unresolved_Node (Node_Ptr.all).Alias.all = Alias.all));
+               if Node_Ptr.all not in Unresolved_Node'Class or else
+                 (Unresolved_Node (Node_Ptr.all).Alias /= null and then
+                  Unresolved_Node (Node_Ptr.all).Alias.all /= Alias.all)
+               then
+                  raise Parser_Error with
+                    "There is already an entry for """ & Symbol_Name.all &
+                    """ with alias information not compatible with entry: " &
+                    Input;
+               end if;
 
                --  Add the missing alias information
 
@@ -1937,7 +1948,8 @@ package body Parser is
 
          return Input (Lower_Bound .. Upper_Bound);
       else
-         raise Parser_Error;
+         raise Parser_Error
+           with "Cannot identify the symbol name in: " & Input;
       end if;
    end Get_Unique_Symbol_Name;
 
@@ -2279,11 +2291,12 @@ package body Parser is
             Stack.Cycle_Usage   := Static_Stack_Analysis.Empty_Value;
 
          else
-            raise Parser_Error;
+            raise Parser_Error with "Cannot understand the type of frame: " &
+              Input (Matches (2).First .. Matches (2).Last);
          end if;
 
       else
-         raise Parser_Error;
+         raise Parser_Error with "Cannot understand the stack usage: " & Input;
       end if;
    end Parse_Stack_Usage;
 
@@ -2911,7 +2924,7 @@ package body Parser is
             end if;
          end;
       else
-         raise Parser_Error;
+         raise Parser_Error with "Cannot parse edge line: " & Input;
       end if;
    end Parse_Edge;
 
@@ -2991,7 +3004,10 @@ package body Parser is
                      --  The information about the primary parent may be
                      --  already there but we make sure it is consistent.
 
-                     raise Parser_Error with "Conflicting primary parent";
+                     raise Parser_Error with "Conflicting primary parent: " &
+                       This_Class.Primary_Parent.Class_Name.all & " and " &
+                       Input
+                          (Match_Parents (1).First .. Match_Parents (1).Last);
                   end if;
 
                   --  We already have the primary parent
@@ -3046,13 +3062,14 @@ package body Parser is
 
                Method :=
                  Insert_Method
-                   (Id => Vtable_Loc'
-                             (This_Class,
-                              Slot_Number'Value
-                                 (Input (Match_Info (1).First ..
-                                         Match_Info (1).Last))),
+                   (Id     => Vtable_Loc'
+                                 (This_Class,
+                                  Slot_Number'Value
+                                     (Input (Match_Info (1).First ..
+                                             Match_Info (1).Last))),
                     Symbol =>
-                      Input (Match_Info (2).First .. Match_Info (2).Last));
+                      Input (Match_Info (2).First .. Match_Info (2).Last),
+                    Input  => Input);
 
                --  Add this method to the list of methods belonging to the
                --  class. Use Include instead of Insert because the method
@@ -3121,7 +3138,7 @@ package body Parser is
 
             else
                raise Parser_Error with
-              "Cannot parse the virtual method: " & Input;
+                 "Cannot parse the virtual method: " & Input;
             end if;
 
          --  It may be the case that the class does not define any virtual
@@ -3356,7 +3373,6 @@ package body Parser is
       when Parser_Error =>
          Ada.Text_IO.Put_Line
            ("Error parsing file " & List_Of_Files.Element (File).all);
-
          if Ada.Text_IO.Is_Open (Descriptor) then
             Ada.Text_IO.Close (Descriptor);
          end if;
