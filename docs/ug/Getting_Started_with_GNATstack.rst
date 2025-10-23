@@ -128,7 +128,7 @@ the following:
 *-pi*
   .. index:: -pi
 
-  Print progress information (for GPS).
+  Print progress information (for GNAT Studio).
 
 *-q*
   .. index:: -q
@@ -305,13 +305,13 @@ string list value representing the switches to be passed to
      package Stack is
         for Switches use ("-p");
      end Stack;
-  end Prj;  
+  end Prj;
 
 The following command will parse the project file :file:`prj.gpr` and
 call *gnatstack* with the specified options::
 
   $ gnatstack -P prj.gpr
-  
+
 When *gnatstack* is used with a project file, if gets the set of
 :file:`.ci` files that correspond to the units that belong to the project
 and all projects in the project tree.
@@ -327,7 +327,7 @@ for the analysis, the appropriate place to specify them is in the
         for Switches use (..., "user1.ci", "user2.ci");
      end Stack;
   end Prj;
-  
+
 .. _GNATstack_Output:
 
 GNATstack output
@@ -350,8 +350,8 @@ The maximum stack consumption for the *main* entry point is 408 bytes, and this
 is a safe bound that can be trusted. The indicated call chain is the path with
 the longest stack consumption from all possible paths starting from *main*.
 
-Within GNAT Programming Studio (GPS) the stack usage information is available
-via the :menuselection:`Tools --> Stack Analysis --> Analyze Stack Usage` menu.
+Within GNAT Studio the stack usage information is available
+via the :menuselection:`Analyze --> Stack Analysis --> Analyze Stack Usage` menu.
 For each of the subprograms the information is displayed in the form of
 annotations containing *local* stack requirements, which refers to a single
 stack frame, and *global* stack requirements, which refers to the worst case
@@ -405,7 +405,7 @@ additional information::
 
   $  gnatstack -v -Wa -P my_project.gpr
   [...]
- 
+
   Worst case analysis is *not* accurate because of unbounded frames.
 
   List of reachable subprograms with dynamic unbounded frames:
@@ -423,7 +423,7 @@ This analysis indicates that the computed worst case stack usage is not
 accurate. There are 576 bytes needed, plus the amount required by the dynamic
 object declared by subprogram *Process*.
 
-Within GPS, this missing information is expressed with annotations indicating
+Within GNAT Studio, this missing information is expressed with annotations indicating
 the reasons behind the inaccuracy. For the *main* entry point we would have::
 
   --  main
@@ -448,7 +448,7 @@ be written into a section named `.GNU.callgraph` doing::
   $ gcc -c -fcallgraph-info=su main_unit.adb
   $ objcopy --add-section .GNU.callgraph=main_unit.ci main_unit.o
   $ gnatstack main_unit.o
-  
+
 This section is not downloaded into the target so it does not affect the
 execution. The advantage is that it may facilitate the retrieval of the
 required :file:`.ci` files (we simply need the list of object files that
