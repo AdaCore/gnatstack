@@ -5,7 +5,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 2005-2020, AdaCore                     --
+--                     Copyright (C) 2005-2026, AdaCore                     --
 --                                                                          --
 -- GNATstack  is free  software;  you can redistribute  it and/or modify it --
 -- under terms of the  GNU General Public License as published  by the Free --
@@ -1516,7 +1516,7 @@ package body Display is
       if Minimum_Size = 0 and then Uncertain_Part then
          Ada.Text_IO.Put ("? bytes");
 
-      elsif Minimum_Size > 0 then
+      elsif Minimum_Size >= 0 then
          Ada.Integer_Text_IO.Put (Minimum_Size, 0);
 
          if Uncertain_Part then

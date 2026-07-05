@@ -519,10 +519,17 @@ package body Parser is
    --  Extract stack requirements.
    --  Format: N bytes[ (static|dynamic[,bounded])]
 
-   procedure Parse_Shape (Input : String; Local : out Boolean);
+   procedure Parse_Shape
+     (Input : String; Local : out Boolean; Thunk : out Boolean);
    --  Local is set to True if the subprogram is defined in the compilation
    --  unit. For unresolved subprograms it returns False.
    --  Format :  shape : ellipse
+   --
+   --  Thunk is set to True when the node is a compiler-generated
+   --  forwarding thunk or clone (e.g. a C++ complete-object constructor
+   --  or destructor that just forwards to the base-object variant) that
+   --  has no frame of its own beyond the single call it forwards to.
+   --  Format :  shape : triangle
 
    procedure Parse_Edge (Input : String);
    --  Get caller and callee in a subprogram call. It may also contain the
@@ -1608,6 +1615,7 @@ package body Parser is
 
       Stack_Info      : Stack_Usage_Info := Unknown_Stack_Usage;
       Locally_Defined : Boolean := False;
+      Thunk           : Boolean := False;
 
       Node_Ptr        : Node_Class_Access := null;
 
@@ -1700,7 +1708,8 @@ package body Parser is
             if Matches (5) /= GNAT.Regpat.No_Match then
                Parse_Shape
                  (Input (Matches (5).First .. Matches (5).Last),
-                  Locally_Defined);
+                  Locally_Defined,
+                  Thunk);
 
             else
                --  Nodes are also locally defined if they define their stack
@@ -1708,6 +1717,23 @@ package body Parser is
 
                Locally_Defined :=
                  Stack_Info.Frame_Type /= Static_Stack_Analysis.Unknown;
+            end if;
+
+            --  A forwarding thunk (shape : triangle) has no frame of its
+            --  own beyond the single call it forwards to. When the
+            --  compiler did not report a byte count for it, its own usage
+            --  is statically known to be zero, instead of falling back to
+            --  "unknown".
+
+            if Thunk
+              and then Stack_Info.Frame_Type = Static_Stack_Analysis.Unknown
+            then
+               Stack_Info :=
+                 (Frame_Type    => Static_Stack_Analysis.Static,
+                  Static_Usage  => 0,
+                  Dynamic_Usage => Static_Stack_Analysis.Empty_Value,
+                  Unknown_Usage => Static_Stack_Analysis.Empty_Value,
+                  Cycle_Usage   => Static_Stack_Analysis.Empty_Value);
             end if;
          end if;
       end if;
@@ -2304,12 +2330,19 @@ package body Parser is
    -- Parse_Shape --
    -----------------
 
-   procedure Parse_Shape (Input : String; Local : out Boolean) is
+   procedure Parse_Shape
+     (Input : String; Local : out Boolean; Thunk : out Boolean) is
    begin
       --  The mark 'ellipse' indicates an external subprogram, i.e., not
       --  locally defined.
 
       Local := Input /= " shape : ellipse";
+
+      --  The mark 'triangle' indicates a compiler-generated forwarding
+      --  thunk or clone: it is locally defined, but its own contribution
+      --  to the stack is limited to the single call it forwards to.
+
+      Thunk := Input = " shape : triangle";
    end Parse_Shape;
 
    ----------------
