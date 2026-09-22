@@ -1,0 +1,12 @@
+def build():
+    anod_build("gnatstack")
+
+
+def test_gnatstack_gnat():
+    anod_install("gnatstack")
+    anod_test("gnatstack", qualifier="standalone")
+
+
+def test_gnatstack_gnat_llvm():
+    anod_install("gnatstack")
+    anod_test("gnatstack", qualifier="compiler=gnat-llvm,standalone")
