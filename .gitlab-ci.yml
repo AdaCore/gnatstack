@@ -7,6 +7,8 @@ include:
   # Issue check
   - component: $CI_SERVER_FQDN/eng/gitlab-templates/check-issue@~latest
 
+  - component: $CI_SERVER_FQDN/it/gitlab-templates/gitleaks@~latest
+
   - component: $CI_SERVER_FQDN/eng/gitlab-templates/build@~latest
     inputs:
       anod-args: run build
