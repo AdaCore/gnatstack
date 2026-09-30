@@ -9,6 +9,7 @@ GNATstack User’s Guide
    Operational_Environment
    The_GNATstack_Tool
    Getting_Started_with_GNATstack
+   Toolchain_Specific_Topics
    Additional_Capabilities
    Examples
    Machine_Specific_Topics

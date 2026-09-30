@@ -6,30 +6,55 @@ Getting Started with GNATstack
 
 Two steps are needed to analyze stack usage: 1) generation of the basic
 stack consumption and call-graph information, followed by 2) analysis
-and report generation.
+and report generation. With an LLVM based toolchain there is one more
+step between the two, the decoding of the linked executable.
 
-.. index:: -fcallgraph-info=su
+GNATstack relies on information produced by the compiler, provided
+through :file:`.ci` files. How those files are obtained differs between
+the two toolchains. A GCC based compiler writes one :file:`.ci` file per
+compilation unit, as described in :ref:`GCC_Based_Toolchains`. With an
+LLVM based compiler the information travels in sections of the object
+files, and a single :file:`.ci` file describing the whole program is
+produced from the linked executable, as described in
+:ref:`LLVM_Based_Toolchains`.
 
 The first step is to compile the application with the required options
 to generate the information about per-subprogram stack consumption and
-call-graph information. The *-fcallgraph-info=su* compiler
-switch outputs this information on a per-file basis in the common VCG
-format::
+call-graph information. The two toolchains use different switches.
+
+.. index:: -fcallgraph-info=su
+
+The *-fcallgraph-info=su* GCC compiler switch outputs this information on a
+per-file basis in the common VCG format::
 
   $ gprbuild main_unit.adb -cargs -fcallgraph-info=su
 
-The use of this compiler switch generates a :file:`.ci` file for every
-compilation unit.
+.. index:: -fexperimental-call-graph-section
+.. index:: -fstack-size-section
+
+An LLVM based compiler requires *-fexperimental-call-graph-section*
+along with *-fstack-size-section* to put the same information into
+sections of the object files::
+
+  $ gprbuild main_unit.adb -cargs -fexperimental-call-graph-section -fstack-size-section
+
+The linked executable is then decoded into a single :file:`.ci` file by
+the *llvm-callgraph-decoder* tool, which is described together with the
+rest of that route in :ref:`LLVM_Based_Toolchains`.
 
 .. index:: -fcallgraph-info=da
 
-The compiler can also generate information about dynamically allocated
+The GCC compiler can also generate information about dynamically allocated
 objects adding the `da` marker to the `-fcallgraph-info`
 compiler switch (`-fcallgraph-info=su,da`). This option helps
 locating the objects that introduce potentially unbounded stack
-requirements.
+requirements. There is no equivalent of the `da` marker under GNAT Pro
+LLVM: a frame size is recorded only where the compiler knows it
+statically, and a subprogram that allocates its frame dynamically is
+left without a size of its own in the information the executable
+carries.
 
-In the second step, GNATstack can then parse these files to generate the
+In the second step, GNATstack can then parse this information to generate the
 complete call graph decorated with stack usage information, so it can
 look for the longest paths in terms of stack usage::
 
@@ -244,34 +269,39 @@ the following:
   .. index:: -oc
 
   Use the `objcopy` executable `name` to extract the :file:`.ci`
-  files from the object files. If may contain the prefix (such as
+  files from the object files. It may contain the prefix (such as
   `powerpc-elf-objcopy`) or the suffix (such as `objcopyppc`).
+  This switch concerns the GCC section route described in
+  :ref:`Information_in_Non-Loadable_Section` only.
 
 *-s=section*
   .. index:: -s
 
   Extract the :file:`.ci` files from section named `section` in the
-  object files.
+  object files. This switch concerns the GCC section route described in
+  :ref:`Information_in_Non-Loadable_Section` only.
 
 *-k*
   .. index:: -k
 
   Keep the temporary files created by GNATstack (such as the :file:`.ci`
-  files extracted from the object files.
+  files extracted from the object files). This switch concerns the GCC
+  section route described in :ref:`Information_in_Non-Loadable_Section`
+  only.
 
 *--target=tgt*
   .. index:: --target
 
   Use `tgt` as program prefix used to build the application being
   analyzed. This value is only used to help retrieving the stack usage
-  information for the run-time library.
+  information for the run-time library (see :ref:`Run-Time_Library`).
 
 *--RTS=rts*
   .. index:: --RTS
 
   Use `rts` as the run-time library used to build the application
   being analyzed. This value is only used to retrieve the stack usage
-  information for the run-time library.
+  information for the run-time library (see :ref:`Run-Time_Library`).
 
 *-Xname=val*
   .. index:: -X
@@ -294,7 +324,7 @@ Use of Project Files
 
 *gnatstack* supports the use of project files. There is an
 optional package in the project file for GNATstack
-(which is the package `Stack`) that has an unique attribute
+(which is the package `Stack`) that has a unique attribute
 `Switches`. This attribute is a simple variable that contains a
 string list value representing the switches to be passed to
 *gnatstack*:
@@ -312,9 +342,10 @@ call *gnatstack* with the specified options::
 
   $ gnatstack -P prj.gpr
 
-When *gnatstack* is used with a project file, if gets the set of
+When *gnatstack* is used with a project file, it gets the set of
 :file:`.ci` files that correspond to the units that belong to the project
-and all projects in the project tree.
+and all projects in the project tree. With an LLVM based toolchain there
+are no such per unit files to collect; see :ref:`LLVM_Based_Toolchains`.
 
 If one or more user-defined :file:`.ci` files need to be taken into account
 for the analysis, the appropriate place to specify them is in the
@@ -365,7 +396,7 @@ previous example, *local* is the 80 bytes of the *main* subprogram, and
   --  Stack usage: local: 80 bytes, global: 408 bytes
 
 More details about the locations of the subprograms and their local stack
-frames is displayed using the *-v* switch::
+frames are displayed using the *-v* switch::
 
   $ gnatstack -v -P my_project.gpr
   [...]
@@ -403,7 +434,7 @@ the previous example we would have the following GNATstack report::
 If we add the "-Wa" and "-v" options to GNATstack we get the following
 additional information::
 
-  $  gnatstack -v -Wa -P my_project.gpr
+  $ gnatstack -v -Wa -P my_project.gpr
   [...]
 
   Worst case analysis is *not* accurate because of unbounded frames.
@@ -435,46 +466,3 @@ and for the *Process* subprogram we would have::
   --  pck.process
   --
   --  Stack usage: local: 480 bytes (unbounded), global: 480 bytes (unbounded)
-
-.. _Information_in_Non-Loadable_Section:
-
-Information in Non-Loadable Section
-===================================
-
-The :file:`.ci` file generated for every compilation unit can be written
-into the generated object as a non-loadable section. For example, it can
-be written into a section named `.GNU.callgraph` doing::
-
-  $ gcc -c -fcallgraph-info=su main_unit.adb
-  $ objcopy --add-section .GNU.callgraph=main_unit.ci main_unit.o
-  $ gnatstack main_unit.o
-
-This section is not downloaded into the target so it does not affect the
-execution. The advantage is that it may facilitate the retrieval of the
-required :file:`.ci` files (we simply need the list of object files that
-make up the application), and it may help guaranteeing the coherence
-between the call-graph and stack usage information and the corresponding
-object files.
-
-The linker would merge (concatenate) the :file:`.ci` sections corresponding
-to the object files being linked into the final executable (including those
-coming from library files).
-
-GNATstack can later extract this section from the object files
-and use the information for the rest of the analysis. GNATstack
-uses the `objcopy` tool to extract the :file:`.ci` files.
-
-By default, GNATstack uses the native `objcopy` executable.
-It can be changed using the *-oc* option (see :ref:`Options_for_GNATstack`)::
-
-  $ powerpc-elf-gcc -c -fcallgraph-info=su main_unit.adb
-  $ powerpc-elf-objcopy --add-section .GNU.callgraph=main_unit.ci main_unit.o
-  $ gnatstack -oc=powerpc-elf-objcopy main_unit.o
-
-The section where the :file:`.ci` files are stored can also be changed, and
-GNATstack provides an option (*-s*, see :ref:`Options_for_GNATstack`) to specify
-this section::
-
-  $ gcc -c -fcallgraph-info=su main_unit.adb
-  $ objcopy --add-section my_section=main_unit.ci main_unit.o
-  $ gnatstack -s=my_section main_unit.o

@@ -29,7 +29,7 @@ following:
      Result : Data_Type;
   begin
      Result := Inverse (Data);
-  end Main_Unit;  
+  end Main_Unit;
 
 A typical project file would contain the flags to compile the
 application with the required options to generate stack consumption
@@ -74,6 +74,54 @@ point) -> `main_unit` (the main Ada program) ->
 `main_unit.inverse`. The maximum stack
 consumption following this path is 376 bytes, and this bound can be
 trusted.
+
+The same example is built and analyzed in the same way with an LLVM
+based toolchain. The project file names the two switches that toolchain
+needs and asks for a static link:
+
+.. code-block:: ada
+
+  project Prj is
+     for Main use ("main_unit.adb");
+     for Object_Dir use "obj";
+
+     package Compiler is
+        for Default_Switches ("Ada") use
+          ("-fexperimental-call-graph-section", "-fstack-size-section");
+     end Compiler;
+
+     package Linker is
+        for Default_Switches ("Ada") use ("-static");
+     end Linker;
+
+     package Stack is
+        for Switches use ("-p");
+     end Stack;
+  end Prj;
+
+The linked executable is decoded before the analysis, and the resulting
+:file:`.ci` file is passed to *gnatstack* explicitly, as explained in
+:ref:`LLVM_Based_Toolchains`::
+
+  $ gprbuild -P prj.gpr
+  [...]
+  $ llvm-callgraph-decoder obj/main_unit --ci > main_unit.ci
+  $ gnatstack -P prj.gpr main_unit.ci
+
+  Worst case analysis is *not* accurate because of external calls. Use -Wa for details.
+
+  Accumulated stack usage information for entry points
+
+  main : total 112 bytes
+   +-> main
+   +-> main_unit
+   +-> main_unit.inverse
+
+The worst-case path found is the same one. The total differs from the
+figure above because the two compilers do not allocate the same frames
+for this program. The warning concerns external calls elsewhere in the
+program: the path shown reaches none of them, which is why its total
+carries no "+?".
 
 Focusing on the capability of detecting problems related to the
 computation of stack requirements we can use the following example:
@@ -128,7 +176,9 @@ computation of stack requirements we can use the following example:
      Q;
   end P;
 
-To compile and analyze this program we do::
+To compile and analyze this program we do the following. This one is a
+GCC example, because it relies on the `da` marker, which an LLVM based
+toolchain does not provide::
 
   $ gcc -c ext.adb
   $ gprbuild p.adb -cargs -fcallgraph-info=su,da
@@ -200,9 +250,9 @@ the required flags). Finally, there is a list of locations where there
 is an indirect call.
 
 Looking at the information about entry points we can see that the
-computed stack requirements for the `main` entry point is 472
+computed stack requirement for the `main` entry point is 472
 bytes. However, this result is not accurate (as indicated by the mark
-`+?`), and we see that the two problems that have been found is
+`+?`), and we see that the two problems that have been found are
 the existence of cycles and unbounded frames.
 
 The call chain information provides more detailed information about

@@ -68,17 +68,17 @@ GNATstack can also perform four additional types of analysis:
   cycles represent potential recursion and hence potentially unbounded
   stack consumption.
 
-GNATstack aims at finding an upper-bound to stack usage by static 
-analysis techniques that give accurate results if some conditions are 
+GNATstack aims at finding an upper-bound to stack usage by static
+analysis techniques that give accurate results if some conditions are
 met, such as no indirect calls, no variable-sized local variable, no
 recursion and full access to the complete environment (including run-time
 and system calls). These conditions, and in particular the last one, are
 not easy to meet completely using the full Ada run-time libraries. When
-all these conditions are not met, there is still interesting information 
+all these conditions are not met, there is still interesting information
 that can be obtained about stack usage, but going all the way to find a
 reliable stack usage upper-bound may require a fair amount of manual work.
 
 GNATstack provides the infrastructure to allow users to
 specify in a text file the missing information, such as the
 potential targets for indirect calls, stack requirements for
-externals calls, and user-defined bounds for unbounded frames.
+external calls, and user-defined bounds for unbounded frames.
